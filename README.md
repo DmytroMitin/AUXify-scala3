@@ -1,8 +1,8 @@
 # AUXify-scala3
 
-Re-inplementing/re-launching https://github.com/DmytroMitin/AUXify for Scala 3 using:
+Re-implementing/re-launching https://github.com/DmytroMitin/AUXify for Scala 3 using:
 
-- quasiqotes for Scala 3:
+- quasiquotes for Scala 3:
 
   https://github.com/DmytroMitin/quasiquotes-scala3 
 
@@ -12,7 +12,7 @@ Re-inplementing/re-launching https://github.com/DmytroMitin/AUXify for Scala 3 u
 
   https://github.com/DmytroMitin/macroparadise-scala3
 
-when there is enough support from quasiquotes and macro-paradide.
+when there is enough support from quasiquotes and macro-paradise.
 
 Goals:
 
