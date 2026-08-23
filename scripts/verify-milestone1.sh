@@ -43,7 +43,7 @@ cat "$negative_log"
   fail "negativeUnsupported compiled successfully; the unsupported class was admitted"
 
 grep -Eiq \
-  'unsupported|not supported|rejected|target profile|RestrictedGenericTraitApply|requires .*trait.*found class' \
+  'requires .*trait.*found class|(target profile|handler).*(unsupported|not supported|rejected)|(unsupported|not supported|rejected)[[:space:]]+(target|target profile|profile|handler)' \
   "$negative_log" ||
   fail "negative diagnostic does not identify an unsupported or rejected target/profile"
 
@@ -53,9 +53,15 @@ grep -Eiq \
   fail "negative diagnostic does not identify the annotated target or handler path"
 
 if grep -Eiq \
-  '(^|[[:space:]])at (java|scala|dotty)\.|Exception in thread|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
   "$negative_log"; then
   fail "negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$negative_log"; then
+  fail "negative compile emitted an uncaught stack frame"
 fi
 
 mapfile -d '' build_config_sources < <(
@@ -77,6 +83,10 @@ for forbidden in \
   'RootProject'; do
   if grep -FnH -- "$forbidden" "${build_config_sources[@]}"; then
     fail "tracked build/config sources contain forbidden dependency source coupling: $forbidden"
+  else
+    grep_status=$?
+    [[ "$grep_status" -eq 1 ]] ||
+      fail "could not inspect tracked build/config sources for forbidden dependency source coupling"
   fi
 done
 
