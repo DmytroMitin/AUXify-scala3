@@ -14,11 +14,9 @@ private[internal] object ApplyDefinitionBuilder:
     val classNameTree = Type.Name(className)
     val typeParameterNameTree = Type.Name(typeParameterName)
     val typeParameter = tparam"$typeParameterNameTree"
-    val typeParameters = List(typeParameter)
     val target = t"$classNameTree[$typeParameterNameTree]"
 
-    q"def apply[..$typeParameters](using inst: $target): $target = inst"
-      .asInstanceOf[Defn.Def]
+    q"def apply[$typeParameter](using inst: $target): $target = inst"
 
   def lower(
       className: String,
