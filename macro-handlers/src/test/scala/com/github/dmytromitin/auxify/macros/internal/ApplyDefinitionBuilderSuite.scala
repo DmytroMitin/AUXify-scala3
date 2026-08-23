@@ -63,15 +63,11 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
   }
 
   test("Scala 3 quasiquote accepts the minimal dynamic definition splices") {
-    val typeParameter = Type.Param(
-      Nil,
-      Type.Name("X"),
-      Type.ParamClause(Nil),
-      Type.Bounds(None, None, Nil, Nil)
-    )
+    val className = Type.Name("Evidence")
+    val typeParameterName = Type.Name("X")
+    val typeParameter = tparam"$typeParameterName"
     val typeParameters = List(typeParameter)
-    val target: Type =
-      Type.Apply(Type.Name("Evidence"), Type.ArgClause(List(Type.Name("X"))))
+    val target = t"$className[$typeParameterName]"
 
     val definition =
       q"def apply[..$typeParameters](using inst: $target): $target = inst"

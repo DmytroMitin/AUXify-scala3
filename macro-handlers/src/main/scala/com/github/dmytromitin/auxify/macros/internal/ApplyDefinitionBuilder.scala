@@ -11,17 +11,11 @@ import scala.meta.dialects.Scala3
 @nowarn("cat=deprecation")
 private[internal] object ApplyDefinitionBuilder:
   def definition(className: String, typeParameterName: String): Defn.Def =
-    val typeParameter = Type.Param(
-      Nil,
-      Type.Name(typeParameterName),
-      Type.ParamClause(Nil),
-      Type.Bounds(None, None, Nil, Nil)
-    )
+    val classNameTree = Type.Name(className)
+    val typeParameterNameTree = Type.Name(typeParameterName)
+    val typeParameter = tparam"$typeParameterNameTree"
     val typeParameters = List(typeParameter)
-    val target: Type = Type.Apply(
-      Type.Name(className),
-      Type.ArgClause(List(Type.Name(typeParameterName)))
-    )
+    val target = t"$classNameTree[$typeParameterNameTree]"
 
     q"def apply[..$typeParameters](using inst: $target): $target = inst"
       .asInstanceOf[Defn.Def]
