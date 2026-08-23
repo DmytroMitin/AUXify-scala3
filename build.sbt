@@ -38,9 +38,13 @@ lazy val consumerSettings = Seq(
   libraryDependencies += compilerPlugin(macroParadisePlugin),
   Compile / scalacOptions ++= {
     val handlerJar = (macroHandlers / Compile / packageBin).value
+    val handlerDependencies =
+      (macroHandlers / Compile / dependencyClasspath).value.files
+    val handlerClasspath =
+      (handlerJar +: handlerDependencies).distinct
     Seq(
       "-Xplugin-require:macroparadise",
-      s"-P:macroparadise:handlerClasspath=${handlerJar.getAbsolutePath}"
+      s"-P:macroparadise:handlerClasspath=${handlerClasspath.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)}"
     )
   }
 )
@@ -49,6 +53,9 @@ lazy val integrationTests = project
   .in(file("integration-tests"))
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
+  .settings(
+    libraryDependencies += "org.scalameta" %% "munit" % munitVersion % Test
+  )
 
 lazy val negativeUnsupported = project
   .in(file("negative-unsupported"))
