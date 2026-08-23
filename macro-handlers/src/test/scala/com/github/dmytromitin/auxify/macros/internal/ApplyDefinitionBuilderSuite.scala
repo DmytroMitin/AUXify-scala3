@@ -131,6 +131,10 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
           assert(current.source.exists, clues(current))
           assertEquals(current.source.path, VirtualSourceName, clues(current))
           assert(current.span.exists, clues(current))
+          current match
+            case definition: untpd.DefTree =>
+              definition.mods.annotations.foreach(annotation => traverse(annotation))
+            case _ => ()
           traverseChildren(current)
     traverser.traverse(tree)
 
