@@ -29,7 +29,8 @@ lazy val macroHandlers = project
     libraryDependencies ++= Seq(
       macroParadiseApi,
       quasiquotesDottyInternal,
-      "org.scalameta" %% "scalameta" % scalaMetaVersion
+      "org.scalameta" %% "scalameta" % scalaMetaVersion,
+      "org.scalameta" %% "munit" % munitVersion % Test
     )
   )
 
