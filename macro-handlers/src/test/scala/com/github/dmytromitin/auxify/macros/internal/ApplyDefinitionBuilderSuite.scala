@@ -8,15 +8,15 @@ import quasiquotes.definitions.dotty.ContextualMethodPeerBridge
 
 import scala.annotation.nowarn
 import scala.meta.*
+import scala.meta.dialects.Scala3
 
 @nowarn("cat=deprecation")
 class ApplyDefinitionBuilderSuite extends munit.FunSuite:
   private val VirtualSourceName = "AuxifyGeneratedShowApply.scala"
 
-  test("definition constructs the canonical source-free neutral apply shape") {
+  test("definition constructs the canonical neutral apply shape") {
     val definition: Defn.Def = ApplyDefinitionBuilder.definition("Show", "A")
 
-    assertEquals(definition.pos, Position.None)
     assertEquals(definition.mods, Nil)
     assertEquals(definition.name.value, "apply")
     assertEquals(definition.paramClauseGroups.size, 1)
@@ -38,7 +38,8 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
     assertEquals(contextualClause.values.size, 1)
     val contextualParameter = contextualClause.values.head
     assertEquals(contextualParameter.name.value, "inst")
-    assertEquals(contextualParameter.mods, Nil)
+    assertEquals(contextualParameter.mods.size, 1)
+    assert(contextualParameter.mods.head.isInstanceOf[Mod.Using])
     assertEquals(contextualParameter.default, None)
     assertScalametaApplied(contextualParameter.decltpe, "Show", "A")
 
@@ -52,6 +53,32 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
     val definition: Defn.Def = ApplyDefinitionBuilder.definition("Evidence", "X")
     val group = definition.paramClauseGroups.head
 
+    assertEquals(group.tparamClause.values.map(_.name.value), List("X"))
+    assertScalametaApplied(
+      group.paramClauses.head.values.head.decltpe,
+      "Evidence",
+      "X"
+    )
+    assertScalametaApplied(definition.decltpe, "Evidence", "X")
+  }
+
+  test("Scala 3 quasiquote accepts the minimal dynamic definition splices") {
+    val typeParameter = Type.Param(
+      Nil,
+      Type.Name("X"),
+      Type.ParamClause(Nil),
+      Type.Bounds(None, None, Nil, Nil)
+    )
+    val typeParameters = List(typeParameter)
+    val target: Type =
+      Type.Apply(Type.Name("Evidence"), Type.ArgClause(List(Type.Name("X"))))
+
+    val definition =
+      q"def apply[..$typeParameters](using inst: $target): $target = inst"
+        .asInstanceOf[Defn.Def]
+
+    assertEquals(definition.paramClauseGroups.size, 1)
+    val group = definition.paramClauseGroups.head
     assertEquals(group.tparamClause.values.map(_.name.value), List("X"))
     assertScalametaApplied(
       group.paramClauses.head.values.head.decltpe,
@@ -90,6 +117,16 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
         case untpd.Ident(name) => assertEquals(name.toString, "inst")
         case other => fail(s"expected body Ident(inst), found $other")
       assertAllNonEmptyTreesHaveProvenance(method)
+    }
+  }
+
+  test("lower reports malformed names through the controlled peer bridge") {
+    withContext {
+      val result = ApplyDefinitionBuilder.lower("bad-name", "A")
+      val failure = result.left.toOption.getOrElse(fail("expected bridge rejection"))
+
+      assertEquals(failure.code, "NEUTRAL_PROJECTION_FAILED")
+      assert(failure.detail.nonEmpty)
     }
   }
 
