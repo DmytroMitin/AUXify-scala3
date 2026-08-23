@@ -76,7 +76,12 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
       assertEquals(lowered.virtualSourceName, VirtualSourceName)
       assertEquals(method.name.toString, "apply")
       assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
-      val contextual = method.trailingParamss.head.head.asInstanceOf[untpd.ValDef]
+      assertEquals(method.trailingParamss.size, 1)
+      val contextualClause = method.trailingParamss.head
+      assertEquals(contextualClause.size, 1)
+      val contextual = contextualClause.head match
+        case value: untpd.ValDef => value
+        case other => fail(s"expected contextual parameter ValDef, found $other")
       assertEquals(contextual.name.toString, "inst")
       assertEquals(contextual.mods.flags, Flags.Param | Flags.Given)
       assertUntypedApplied(contextual.tpt, "Show", "A")
@@ -84,11 +89,7 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
       method.rhs match
         case untpd.Ident(name) => assertEquals(name.toString, "inst")
         case other => fail(s"expected body Ident(inst), found $other")
-      nonEmptyTrees(method).foreach { tree =>
-        assert(tree.source.exists, clues(tree))
-        assertEquals(tree.source.path, VirtualSourceName, clues(tree))
-        assert(tree.span.exists, clues(tree))
-      }
+      assertAllNonEmptyTreesHaveProvenance(method)
     }
   }
 
@@ -121,23 +122,17 @@ class ApplyDefinitionBuilderSuite extends munit.FunSuite:
         assertEquals(actualArgument.toString, argument)
       case other => fail(s"expected AppliedTypeTree($constructor, $argument), found $other")
 
-  private def nonEmptyTrees(
+  private def assertAllNonEmptyTreesHaveProvenance(
       tree: untpd.Tree
-  )(using Context): Vector[untpd.Tree] =
-    if tree.isEmpty then Vector.empty
-    else tree +: directChildren(tree).flatMap(nonEmptyTrees)
-
-  private def directChildren(
-      tree: untpd.Tree
-  )(using Context): Vector[untpd.Tree] =
-    tree match
-      case value: untpd.DefDef =>
-        value.paramss.flatten.toVector ++ Vector(value.tpt, value.rhs)
-      case value: untpd.TypeDef => Vector(value.rhs)
-      case value: untpd.TypeBoundsTree => Vector(value.lo, value.hi)
-      case value: untpd.ValDef => Vector(value.tpt, value.rhs)
-      case value: untpd.AppliedTypeTree => value.tpt +: value.args.toVector
-      case _ => Vector.empty
+  )(using Context): Unit =
+    val traverser = new untpd.UntypedTreeTraverser:
+      override def traverse(current: untpd.Tree)(using Context): Unit =
+        if !current.isEmpty then
+          assert(current.source.exists, clues(current))
+          assertEquals(current.source.path, VirtualSourceName, clues(current))
+          assert(current.span.exists, clues(current))
+          traverseChildren(current)
+    traverser.traverse(tree)
 
   private def withContext[A](run: Context ?=> A): A =
     val base = new ContextBase
