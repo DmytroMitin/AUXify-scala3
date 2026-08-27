@@ -105,13 +105,15 @@ The preferred external `build.sbt` is:
 enablePlugins(macroparadise.sbt.MacroParadisePrecompiledPlugin)
 
 scalaVersion := "3.8.4"
+val auxifyVersion = "0.1.0-SNAPSHOT"
 
 macroParadiseMarkerModules := Seq(
-  "com.github.dmytromitin" %% "macroannotations" % "0.1.0-SNAPSHOT"
+  "com.github.dmytromitin" %% "auxify-scala3-macro-annotations" % auxifyVersion
 )
 
 macroParadiseHandlerModules := Seq(
-  "com.github.dmytromitin" %% "macrohandlers" % "0.1.0-SNAPSHOT"
+  ("com.github.dmytromitin" % "auxify-scala3-macro-handlers" % auxifyVersion)
+    .cross(CrossVersion.full)
 )
 ```
 
@@ -131,6 +133,15 @@ The plugin is generic Macro-Paradise tooling. AUXify does not currently provide
 an AUXify-specific sbt plugin, and the external build should not duplicate the
 derived `scalacOptions` manually while this plugin is enabled.
 
+The compiler product version/module settings and the AUXify marker and handler
+module settings are ordinary build inputs and may be overridden within the
+generic plugin's supported contract. Advanced builds may also append labelled
+entries through `macroParadiseAdditionalHandlerClasspath`. In contrast,
+`macroParadiseExternalArtifactIdentity` is derived output in supported
+AutoPlugin mode and is not an arbitrary identity setting to replace. Builds
+that need complete ownership of these mechanics should avoid or disable the
+AutoPlugin and use the manual path below.
+
 ### Manual wiring / escape hatch and architecture reference
 
 When the source-built sbt plugin is unavailable or deliberately disabled, the
@@ -149,6 +160,7 @@ import java.nio.file.Files
 import java.security.MessageDigest
 
 ThisBuild / scalaVersion := "3.8.4"
+val auxifyVersion = "0.1.0-SNAPSHOT"
 
 lazy val AuxifyHandler = config("auxifyHandler").hide
 
@@ -166,12 +178,13 @@ lazy val root = project
   .configs(AuxifyHandler)
   .settings(
     libraryDependencies ++= Seq(
-      "com.github.dmytromitin" %% "macroannotations" % "0.1.0-SNAPSHOT",
+      "com.github.dmytromitin" %% "auxify-scala3-macro-annotations" % auxifyVersion,
       compilerPlugin(
         ("com.github.dmytromitin" % "macroparadise-scala3-plugin" % "0.1.1-SNAPSHOT")
           .cross(CrossVersion.full)
       ),
-      ("com.github.dmytromitin" %% "macrohandlers" % "0.1.0-SNAPSHOT") % AuxifyHandler
+      (("com.github.dmytromitin" % "auxify-scala3-macro-handlers" % auxifyVersion)
+        .cross(CrossVersion.full)) % AuxifyHandler
     ),
     Compile / scalacOptions ++= {
       val handlerClasspath = (Compile / update).value
@@ -180,10 +193,10 @@ lazy val root = project
         .distinct
       val markerJar = (Compile / dependencyClasspath).value.files
         .map(_.getCanonicalFile)
-        .find(_.getName.startsWith("macroannotations_3"))
+        .find(_.getName.startsWith("auxify-scala3-macro-annotations_3"))
         .getOrElse(sys.error("AUXify marker JAR was not resolved"))
       val handlerJar = handlerClasspath
-        .find(_.getName.startsWith("macrohandlers_3"))
+        .find(_.getName.startsWith("auxify-scala3-macro-handlers_3.8.4"))
         .getOrElse(sys.error("AUXify handler JAR was not resolved"))
 
       Seq(
@@ -202,17 +215,25 @@ lazy val root = project
 The dependencies are separate because compilation uses three different
 classpaths:
 
-- `macroannotations_3` is an ordinary compile dependency. User source imports
+- `auxify-scala3-macro-annotations_3` is an ordinary binary-crossed compile
+  dependency. User source imports
   `com.github.dmytromitin.auxify.macros.apply` from this JAR, which contains the
-  annotation marker and its runtime-retained handler metadata.
+  annotation marker and its runtime-retained handler metadata. Its packaged
+  class exposes no Dotty compiler type: it extends Scala's annotation base and
+  carries the Java `@expander` metadata descriptor, so ordinary Scala-3 binary
+  crossing remains appropriate.
 - `macroparadise-scala3-plugin_3.8.4` is loaded by the Scala compiler through
   `compilerPlugin(...)`. `CrossVersion.full` is required because the compiler
   plugin is tied to the exact Scala 3 compiler line, not only Scala's binary
   version.
-- `macrohandlers_3` contains AUXify's precompiled annotation-handler
-  implementation. Macro-Paradise needs it while compiling annotated source,
-  but the application does not use it as an ordinary compile or runtime
-  dependency.
+- `auxify-scala3-macro-handlers_3.8.4` contains AUXify's exact-full-cross
+  precompiled annotation-handler implementation. Its public JVM descriptors
+  and implementation directly reference Dotty `Context`/raw trees, the exact
+  Macro-Paradise handler API, and exact Quasiquotes lowering. Separate compiler
+  lines therefore need separate module coordinates rather than overwriting one
+  `_3` module/version. Macro-Paradise needs this artifact while compiling
+  annotated source, but the application does not use it as an ordinary compile
+  or runtime dependency.
 
 #### The hidden handler dependency configuration
 
@@ -224,7 +245,7 @@ transitive dependency closure without putting that closure into the ordinary
 application `Compile` or `Runtime` dependency graph.
 
 `.configs(AuxifyHandler)` attaches the custom configuration to this project,
-and `% AuxifyHandler` places `macrohandlers_3` in it rather than in ordinary
+and `% AuxifyHandler` places the full-cross AUXify handler in it rather than in ordinary
 `Compile`. `.hide` keeps the configuration out of normal user-facing
 configuration delegation and aggregation surfaces. It does not encrypt,
 sandbox, shade, or otherwise transform any JAR.
@@ -275,7 +296,8 @@ that first clean build. A clean-build-only setup can omit the helper, the
 `markerJar`/`handlerJar` lookups, and the identity option together.
 
 After compilation, the generated result is ordinary Scala code. The verified
-external consumer runs without `macrohandlers_3` on `Runtime / fullClasspath`:
+external consumer runs without `auxify-scala3-macro-handlers_3.8.4` on
+`Runtime / fullClasspath`:
 the handler is a compilation-time transformation implementation, not an
 application service.
 
@@ -285,9 +307,14 @@ The generic Macro-Paradise sbt plugin now supplies the preferred convenience
 path while the explicit block above preserves the real
 marker/compiler-plugin/handler/runtime and Zinc reference contract. A separate
 AUXify sbt plugin is not currently required merely to wrap the two AUXify
-coordinates. Stable remote plugin coordinates, broader BSP qualification, and
-release-grade dependency availability remain future work; the source-built
-development proof does not imply any of them.
+coordinates. Reconsider one only if future evidence produces meaningful
+AUXify-owned build policy—such as multiple handler bundles, feature selection,
+cross-version coordination, or migration tooling—that cannot be expressed
+cleanly through the generic settings. The peer has qualified its source-built
+plugin in persistent sbt BSP sessions for exact Scala 3.3.8 and 3.8.4, but
+stable remote plugin coordinates and release-grade dependency availability
+remain future work; AUXify's own development proof remains the exact 3.8.4
+consumer documented here.
 
 For example, `src/main/scala/ShowApp.scala` can contain:
 

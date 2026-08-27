@@ -7,6 +7,9 @@ val quasiquotesVersion = "0.2.0"
 val scalaMetaVersion = "4.17.3"
 val munitVersion = "1.0.4"
 
+lazy val verifyPublicModuleCoordinates =
+  taskKey[Unit]("Verify public AUXify module names and cross-version policy")
+
 val macroParadiseApi =
   ("com.github.dmytromitin" % "macroparadise-scala3-plugin-api" % macroParadiseVersion)
     .cross(CrossVersion.full)
@@ -21,11 +24,19 @@ val quasiquotesDottyInternal =
 
 lazy val macroAnnotations = project
   .in(file("macro-annotations"))
-  .settings(libraryDependencies += macroParadiseApi)
+  .settings(
+    name := "AUXify Scala 3 Macro Annotations",
+    moduleName := "auxify-scala3-macro-annotations",
+    crossVersion := CrossVersion.binary,
+    libraryDependencies += macroParadiseApi
+  )
 
 lazy val macroHandlers = project
   .in(file("macro-handlers"))
   .settings(
+    name := "AUXify Scala 3 Macro Handlers",
+    moduleName := "auxify-scala3-macro-handlers",
+    crossVersion := CrossVersion.full,
     libraryDependencies ++= Seq(
       macroParadiseApi,
       quasiquotesDottyInternal,
@@ -65,4 +76,48 @@ lazy val negativeUnsupported = project
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)
-  .settings(publish / skip := true)
+  .settings(
+    publish / skip := true,
+    verifyPublicModuleCoordinates := {
+      val markerModule = (macroAnnotations / moduleName).value
+      val handlerModule = (macroHandlers / moduleName).value
+      val markerCross = (macroAnnotations / crossVersion).value
+      val handlerCross = (macroHandlers / crossVersion).value
+      val markerArtifact =
+        (macroAnnotations / Compile / packageBin / artifactPath).value.getName
+      val handlerArtifact =
+        (macroHandlers / Compile / packageBin / artifactPath).value.getName
+
+      require(
+        markerModule == "auxify-scala3-macro-annotations",
+        s"unexpected public marker module: $markerModule"
+      )
+      require(
+        handlerModule == "auxify-scala3-macro-handlers",
+        s"unexpected public handler module: $handlerModule"
+      )
+      require(
+        markerCross == CrossVersion.binary,
+        s"marker must remain Scala-3 binary cross, found $markerCross"
+      )
+      require(
+        handlerCross == CrossVersion.full,
+        s"handler must use exact full cross, found $handlerCross"
+      )
+      require(
+        markerArtifact.startsWith("auxify-scala3-macro-annotations_3-"),
+        s"unexpected public marker artifact: $markerArtifact"
+      )
+      require(
+        handlerArtifact.startsWith("auxify-scala3-macro-handlers_3.8.4-"),
+        s"unexpected public handler artifact: $handlerArtifact"
+      )
+      require(
+        !Seq(markerModule, handlerModule).exists(Set("macroannotations", "macrohandlers")),
+        "old generic AUXify modules remain configured"
+      )
+      streams.value.log.info(
+        s"AUXIFY_PUBLIC_MODULE_COORDINATES_PASS marker=$markerArtifact handler=$handlerArtifact"
+      )
+    }
+  )

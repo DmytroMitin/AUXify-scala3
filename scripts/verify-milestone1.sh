@@ -24,6 +24,7 @@ java_feature="$({
 [[ "$java_feature" == "25" ]] ||
   fail "Java feature version 25 is required; found ${java_feature:-unknown}"
 
+sbt -batch verifyPublicModuleCoordinates
 sbt -batch 'macroHandlers / Test / test'
 sbt -batch 'integrationTests / Test / test'
 
