@@ -43,11 +43,15 @@ artifacts below are development artifacts: AUXify, Macro-Paradise 0.1.1-SNAPSHOT
 and the required Quasiquotes integration are not claimed to be available from a
 remote artifact repository.
 
-From an AUXify checkout, first prepare the pinned Macro-Paradise and Quasiquotes
-artifacts and publish the AUXify marker and handler to the local Ivy repository:
+### Preferred development setup with the Macro-Paradise sbt plugin
+
+From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API and
+Quasiquotes artifacts, publish the source-built Macro-Paradise sbt integration,
+and publish the AUXify marker and handler to the local Ivy repository:
 
 ```sh
 ./scripts/prepare-ci-dependencies.sh
+./scripts/prepare-macroparadise-sbt-integration.sh
 sbt -batch "macroAnnotations/publishLocal" "macroHandlers/publishLocal"
 ```
 
@@ -56,6 +60,18 @@ reproducible helper for this local-development setup. It clones the exact pinned
 public Macro-Paradise and Quasiquotes revisions into disposable temporary
 directories, verifies those revisions, and publishes only the peer artifacts
 that AUXify currently consumes into the local repository.
+
+`prepare-macroparadise-sbt-integration.sh` separately clones the exact committed
+source that contains Macro-Paradise's generic sbt integration, verifies its sbt
+1.x/Scala 2.12 dependency and local-publication policy, and runs `publishLocal`
+inside that source build. The integration is currently source-built and
+unreleased: the local-development step is required because no remote
+`sbt-macroparadise` coordinate is claimed.
+
+The compiler-product source pin intentionally remains independent of the newer
+sbt-integration source pin. The sbt plugin selects Macro-Paradise compiler/API
+version `0.1.1-SNAPSHOT` through exact full-cross modules; the verified mixed
+setup does not require an opportunistic compiler-product source upgrade.
 
 The two sbt tasks then publish AUXify's own modules locally:
 
@@ -75,7 +91,56 @@ Pin sbt in the external project's `project/build.properties`:
 sbt.version=1.12.15
 ```
 
-Use this `build.sbt` in that separate project:
+Enable the locally published generic plugin in `project/plugins.sbt`:
+
+```scala
+addSbtPlugin(
+  "com.github.dmytromitin" % "sbt-macroparadise" % "0.1.1-SNAPSHOT"
+)
+```
+
+The preferred external `build.sbt` is:
+
+```scala
+enablePlugins(macroparadise.sbt.MacroParadisePrecompiledPlugin)
+
+scalaVersion := "3.8.4"
+
+macroParadiseMarkerModules := Seq(
+  "com.github.dmytromitin" %% "macroannotations" % "0.1.0-SNAPSHOT"
+)
+
+macroParadiseHandlerModules := Seq(
+  "com.github.dmytromitin" %% "macrohandlers" % "0.1.0-SNAPSHOT"
+)
+```
+
+### What the Macro-Paradise sbt plugin does
+
+The two module settings preserve the same three roles as the original manual
+proof. The marker modules become ordinary consumer dependencies. The plugin
+selects exactly one full-cross Macro-Paradise compiler plugin, resolves handler
+modules and their complete transitive closure through a hidden configuration,
+and derives the fail-closed plugin requirement, platform-correct
+`handlerClasspath`, and content-sensitive `externalArtifactIdentity` compiler
+options. The identity covers the explicit marker artifacts and complete ordered
+effective handler classpath; it is generated build-invalidation input, not an
+authentication or security claim.
+
+The plugin is generic Macro-Paradise tooling. AUXify does not currently provide
+an AUXify-specific sbt plugin, and the external build should not duplicate the
+derived `scalacOptions` manually while this plugin is enabled.
+
+### Manual wiring / escape hatch and architecture reference
+
+When the source-built sbt plugin is unavailable or deliberately disabled, the
+following explicit setup remains the supported manual escape hatch. It is also
+the executable reference for the marker/compiler-plugin/handler/runtime and
+Zinc boundaries hidden by the preferred plugin-backed setup. Manual users need
+`prepare-ci-dependencies.sh` plus the two AUXify `publishLocal` tasks above, but
+do not need to prepare `sbt-macroparadise`.
+
+Use this `build.sbt` in the separate project:
 
 ```scala
 import java.io.File
@@ -214,16 +279,15 @@ external consumer runs without `macrohandlers_3` on `Runtime / fullClasspath`:
 the handler is a compilation-time transformation implementation, not an
 application service.
 
-### Future build-tool ergonomics
+### Remaining build-tool ergonomics
 
-The current build is intentionally explicit because it proves the real marker,
-compiler-plugin, handler-classloader, runtime, and Zinc boundaries. A future
-AUXify sbt plugin could reduce the user setup to a small setting or plugin
-enablement. Generic external-handler wiring may instead belong in a future
-Macro-Paradise sbt plugin; if both exist, AUXify should compose with that
-generic support and add only AUXify-specific artifacts and defaults rather than
-reimplementing the same mechanics. No such plugin API is promised or
-implemented yet.
+The generic Macro-Paradise sbt plugin now supplies the preferred convenience
+path while the explicit block above preserves the real
+marker/compiler-plugin/handler/runtime and Zinc reference contract. A separate
+AUXify sbt plugin is not currently required merely to wrap the two AUXify
+coordinates. Stable remote plugin coordinates, broader BSP qualification, and
+release-grade dependency availability remain future work; the source-built
+development proof does not imply any of them.
 
 For example, `src/main/scala/ShowApp.scala` can contain:
 
