@@ -24,7 +24,21 @@ milestone. The current proof is specific to Scala 3.8.4 on JDK 25.
 | `@delegated` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` | Characterized / not yet implemented | Not part of the supported product milestone |
-| `@poly` | Experimental / not parity-blocking | The Scala 2 README mentioned it, but the old implementation did not deliver it |
+| `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
+
+Scala 2 AUXify never implemented `@poly`; its planned target was an adapter
+from an AUXify type class to Shapeless `Poly1` / `Poly2` case dispatch, where
+separate `Case.Aux` instances could select different implementations and
+result types. Shapeless 3 currently does not provide that counterpart.
+Standard Scala 3 polymorphic function types such as `[A] => List[A] => List[A]`
+are parametric function values, not a direct replacement for that ad-hoc case
+lookup model.
+
+The annotation can be reconsidered if a suitable Scala 3 library abstraction
+emerges, or if an independently justified abstraction is later designed in
+AUXify or, preferably when it has broader value, a separate reusable project.
+That prerequisite is a future design option, not a commitment by AUXify to
+build it.
 
 The supported `@apply` slice and its dependencies remain development,
 local-source-built artifacts. They are not claimed to be stable or available
