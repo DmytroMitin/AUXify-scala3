@@ -13,6 +13,33 @@ milestone. The current proof is specific to Scala 3.8.4 on JDK 25.
   Scala 2 implementation whose delivered macro annotations define the main
   parity target.
 
+## Annotation status
+
+| Annotation | Public status | Current boundary |
+| --- | --- | --- |
+| Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified only for exact Scala 3.8.4 on JDK 25 |
+| Full `@apply` for the path-dependent/refined `Add.Out` form | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@delegated` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
+| `@self` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@poly` | Experimental / not parity-blocking | The Scala 2 README mentioned it, but the old implementation did not deliver it |
+
+The supported `@apply` slice and its dependencies remain development,
+local-source-built artifacts. They are not claimed to be stable or available
+from a remote artifact repository.
+
+### Development module coordinates
+
+- Marker: `com.github.dmytromitin:auxify-scala3-macro-annotations_3:0.1.0-SNAPSHOT`
+  — Scala 3 binary-crossed (`_3`).
+- Handler: `com.github.dmytromitin:auxify-scala3-macro-handlers_3.8.4:0.1.0-SNAPSHOT`
+  — exact-full-cross (`_3.8.4`) because it participates in the
+  compiler-sensitive handler universe.
+
+Both coordinates are development/local-only at this stage.
+
 For a supported generic trait such as:
 
 ```scala
