@@ -6,7 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
-macro_paradise_commit="27239301848d61bd91510edba0b751051e4760a7"
+macro_paradise_commit="939f8fc900e9be3fba0306a9210ddbd82c3d20da"
 quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
 quasiquotes_commit="d5ea5a19a068900383b09b59abafd1f905c23c59"
 scala_version="3.8.4"
