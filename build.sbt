@@ -3,7 +3,7 @@ ThisBuild / organization := "com.github.dmytromitin"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
 val macroParadiseVersion = "0.1.1-SNAPSHOT"
-val quasiquotesVersion = "0.2.0"
+val quasiquotesVersion = "0.3.0-SNAPSHOT"
 val scalaMetaVersion = "4.17.3"
 val munitVersion = "1.0.4"
 
