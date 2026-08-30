@@ -16,15 +16,18 @@ class ApplyAddOutBridgeConsumerSuite extends munit.FunSuite:
   test("input 037 lowers the canonical bounded Add.Out method with exact topology and provenance") {
     withContext {
       assertLowered(
-        definition("apply", "N", "M", "Nat", "Add", "inst", "Out"),
-        "AuxifyGeneratedAddApply.scala",
+        ApplyDefinitionBuilder.FullShape(
+          typeClassName = "Add",
+          firstTypeParameterName = "N",
+          secondTypeParameterName = "M",
+          upperBoundTypeName = "Nat",
+          resultTypeMemberName = "Out"
+        ),
         "def apply[N <: Nat, M <: Nat](using inst: Add[N, M]): Add[N, M] { type Out = inst.Out } = inst",
-        "apply",
         "N",
         "M",
         "Nat",
         "Add",
-        "inst",
         "Out"
       )
     }
@@ -33,23 +36,18 @@ class ApplyAddOutBridgeConsumerSuite extends munit.FunSuite:
   test("input 037 lowers independently renamed legal binders and members") {
     withContext {
       assertLowered(
-        definition(
-          "derive",
-          "Left",
-          "Right",
-          "Natural",
-          "Combine",
-          "evidence",
-          "Result"
+        ApplyDefinitionBuilder.FullShape(
+          typeClassName = "Combine",
+          firstTypeParameterName = "Left",
+          secondTypeParameterName = "Right",
+          upperBoundTypeName = "Natural",
+          resultTypeMemberName = "Result"
         ),
-        "AuxifyGeneratedCombineApply.scala",
-        "def derive[Left <: Natural, Right <: Natural](using evidence: Combine[Left, Right]): Combine[Left, Right] { type Result = evidence.Result } = evidence",
-        "derive",
+        "def apply[Left <: Natural, Right <: Natural](using inst: Combine[Left, Right]): Combine[Left, Right] { type Result = inst.Result } = inst",
         "Left",
         "Right",
         "Natural",
         "Combine",
-        "evidence",
         "Result"
       )
     }
@@ -78,52 +76,28 @@ class ApplyAddOutBridgeConsumerSuite extends munit.FunSuite:
     }
   }
 
-  private def definition(
-      methodName: String,
-      firstTypeParameterName: String,
-      secondTypeParameterName: String,
-      upperBoundName: String,
-      constructorName: String,
-      contextualParameterName: String,
-      memberName: String
-  ): Defn.Def =
-    val method = Term.Name(methodName)
-    val firstName = Type.Name(firstTypeParameterName)
-    val secondName = Type.Name(secondTypeParameterName)
-    val upperBound = Type.Name(upperBoundName)
-    val constructor = Type.Name(constructorName)
-    val contextualName = Term.Name(contextualParameterName)
-    val selectedMember = Type.Name(memberName)
-    val first: Type.Param = tparam"$firstName <: $upperBound"
-    val second: Type.Param = tparam"$secondName <: $upperBound"
-    val applied: Type = t"$constructor[..${List(firstName, secondName)}]"
-    val selected: Type = t"$contextualName.$selectedMember"
-    val refined: Type = t"$applied { type $selectedMember = $selected }"
-
-    q"def $method[..${List(first, second)}](using $contextualName: $applied): $refined = $contextualName"
-
   private def assertLowered(
-      definition: Defn.Def,
-      virtualSourceName: String,
+      shape: ApplyDefinitionBuilder.FullShape,
       expectedGeneratedSource: String,
-      methodName: String,
       firstTypeParameterName: String,
       secondTypeParameterName: String,
       upperBoundName: String,
       constructorName: String,
-      contextualParameterName: String,
       memberName: String
   )(using Context): Unit =
+    val definition: Defn.Def = ApplyDefinitionBuilder.fullDefinition(shape)
     val lowered: ContextualMethodPeerBridge.Lowered =
-      ContextualMethodPeerBridge
-        .lower(definition, virtualSourceName)
+      ApplyDefinitionBuilder
+        .lowerFull(shape)
         .fold(failure => fail(s"${failure.code}: ${failure.detail}"), identity)
     val method: untpd.DefDef = lowered.tree
+    val virtualSourceName = s"AuxifyGenerated${shape.typeClassName}Apply.scala"
 
     assertEquals(lowered.generatedSource, expectedGeneratedSource)
+    assertEquals(definition.name.value, "apply")
     assertEquals(lowered.virtualSourceName, virtualSourceName)
     assertEquals(method.source.path, virtualSourceName)
-    assertEquals(method.name.toString, methodName)
+    assertEquals(method.name.toString, "apply")
     assertEquals(method.mods.flags, Flags.Method)
     assertEquals(
       method.leadingTypeParams.map(_.name.toString),
@@ -142,7 +116,7 @@ class ApplyAddOutBridgeConsumerSuite extends munit.FunSuite:
     val contextual = method.trailingParamss match
       case List(List(value: untpd.ValDef)) => value
       case other => fail(s"expected one contextual parameter, found $other")
-    assertEquals(contextual.name.toString, contextualParameterName)
+    assertEquals(contextual.name.toString, "inst")
     assertEquals(contextual.mods.flags, Flags.Param | Flags.Given)
     assertApplied(
       contextual.tpt,
@@ -162,14 +136,14 @@ class ApplyAddOutBridgeConsumerSuite extends munit.FunSuite:
         assertEquals(member.name.toString, memberName)
         member.rhs match
           case untpd.Select(untpd.Ident(prefix), selected) =>
-            assertEquals(prefix.toString, contextualParameterName)
+            assertEquals(prefix.toString, "inst")
             assertEquals(selected.toString, memberName)
           case other => fail(s"expected selected type alias, found $other")
       case other => fail(s"expected one-member RefinedTypeTree, found $other")
 
     method.rhs match
-      case untpd.Ident(name) => assertEquals(name.toString, contextualParameterName)
-      case other => fail(s"expected body Ident($contextualParameterName), found $other")
+      case untpd.Ident(name) => assertEquals(name.toString, "inst")
+      case other => fail(s"expected body Ident(inst), found $other")
 
     assertProvenance(method, virtualSourceName, lowered.generatedSource.length)
 
