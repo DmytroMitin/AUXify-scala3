@@ -1,8 +1,8 @@
 # AUXify-scala3
 
-AUXify-scala3 currently provides experimental first Scala 3 `@apply` and
-`@self` development milestones. The current proof is specific to Scala 3.8.4
-on JDK 25.
+AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@self`,
+and `@delegated` development milestones. The current proof is specific to
+Scala 3.8.4 on JDK 25.
 
 ## Related projects
 
@@ -22,7 +22,7 @@ on JDK 25.
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified only for exact Scala 3.8.4 on JDK 25 |
 | `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
-| `@delegated` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -41,9 +41,9 @@ AUXify or, preferably when it has broader value, a separate reusable project.
 That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
-The supported `@apply` and `@self` slices and their dependencies remain development,
-local-source-built artifacts. They are not claimed to be stable or available
-from a remote artifact repository.
+The supported `@apply`, `@self`, and `@delegated` slices and their dependencies
+remain development, local-source-built artifacts. They are not claimed to be
+stable or available from a remote artifact repository.
 
 ### Development module coordinates
 
@@ -103,6 +103,38 @@ preserved, so a renamed `Combine[L <: Natural, R <: Natural]` with abstract
 multiple result members, aliases, modifiers, and differing or complex bounds
 remain outside this first slice.
 
+The first supported `@delegated` slice is:
+
+```scala
+import com.github.dmytromitin.auxify.macros.delegated
+
+@delegated
+trait Show[A]:
+  def show(a: A): String
+```
+
+It conceptually adds this direct companion forwarder:
+
+```scala
+def show[A](a: A)(using inst: Show[A]): String = inst.show(a)
+```
+
+The evidence name is generated deterministically and avoids the ordinary
+parameter name; its exact spelling is not a compatibility contract. This slice
+requires exactly one invariant unbounded enclosing type parameter and exactly
+one public, abstract, unannotated direct method. That method must have no
+method-owned type parameters, exactly one ordinary clause containing exactly
+one non-defaulted unmodified parameter whose type is the enclosing type
+parameter, and one simple unqualified named result type. The generated method
+adds a final `using` instance and delegates directly to the same method name.
+A direct same-name companion member is preserved under the current bounded
+syntactic conflict policy, so no generated overload is added in that case.
+
+Additional methods or clauses, method-owned type parameters, contextual or
+default parameters, overloads, applied/qualified/function/path-dependent
+results, abstract-member result rewriting, and wider historical forwarding
+semantics remain later parity work.
+
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
 ```scala
@@ -129,7 +161,7 @@ controlled conflict. This first slice intentionally exposes no annotation
 arguments: historical `lowerBound` / `fBound` options, generic traits, and
 class or object targets remain later parity work.
 
-## Using `@apply` from an sbt project
+## Using supported annotations from an sbt project
 
 The current external-consumer proof is exact Scala 3.8.4 on JDK 25. All of the
 artifacts below are development artifacts: AUXify, Macro-Paradise 0.1.1-SNAPSHOT,
@@ -412,7 +444,7 @@ consumer documented here.
 For example, `src/main/scala/ShowApp.scala` can contain:
 
 ```scala
-import com.github.dmytromitin.auxify.macros.apply
+import com.github.dmytromitin.auxify.macros.{apply, delegated}
 
 @apply
 trait Show[A]:
@@ -422,9 +454,18 @@ object Show:
   given Show[String] with
     def show(a: String): String = a
 
+@delegated
+trait Render[A]:
+  def render(a: A): String
+
+object Render:
+  given Render[Int] with
+    def render(a: Int): String = a.toString
+
 object ShowApp:
   def main(args: Array[String]): Unit =
     println(Show[String].show("external"))
+    println(Render.render(42))
 ```
 
 Run it with `sbt -batch run`.
@@ -446,3 +487,7 @@ either the one-invariant-unbounded-parameter simple shape or the exact
 two-common-simple-upper-bound / one-abstract-result-member full shape described
 above. This milestone does not claim arbitrary type-class derivation or full
 historical `@apply` parity.
+
+The verified `@delegated` target is likewise only the one-unbounded-parameter,
+one-public-abstract-method shape documented above; the external example does
+not imply full historical `@delegated` parity.

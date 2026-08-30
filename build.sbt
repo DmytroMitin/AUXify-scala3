@@ -88,6 +88,11 @@ lazy val negativeSelfUnsupported = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeDelegatedUnsupported = project
+  .in(file("negative-delegated-unsupported"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)

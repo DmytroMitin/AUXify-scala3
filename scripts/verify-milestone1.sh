@@ -32,7 +32,8 @@ negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-milestone1-negative.XXXXXX")"
 full_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-full-apply-negative.XXXXXX")"
 self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXXX")"
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log"' EXIT
+delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log"' EXIT
 
 if sbt -batch 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -153,6 +154,39 @@ for self_negative_log in "$self_conflict_log" "$self_unsupported_log"; do
   fi
 done
 
+if sbt -batch 'negativeDelegatedUnsupported / Compile / compile' >"$delegated_negative_log" 2>&1; then
+  delegated_negative_status=0
+else
+  delegated_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled delegated first-slice source-shape diagnostics ---'
+cat "$delegated_negative_log"
+
+[[ "$delegated_negative_status" -ne 0 ]] ||
+  fail "negativeDelegatedUnsupported compiled successfully; unsupported delegated shapes were admitted"
+
+for expected_diagnostic in \
+  'unsupported @delegated source shape for `ConcreteDelegated`: direct method `show` must be abstract' \
+  'unsupported @delegated source shape for `AppliedResultDelegated`: direct method `show` result type must be one unqualified named type' \
+  'unsupported @delegated source shape for `PolymorphicDelegated`: direct method `show` must not declare method type parameters' \
+  'unsupported @delegated source shape for `WrongTopologyDelegated`: direct method `show` requires exactly one ordinary parameter; found 2'; do
+  grep -Fq -- "$expected_diagnostic" "$delegated_negative_log" ||
+    fail "delegated negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$delegated_negative_log"; then
+  fail "delegated negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$delegated_negative_log"; then
+  fail "delegated negative compile emitted an uncaught stack frame"
+fi
+
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
@@ -180,5 +214,6 @@ for forbidden in \
 done
 
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS'
