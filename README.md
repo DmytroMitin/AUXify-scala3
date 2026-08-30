@@ -1,7 +1,8 @@
 # AUXify-scala3
 
-AUXify-scala3 currently provides an experimental first Scala 3 `@apply`
-milestone. The current proof is specific to Scala 3.8.4 on JDK 25.
+AUXify-scala3 currently provides experimental first Scala 3 `@apply` and
+`@self` development milestones. The current proof is specific to Scala 3.8.4
+on JDK 25.
 
 ## Related projects
 
@@ -23,7 +24,7 @@ milestone. The current proof is specific to Scala 3.8.4 on JDK 25.
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
-| `@self` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
 
 Scala 2 AUXify never implemented `@poly`; its planned target was an adapter
@@ -40,7 +41,7 @@ AUXify or, preferably when it has broader value, a separate reusable project.
 That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
-The supported `@apply` slice and its dependencies remain development,
+The supported `@apply` and `@self` slices and their dependencies remain development,
 local-source-built artifacts. They are not claimed to be stable or available
 from a remote artifact repository.
 
@@ -76,6 +77,32 @@ companion:
 ```scala
 def apply[A](using inst: Show[A]): Show[A] = inst
 ```
+
+For a plain zero-parameter trait, the first supported `@self` slice is:
+
+```scala
+import com.github.dmytromitin.auxify.macros.self
+
+@self
+trait Nat:
+  type Existing = String
+```
+
+It conceptually adds a collision-safe self alias and the default bounded member:
+
+```scala
+trait Nat { self =>
+  type Self >: self.type <: Nat { type Self = self.Self }
+  type Existing = String
+}
+```
+
+An existing named self alias is retained. For an anonymous self, direct term
+members named `self`, `self$1`, and so on are skipped deterministically when
+selecting the generated alias. A direct existing type member named `Self` is a
+controlled conflict. This first slice intentionally exposes no annotation
+arguments: historical `lowerBound` / `fBound` options, generic traits, and
+class or object targets remain later parity work.
 
 ## Using `@apply` from an sbt project
 

@@ -29,7 +29,9 @@ sbt -batch 'macroHandlers / Test / test'
 sbt -batch 'integrationTests / Test / test'
 
 negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-milestone1-negative.XXXXXX")"
-trap 'rm -f "$negative_log"' EXIT
+self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXXX")"
+self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
+trap 'rm -f "$negative_log" "$self_conflict_log" "$self_unsupported_log"' EXIT
 
 if sbt -batch 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -65,6 +67,54 @@ if grep -Eq \
   fail "negative compile emitted an uncaught stack frame"
 fi
 
+if sbt -batch 'negativeSelfConflict / Compile / compile' >"$self_conflict_log" 2>&1; then
+  self_conflict_status=0
+else
+  self_conflict_status=$?
+fi
+
+printf '%s\n' '--- controlled direct-Self-conflict diagnostic ---'
+cat "$self_conflict_log"
+
+[[ "$self_conflict_status" -ne 0 ]] ||
+  fail "negativeSelfConflict compiled successfully; the direct Self conflict was admitted"
+
+grep -Fq \
+  'already contains direct type member `Self`; bounded self preparation requires deterministic rejection' \
+  "$self_conflict_log" ||
+  fail "direct Self conflict did not emit the stable project-owned diagnostic"
+
+if sbt -batch 'negativeSelfUnsupported / Compile / compile' >"$self_unsupported_log" 2>&1; then
+  self_unsupported_status=0
+else
+  self_unsupported_status=$?
+fi
+
+printf '%s\n' '--- controlled unsupported-self-target diagnostic ---'
+cat "$self_unsupported_log"
+
+[[ "$self_unsupported_status" -ne 0 ]] ||
+  fail "negativeSelfUnsupported compiled successfully; the unsupported class was admitted"
+
+grep -Eiq \
+  'requires .*trait.*found class.*UnsupportedSelfTarget|UnsupportedSelfTarget.*requires .*trait' \
+  "$self_unsupported_log" ||
+  fail "unsupported @self target did not emit the stable trait-profile diagnostic"
+
+for self_negative_log in "$self_conflict_log" "$self_unsupported_log"; do
+  if grep -Eiq \
+    'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+    "$self_negative_log"; then
+    fail "@self negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+  fi
+
+  if grep -Eq \
+    '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+    "$self_negative_log"; then
+    fail "@self negative compile emitted an uncaught stack frame"
+  fi
+done
+
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
@@ -91,4 +141,5 @@ for forbidden in \
   fi
 done
 
+printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS'

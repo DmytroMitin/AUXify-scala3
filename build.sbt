@@ -73,6 +73,16 @@ lazy val negativeUnsupported = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeSelfConflict = project
+  .in(file("negative-self-conflict"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
+lazy val negativeSelfUnsupported = project
+  .in(file("negative-self-unsupported"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)
