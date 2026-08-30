@@ -29,9 +29,10 @@ sbt -batch 'macroHandlers / Test / test'
 sbt -batch 'integrationTests / Test / test'
 
 negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-milestone1-negative.XXXXXX")"
+full_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-full-apply-negative.XXXXXX")"
 self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXXX")"
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
-trap 'rm -f "$negative_log" "$self_conflict_log" "$self_unsupported_log"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log"' EXIT
 
 if sbt -batch 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -65,6 +66,43 @@ if grep -Eq \
   '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
   "$negative_log"; then
   fail "negative compile emitted an uncaught stack frame"
+fi
+
+if sbt -batch 'negativeFullUnsupported / Compile / compile' >"$full_negative_log" 2>&1; then
+  full_negative_status=0
+else
+  full_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled full-apply source-shape diagnostics ---'
+cat "$full_negative_log"
+
+[[ "$full_negative_status" -ne 0 ]] ||
+  fail "negativeFullUnsupported compiled successfully; unsupported full shapes were admitted"
+
+for expected_diagnostic in \
+  'unsupported full @apply source shape for `MismatchedEnclosingBounds`: enclosing type-parameter upper bounds must be the same named type' \
+  'unsupported full @apply source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias' \
+  'unsupported full @apply source shape for `LowerBoundedResult`: result type member `Out` must not define a lower bound' \
+  'unsupported full @apply source shape for `MismatchedResult`: result type member `Out` upper bound must match enclosing bound `Nat`' \
+  'unsupported full @apply source shape for `MultipleResults`: requires exactly one direct type member; found 2' \
+  'unsupported full @apply source shape for `PolymorphicResult`: result type member `Out` must not declare type parameters' \
+  'unsupported full @apply source shape for `ProtectedResult`: result type member `Out` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported full @apply source shape for `AppliedBounds`: enclosing type-parameter upper bounds must be unqualified named types'; do
+  grep -Fq -- "$expected_diagnostic" "$full_negative_log" ||
+    fail "full-apply negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$full_negative_log"; then
+  fail "full-apply negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$full_negative_log"; then
+  fail "full-apply negative compile emitted an uncaught stack frame"
 fi
 
 if sbt -batch 'negativeSelfConflict / Compile / compile' >"$self_conflict_log" 2>&1; then
@@ -142,4 +180,5 @@ for forbidden in \
 done
 
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS'

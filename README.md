@@ -19,7 +19,7 @@ on JDK 25.
 | Annotation | Public status | Current boundary |
 | --- | --- | --- |
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified only for exact Scala 3.8.4 on JDK 25 |
-| Full `@apply` for the path-dependent/refined `Add.Out` form | Characterized / not yet implemented | Not part of the supported product milestone |
+| Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified only for exact Scala 3.8.4 on JDK 25 |
 | `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` | Characterized / not yet implemented | Not part of the supported product milestone |
@@ -77,6 +77,31 @@ companion:
 ```scala
 def apply[A](using inst: Show[A]): Show[A] = inst
 ```
+
+The first full slice additionally supports this bounded result-member topology:
+
+```scala
+@apply
+trait Add[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  def apply(n: N, m: M): Out
+```
+
+It conceptually adds:
+
+```scala
+def apply[N <: Nat, M <: Nat](using inst: Add[N, M]):
+  Add[N, M] { type Out = inst.Out } = inst
+```
+
+For this slice, the two invariant enclosing parameters must have the same
+unqualified named upper bound and no lower or context bounds. The trait must
+have exactly one direct, public, unannotated, non-polymorphic abstract type
+member with no lower bound and that same named upper bound. Its source name is
+preserved, so a renamed `Combine[L <: Natural, R <: Natural]` with abstract
+`Result <: Natural` is supported too. Ordinary type-class methods are allowed;
+multiple result members, aliases, modifiers, and differing or complex bounds
+remain outside this first slice.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
@@ -415,8 +440,9 @@ a development-only step. This README makes no claim that the required AUXify,
 Macro-Paradise, or quasiquotes artifacts are available from a remote artifact
 repository.
 
-The verified target is deliberately narrow: one top-level, non-sealed,
-ordinary trait with exactly one invariant, unbounded type parameter and no
-constructor or value parameters. Path-dependent type-member materialization
-such as `Add.Out` is not supported or claimed by this milestone; it is reserved
-for a later milestone.
+The verified `@apply` target remains deliberately narrow: a top-level,
+non-sealed ordinary trait with no constructor or value parameters, using
+either the one-invariant-unbounded-parameter simple shape or the exact
+two-common-simple-upper-bound / one-abstract-result-member full shape described
+above. This milestone does not claim arbitrary type-class derivation or full
+historical `@apply` parity.

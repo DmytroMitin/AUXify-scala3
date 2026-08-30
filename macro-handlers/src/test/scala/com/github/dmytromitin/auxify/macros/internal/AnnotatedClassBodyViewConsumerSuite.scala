@@ -265,3 +265,4 @@ private object InspectionPolicy:
   private def enclosing(shape: DirectTypeShape): Option[String] = shape match
     case DirectTypeShape.EnclosingTypeParameter(name, _) => Some(name)
     case DirectTypeShape.Unsupported(_, _, _) => None
+    case DirectTypeShape.NamedType(_, _) => None
