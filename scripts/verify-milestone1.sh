@@ -4,6 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
+scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
 fail() {
   printf 'milestone verification failed: %s\n' "$1" >&2
@@ -12,6 +13,15 @@ fail() {
 
 [[ "$(pwd -P)" == "$product_root" ]] ||
   fail "run scripts/verify-milestone1.sh from the product root"
+
+case "$scala_version" in
+  3.3.8|3.8.4) ;;
+  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8 or 3.8.4" ;;
+esac
+
+run_sbt() {
+  sbt -Dauxify.scalaVersion="$scala_version" -batch "$@"
+}
 
 if ! java_properties="$(java -XshowSettings:properties -version 2>&1)"; then
   fail "java runtime could not be inspected"
@@ -24,18 +34,23 @@ java_feature="$({
 [[ "$java_feature" == "25" ]] ||
   fail "Java feature version 25 is required; found ${java_feature:-unknown}"
 
-sbt -batch verifyPublicModuleCoordinates
-sbt -batch 'macroHandlers / Test / test'
-sbt -batch 'integrationTests / Test / test'
+printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
+printf 'AUXIFY_JAVA_FEATURE=%s\n' "$java_feature"
+
+run_sbt verifyPublicModuleCoordinates
+run_sbt 'macroHandlers / Test / test'
+run_sbt 'integrationTests / Test / test'
+run_sbt 'macroAnnotations / publishLocal' 'macroHandlers / publishLocal'
 
 negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-milestone1-negative.XXXXXX")"
 full_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-full-apply-negative.XXXXXX")"
 self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXXX")"
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
 delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log"' EXIT
+external_root=""
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
-if sbt -batch 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
+if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
 else
   negative_status=$?
@@ -69,7 +84,7 @@ if grep -Eq \
   fail "negative compile emitted an uncaught stack frame"
 fi
 
-if sbt -batch 'negativeFullUnsupported / Compile / compile' >"$full_negative_log" 2>&1; then
+if run_sbt 'negativeFullUnsupported / Compile / compile' >"$full_negative_log" 2>&1; then
   full_negative_status=0
 else
   full_negative_status=$?
@@ -106,7 +121,7 @@ if grep -Eq \
   fail "full-apply negative compile emitted an uncaught stack frame"
 fi
 
-if sbt -batch 'negativeSelfConflict / Compile / compile' >"$self_conflict_log" 2>&1; then
+if run_sbt 'negativeSelfConflict / Compile / compile' >"$self_conflict_log" 2>&1; then
   self_conflict_status=0
 else
   self_conflict_status=$?
@@ -123,7 +138,7 @@ grep -Fq \
   "$self_conflict_log" ||
   fail "direct Self conflict did not emit the stable project-owned diagnostic"
 
-if sbt -batch 'negativeSelfUnsupported / Compile / compile' >"$self_unsupported_log" 2>&1; then
+if run_sbt 'negativeSelfUnsupported / Compile / compile' >"$self_unsupported_log" 2>&1; then
   self_unsupported_status=0
 else
   self_unsupported_status=$?
@@ -154,7 +169,7 @@ for self_negative_log in "$self_conflict_log" "$self_unsupported_log"; do
   fi
 done
 
-if sbt -batch 'negativeDelegatedUnsupported / Compile / compile' >"$delegated_negative_log" 2>&1; then
+if run_sbt 'negativeDelegatedUnsupported / Compile / compile' >"$delegated_negative_log" 2>&1; then
   delegated_negative_status=0
 else
   delegated_negative_status=$?
@@ -213,7 +228,23 @@ for forbidden in \
   fi
 done
 
+external_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-external-consumer.XXXXXX")"
+cp -R "$product_root/qualification/external-consumer/." "$external_root"
+
+(
+  cd "$external_root"
+  sbt -Dauxify.scalaVersion="$scala_version" -batch \
+    clean \
+    verifyExternalPolicy \
+    run
+)
+
+rm -rf -- "$external_root"
+external_root=""
+
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
-printf '%s\n' 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS'
+printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
+  "$scala_version" \
+  "$java_feature"

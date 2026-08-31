@@ -8,8 +8,16 @@ on:
 
 jobs:
   test:
-    name: Test (Scala 3.8.4 / JDK 25)
+    name: Test (Scala ${{ matrix.scala-version }} / JDK 25)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scala-version:
+          - "3.3.8"
+          - "3.8.4"
+    env:
+      AUXIFY_SCALA_VERSION: ${{ matrix.scala-version }}
 
     steps:
       - name: Checkout repository

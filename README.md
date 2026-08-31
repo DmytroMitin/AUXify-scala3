@@ -1,8 +1,9 @@
 # AUXify-scala3
 
 AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@self`,
-and `@delegated` development milestones. The current proof is specific to
-Scala 3.8.4 on JDK 25.
+and `@delegated` development milestones. The current product is qualified on
+exact Scala 3.3.8 and Scala 3.8.4 with JDK 25. Scala 3.8.4 remains the default
+developer line.
 
 ## Related projects
 
@@ -18,8 +19,8 @@ Scala 3.8.4 on JDK 25.
 
 | Annotation | Public status | Current boundary |
 | --- | --- | --- |
-| Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified only for exact Scala 3.8.4 on JDK 25 |
-| Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified only for exact Scala 3.8.4 on JDK 25 |
+| Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8 and Scala 3.8.4 with JDK 25 |
+| Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8 and Scala 3.8.4 with JDK 25 |
 | `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
@@ -49,9 +50,9 @@ stable or available from a remote artifact repository.
 
 - Marker: `com.github.dmytromitin:auxify-scala3-macro-annotations_3:0.1.0-SNAPSHOT`
   — Scala 3 binary-crossed (`_3`).
-- Handler: `com.github.dmytromitin:auxify-scala3-macro-handlers_3.8.4:0.1.0-SNAPSHOT`
-  — exact-full-cross (`_3.8.4`) because it participates in the
-  compiler-sensitive handler universe.
+- Handler: `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:0.1.0-SNAPSHOT`
+  — exact-full-cross, with separately built `_3.3.8` and `_3.8.4` artifacts,
+  because it participates in the compiler-sensitive handler universe.
 
 Both coordinates are development/local-only at this stage.
 
@@ -163,10 +164,10 @@ class or object targets remain later parity work.
 
 ## Using supported annotations from an sbt project
 
-The current external-consumer proof is exact Scala 3.8.4 on JDK 25. All of the
-artifacts below are development artifacts: AUXify, Macro-Paradise 0.1.1-SNAPSHOT,
-and the required Quasiquotes integration are not claimed to be available from a
-remote artifact repository.
+The current external-consumer proof covers exact Scala 3.3.8 and Scala 3.8.4
+on JDK 25. All of the artifacts below are development artifacts: AUXify,
+Macro-Paradise 0.1.1-SNAPSHOT, and the required Quasiquotes integration are not
+claimed to be available from a remote artifact repository.
 
 ### Preferred development setup with the Macro-Paradise sbt plugin
 
@@ -175,23 +176,26 @@ Quasiquotes artifacts, publish the source-built Macro-Paradise sbt integration,
 and publish the AUXify marker and handler to the local Ivy repository:
 
 ```sh
-./scripts/prepare-ci-dependencies.sh
-./scripts/prepare-macroparadise-sbt-integration.sh
-sbt -batch "macroAnnotations/publishLocal" "macroHandlers/publishLocal"
+AUXIFY_SCALA_VERSION=3.8.4 ./scripts/prepare-ci-dependencies.sh
+sbt -Dauxify.scalaVersion=3.8.4 -batch "macroAnnotations/publishLocal" "macroHandlers/publishLocal"
 ```
 
-Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the checked-in,
-reproducible helper for this local-development setup. It clones the exact pinned
-public Macro-Paradise and Quasiquotes revisions into disposable temporary
-directories, verifies those revisions, and publishes only the peer artifacts
-that AUXify currently consumes into the local repository.
+Use `3.3.8` consistently in both selectors to prepare the other qualified
+line. Omitting both selectors retains the default Scala 3.8.4 behavior.
 
-`prepare-macroparadise-sbt-integration.sh` separately clones the exact committed
-source that contains Macro-Paradise's generic sbt integration, verifies its sbt
-1.x/Scala 2.12 dependency and local-publication policy, and runs `publishLocal`
-inside that source build. The integration is currently source-built and
-unreleased: the local-development step is required because no remote
-`sbt-macroparadise` coordinate is claimed.
+Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the
+checked-in, reproducible helper for this local-development setup. It accepts
+exactly `AUXIFY_SCALA_VERSION=3.3.8` or `AUXIFY_SCALA_VERSION=3.8.4`, clones the
+exact pinned public Macro-Paradise and Quasiquotes revisions into disposable
+temporary directories, verifies those revisions, and publishes only the peer
+artifacts that AUXify currently consumes into the local repository.
+
+Dependency preparation also invokes `prepare-macroparadise-sbt-integration.sh`,
+which separately clones the exact committed source containing Macro-Paradise's
+generic sbt integration, verifies its sbt 1.x/Scala 2.12 dependency and
+local-publication policy, and runs `publishLocal` inside that source build. The
+integration is currently source-built and unreleased: the local-development
+step is required because no remote `sbt-macroparadise` coordinate is claimed.
 
 The compiler-product source pin intentionally remains independent of the newer
 sbt-integration source pin. The sbt plugin selects Macro-Paradise compiler/API
@@ -420,8 +424,9 @@ repeatedly republished marker/handler SNAPSHOTs, but is not required merely for
 that first clean build. A clean-build-only setup can omit the helper, the
 `markerJar`/`handlerJar` lookups, and the identity option together.
 
-After compilation, the generated result is ordinary Scala code. The verified
-external consumer runs without `auxify-scala3-macro-handlers_3.8.4` on
+After compilation, the generated result is ordinary Scala code. On both
+qualified compiler lines, the verified external consumer runs without the
+selected exact-line `auxify-scala3-macro-handlers_<exact-scala>` artifact on
 `Runtime / fullClasspath`:
 the handler is a compilation-time transformation implementation, not an
 application service.
@@ -438,8 +443,8 @@ cross-version coordination, or migration tooling—that cannot be expressed
 cleanly through the generic settings. The peer has qualified its source-built
 plugin in persistent sbt BSP sessions for exact Scala 3.3.8 and 3.8.4, but
 stable remote plugin coordinates and release-grade dependency availability
-remain future work; AUXify's own development proof remains the exact 3.8.4
-consumer documented here.
+remain future work. AUXify's own bounded development proof covers both exact
+compiler lines with JDK 25.
 
 For example, `src/main/scala/ShowApp.scala` can contain:
 

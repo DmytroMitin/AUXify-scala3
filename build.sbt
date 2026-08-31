@@ -1,4 +1,14 @@
-ThisBuild / scalaVersion := "3.8.4"
+val supportedScalaVersions = Set("3.3.8", "3.8.4")
+val selectedScalaVersion =
+  sys.props.getOrElse("auxify.scalaVersion", "3.8.4")
+
+ThisBuild / scalaVersion := {
+  require(
+    supportedScalaVersions(selectedScalaVersion),
+    s"unsupported exact AUXify Scala version: $selectedScalaVersion; expected one of ${supportedScalaVersions.toSeq.sorted.mkString(", ")}"
+  )
+  selectedScalaVersion
+}
 ThisBuild / organization := "com.github.dmytromitin"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
@@ -129,7 +139,7 @@ lazy val root = project
         s"unexpected public marker artifact: $markerArtifact"
       )
       require(
-        handlerArtifact.startsWith("auxify-scala3-macro-handlers_3.8.4-"),
+        handlerArtifact.startsWith(s"auxify-scala3-macro-handlers_${scalaVersion.value}-"),
         s"unexpected public handler artifact: $handlerArtifact"
       )
       require(

@@ -9,7 +9,7 @@ macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.g
 macro_paradise_commit="a7d0e3787550629f96df2f4d00e9dbcb03980565"
 quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
 quasiquotes_commit="bf498a602aeb5e389203cfd2980aabab2c890016"
-scala_version="3.8.4"
+scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
 fail() {
   printf 'CI dependency preparation failed: %s\n' "$1" >&2
@@ -18,6 +18,15 @@ fail() {
 
 [[ "$(pwd -P)" == "$product_root" ]] ||
   fail "run scripts/prepare-ci-dependencies.sh from the product root"
+
+case "$scala_version" in
+  3.3.8|3.8.4) ;;
+  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8 or 3.8.4" ;;
+esac
+
+printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
+printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$macro_paradise_commit"
+printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$quasiquotes_commit"
 
 for command in git sbt java; do
   command -v "$command" >/dev/null 2>&1 ||
@@ -72,6 +81,7 @@ clone_at_commit \
 (
   cd "$quasiquotes_checkout"
   sbt -batch \
+    "++$scala_version!" \
     "core/publishLocal" \
     "set neutralScalameta / publish / skip := false" \
     "neutralScalameta/publishLocal" \
@@ -79,4 +89,10 @@ clone_at_commit \
     "dottyInternal/publishLocal"
 )
 
-printf '%s\n' 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED'
+AUXIFY_SCALA_VERSION="$scala_version" \
+  "$script_dir/prepare-macroparadise-sbt-integration.sh"
+
+printf 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED scala=%s macro_paradise=%s quasiquotes=%s\n' \
+  "$scala_version" \
+  "$macro_paradise_commit" \
+  "$quasiquotes_commit"
