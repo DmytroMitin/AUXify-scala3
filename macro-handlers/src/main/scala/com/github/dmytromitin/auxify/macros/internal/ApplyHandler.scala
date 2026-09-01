@@ -3,6 +3,7 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
+  ExpansionCompositionPolicy,
   ExpansionInput,
   ExpansionOutcome,
   ExpansionTargetProfile,
@@ -21,6 +22,9 @@ final class ApplyHandler extends ParadiseAnnotationExpander:
 
   override val targetProfile: ExpansionTargetProfile =
     ExpansionTargetProfile.RestrictedOrTwoUpperBoundedGenericTrait
+
+  override val compositionPolicy: ExpansionCompositionPolicy =
+    ExpansionCompositionPolicy.SourceOrdered
 
   override val consumesExistingCompanion: Boolean = true
 

@@ -7,6 +7,7 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
+  ExpansionCompositionPolicy,
   ExpansionInput,
   ExpansionOutcome,
   ExpansionTargetProfile,
@@ -25,6 +26,10 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     assertEquals(
       handler.targetProfile,
       ExpansionTargetProfile.RestrictedGenericTraitApply
+    )
+    assertEquals(
+      handler.compositionPolicy,
+      ExpansionCompositionPolicy.SourceOrdered
     )
     assert(handler.consumesExistingCompanion)
   }

@@ -7,6 +7,7 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
+  ExpansionCompositionPolicy,
   ExpansionInput,
   ExpansionOutcome,
   ExpansionTargetProfile,
@@ -18,6 +19,10 @@ class ApplyHandlerSuite extends munit.FunSuite:
     assertEquals(
       new ApplyHandler().targetProfile,
       ExpansionTargetProfile.RestrictedOrTwoUpperBoundedGenericTrait
+    )
+    assertEquals(
+      new ApplyHandler().compositionPolicy,
+      ExpansionCompositionPolicy.SourceOrdered
     )
   }
 

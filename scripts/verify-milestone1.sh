@@ -47,8 +47,9 @@ full_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-full-apply-negative.XXXXXX")
 self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXXX")"
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
 delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
+composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -202,6 +203,42 @@ if grep -Eq \
   fail "delegated negative compile emitted an uncaught stack frame"
 fi
 
+run_sbt 'negativeCompositionLateRejection / clean'
+if run_sbt 'negativeCompositionLateRejection / Compile / compile' >"$composition_negative_log" 2>&1; then
+  composition_negative_status=0
+else
+  composition_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled late composition rejection and rollback ---'
+cat "$composition_negative_log"
+
+[[ "$composition_negative_status" -ne 0 ]] ||
+  fail "negativeCompositionLateRejection compiled successfully; the late delegated rejection was lost"
+
+grep -Fq \
+  'unsupported @delegated source shape for `LateDelegatedRejection`: direct method `show` result type must be one unqualified named type' \
+  "$composition_negative_log" ||
+  fail "late composition rejection omitted the deterministic delegated decoder diagnostic"
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$composition_negative_log"; then
+  fail "late composition rejection emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$composition_negative_log"; then
+  fail "late composition rejection emitted an uncaught stack frame"
+fi
+
+composition_classes="$product_root/negative-composition-late-rejection/target/scala-$scala_version/classes"
+if [[ -d "$composition_classes" ]] && find "$composition_classes" -type f \
+  \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+  fail "late composition rejection left partial class or TASTy output"
+fi
+
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
@@ -245,6 +282,7 @@ external_root=""
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

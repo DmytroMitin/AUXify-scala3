@@ -24,6 +24,7 @@ developer line.
 | `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
+| Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -135,6 +136,31 @@ Additional methods or clauses, method-owned type parameters, contextual or
 default parameters, overloads, applied/qualified/function/path-dependent
 results, abstract-member result rewriting, and wider historical forwarding
 semantics remain later parity work.
+
+The supported `@apply` and `@delegated` slices may be stacked in either source
+order when the same trait independently satisfies both existing closed target
+profiles:
+
+```scala
+@apply
+@delegated
+trait ApplyThenDelegated[A]:
+  def show(a: A): String
+
+@delegated
+@apply
+trait DelegatedThenApply[A]:
+  def show(a: A): String
+```
+
+Both forms produce the contextual `apply` materializer and the delegated
+forwarder. Existing unrelated companion members survive. A direct existing
+`apply` suppresses only the generated materializer, while a direct existing
+forwarding name suppresses only that forwarder. This qualification is limited
+to this pair and their common one-invariant-unbounded-parameter,
+one-eligible-method family; it does not admit arbitrary handlers, other
+annotation stacks, broader target profiles, or overload-aware conflict
+semantics.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
