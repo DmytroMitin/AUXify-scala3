@@ -11,18 +11,65 @@ ThisBuild / scalaVersion := {
 }
 ThisBuild / organization := "com.github.dmytromitin"
 ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / organizationName := "Dmytro Mitin"
+ThisBuild / versionScheme := Some("early-semver")
+ThisBuild / publish / skip := true
+ThisBuild / publishMavenStyle := true
+ThisBuild / Compile / packageSrc / publishArtifact := true
+ThisBuild / Compile / packageDoc / publishArtifact := true
+ThisBuild / Test / publishArtifact := false
+ThisBuild / licenses := List(
+  "Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0")
+)
+ThisBuild / homepage := Some(url("https://github.com/DmytroMitin/AUXify-scala3"))
+ThisBuild / scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/DmytroMitin/AUXify-scala3"),
+    "scm:git:https://github.com/DmytroMitin/AUXify-scala3.git",
+    Some("scm:git:ssh://git@github.com:DmytroMitin/AUXify-scala3.git")
+  )
+)
+ThisBuild / developers := List(
+  Developer(
+    "DmytroMitin",
+    "Dmytro Mitin",
+    "dmitin3@gmail.com",
+    url("https://github.com/DmytroMitin")
+  )
+)
+ThisBuild / pomIncludeRepository := (_ => false)
 
-val macroParadiseVersion = "0.1.1-SNAPSHOT"
-val quasiquotesVersion = "0.3.0-SNAPSHOT"
+val macroParadiseVersion =
+  sys.props.getOrElse("macroparadise.version", "0.1.1-SNAPSHOT")
+val quasiquotesVersion =
+  sys.props.getOrElse("quasiquotes.version", "0.3.0-SNAPSHOT")
 val scalaMetaVersion = "4.17.3"
 val munitVersion = "1.0.4"
+
+lazy val publicPublicationSettings = Seq(
+  publish / skip := false,
+  publishTo := sys.props.get("auxify.releaseSimulationRepository").map { path =>
+    Resolver.file("auxify-release-simulation", file(path))(Resolver.mavenStylePatterns)
+  },
+  Compile / packageBin / mappings +=
+    baseDirectory.value.getParentFile / "LICENSE" -> "META-INF/LICENSE",
+  Compile / packageSrc / mappings +=
+    baseDirectory.value.getParentFile / "LICENSE" -> "META-INF/LICENSE",
+  Compile / packageDoc / mappings +=
+    baseDirectory.value.getParentFile / "LICENSE" -> "META-INF/LICENSE"
+)
 
 lazy val verifyPublicModuleCoordinates =
   taskKey[Unit]("Verify public AUXify module names and cross-version policy")
 
+lazy val verifyReleaseReadiness =
+  taskKey[Unit]("Verify the bounded AUXify Maven Central artifact and POM contract")
+
 val macroParadiseApi =
   ("com.github.dmytromitin" % "macroparadise-scala3-plugin-api" % macroParadiseVersion)
     .cross(CrossVersion.full)
+
+lazy val MarkerBuild = config("marker-build").hide
 
 val macroParadisePlugin =
   ("com.github.dmytromitin" % "macroparadise-scala3-plugin" % macroParadiseVersion)
@@ -34,17 +81,26 @@ val quasiquotesDottyInternal =
 
 lazy val macroAnnotations = project
   .in(file("macro-annotations"))
+  .configs(MarkerBuild)
+  .settings(publicPublicationSettings)
   .settings(
     name := "AUXify Scala 3 Macro Annotations",
+    description := "Scala 3 annotation markers for the bounded AUXify macro-annotation slices",
     moduleName := "auxify-scala3-macro-annotations",
     crossVersion := CrossVersion.binary,
-    libraryDependencies += macroParadiseApi
+    libraryDependencies += macroParadiseApi % MarkerBuild,
+    Compile / unmanagedJars ++=
+      update.value
+        .select(configurationFilter(MarkerBuild.name))
+        .map(Attributed.blank)
   )
 
 lazy val macroHandlers = project
   .in(file("macro-handlers"))
+  .settings(publicPublicationSettings)
   .settings(
     name := "AUXify Scala 3 Macro Handlers",
+    description := "Exact-Scala-version precompiled handlers for the bounded AUXify macro-annotation slices",
     moduleName := "auxify-scala3-macro-handlers",
     crossVersion := CrossVersion.full,
     libraryDependencies ++= Seq(
@@ -148,6 +204,146 @@ lazy val root = project
       )
       streams.value.log.info(
         s"AUXIFY_PUBLIC_MODULE_COORDINATES_PASS marker=$markerArtifact handler=$handlerArtifact"
+      )
+    },
+    verifyReleaseReadiness := {
+      val internalProjects = Vector(
+        "root" -> (publish / skip).value,
+        "integrationTests" -> (integrationTests / publish / skip).value,
+        "negativeUnsupported" -> (negativeUnsupported / publish / skip).value,
+        "negativeFullUnsupported" -> (negativeFullUnsupported / publish / skip).value,
+        "negativeSelfConflict" -> (negativeSelfConflict / publish / skip).value,
+        "negativeSelfUnsupported" -> (negativeSelfUnsupported / publish / skip).value,
+        "negativeDelegatedUnsupported" -> (negativeDelegatedUnsupported / publish / skip).value
+      )
+      val publicProjects = Vector(
+        "macroAnnotations" -> (macroAnnotations / publish / skip).value,
+        "macroHandlers" -> (macroHandlers / publish / skip).value
+      )
+
+      require(
+        internalProjects.forall(_._2),
+        s"internal AUXify publication enabled: ${internalProjects.filterNot(_._2).map(_._1).mkString(", ")}"
+      )
+      require(
+        publicProjects.forall(!_._2),
+        s"intended AUXify artifact remains skipped: ${publicProjects.filter(_._2).map(_._1).mkString(", ")}"
+      )
+      require(
+        (macroAnnotations / credentials).value.isEmpty &&
+          (macroHandlers / credentials).value.isEmpty,
+        "AUXify build must not configure publication credentials"
+      )
+      val publishDestinations = Vector(
+        (macroAnnotations / publishTo).value,
+        (macroHandlers / publishTo).value
+      )
+      val simulationRepository = sys.props
+        .get("auxify.releaseSimulationRepository")
+        .map(path => file(path).getCanonicalFile)
+      simulationRepository match {
+        case None =>
+          require(
+            publishDestinations.forall(_.isEmpty),
+            "normal development state must configure no publication destination"
+          )
+        case Some(repository) =>
+          val tmpRoot = file(sys.props.getOrElse("java.io.tmpdir", "/tmp")).getCanonicalFile
+          require(
+            repository.toPath.startsWith(tmpRoot.toPath),
+            s"release simulation repository must be task-owned under $tmpRoot, found $repository"
+          )
+          require(
+            publishDestinations.forall(_.exists { resolver =>
+              resolver.name == "auxify-release-simulation" &&
+                resolver.toString.contains(repository.getPath + "/")
+            }),
+            s"release simulation publish destination does not match $repository"
+          )
+      }
+
+      val packaged = Vector(
+        (macroAnnotations / Compile / packageBin).value,
+        (macroAnnotations / Compile / packageSrc).value,
+        (macroAnnotations / Compile / packageDoc).value,
+        (macroHandlers / Compile / packageBin).value,
+        (macroHandlers / Compile / packageSrc).value,
+        (macroHandlers / Compile / packageDoc).value
+      )
+      require(
+        packaged.forall(file => file.isFile && file.length > 0L),
+        s"missing or empty public artifact: ${packaged.filterNot(file => file.isFile && file.length > 0L).mkString(", ")}"
+      )
+      def containsLicense(archive: File): Boolean = {
+        val jar = new java.util.jar.JarFile(archive)
+        try jar.getEntry("META-INF/LICENSE") != null
+        finally jar.close()
+      }
+      require(
+        packaged.forall(containsLicense),
+        s"public artifact missing META-INF/LICENSE: ${packaged.filterNot(containsLicense).mkString(", ")}"
+      )
+
+      val markerPom = IO.read((macroAnnotations / Compile / makePom).value)
+      val handlerPom = IO.read((macroHandlers / Compile / makePom).value)
+      val metadataTokens = Vector(
+        "<name>",
+        "<description>",
+        "<url>https://github.com/DmytroMitin/AUXify-scala3</url>",
+        "<licenses>",
+        "<scm>",
+        "<developers>",
+        "<info.versionScheme>early-semver</info.versionScheme>"
+      )
+      val missingMetadata = Vector("marker" -> markerPom, "handler" -> handlerPom).flatMap {
+        case (label, pom) => metadataTokens.filterNot(pom.contains).map(token => s"$label:$token")
+      }
+      require(missingMetadata.isEmpty, s"generated POM metadata is incomplete: ${missingMetadata.mkString(", ")}")
+
+      val line = scalaVersion.value
+      require(
+        !markerPom.contains("macroparadise-scala3-plugin-api_"),
+        "binary-cross marker POM must not expose an exact-Scala-version Macro-Paradise API dependency"
+      )
+      Vector(
+        "<artifactId>macroparadise-scala3-plugin-api_" + line + "</artifactId>",
+        "<artifactId>quasiquotes-scala3-dotty-internal_" + line + "</artifactId>",
+        "<artifactId>scalameta_3</artifactId>",
+        "<version>4.17.3</version>"
+      ).foreach(token => require(handlerPom.contains(token), s"handler POM missing required dependency token: $token"))
+      val handlerPomXml = scala.xml.XML.loadString(handlerPom)
+      val munitDependencies = (handlerPomXml \\ "dependency").filter(node =>
+        (node \ "artifactId").text == "munit_3"
+      )
+      require(
+        munitDependencies.forall(node => (node \ "scope").text == "test"),
+        "MUnit leaked into the handler POM outside test scope"
+      )
+
+      val forbiddenPomTokens = Vector(
+        "SNAPSHOT-",
+        "Project" + "Ref",
+        "Root" + "Project",
+        "file:/",
+        "AUXify-scala3-control",
+        "/home/"
+      )
+      val contaminated = Vector("marker" -> markerPom, "handler" -> handlerPom).flatMap {
+        case (label, pom) => forbiddenPomTokens.filter(pom.contains).map(token => s"$label:$token")
+      }
+      require(contaminated.isEmpty, s"generated POM contamination: ${contaminated.mkString(", ")}")
+
+      if (version.value == "0.1.0") {
+        require(macroParadiseVersion == "0.1.1", s"release-shaped build requires Macro-Paradise 0.1.1, found $macroParadiseVersion")
+        require(quasiquotesVersion == "0.3.0", s"release-shaped build requires Quasiquotes 0.3.0, found $quasiquotesVersion")
+        require(
+          !markerPom.contains("SNAPSHOT") && !handlerPom.contains("SNAPSHOT"),
+          "release-shaped POMs must contain no SNAPSHOT coordinate"
+        )
+      }
+
+      streams.value.log.info(
+        s"AUXIFY_RELEASE_READINESS_PASS scala=$line public=${publicProjects.map(_._1).mkString(",")} internalSkipped=${internalProjects.size} primaries=8 simulation=${simulationRepository.nonEmpty} credentials=none"
       )
     }
   )

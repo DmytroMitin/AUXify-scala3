@@ -37,7 +37,7 @@ java_feature="$({
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
 printf 'AUXIFY_JAVA_FEATURE=%s\n' "$java_feature"
 
-run_sbt verifyPublicModuleCoordinates
+run_sbt verifyPublicModuleCoordinates verifyReleaseReadiness
 run_sbt 'macroHandlers / Test / test'
 run_sbt 'integrationTests / Test / test'
 run_sbt 'macroAnnotations / publishLocal' 'macroHandlers / publishLocal'
