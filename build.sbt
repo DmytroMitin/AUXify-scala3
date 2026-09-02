@@ -1,4 +1,4 @@
-val supportedScalaVersions = Set("3.3.8", "3.8.4")
+val supportedScalaVersions = Set("3.3.8", "3.8.4", "3.9.0")
 val selectedScalaVersion =
   sys.props.getOrElse("auxify.scalaVersion", "3.8.4")
 
@@ -217,6 +217,13 @@ lazy val root = project
       )
     },
     verifyReleaseReadiness := {
+      val intendedPublicModuleCount = 1 + supportedScalaVersions.size
+      val primaryArtifactCount = intendedPublicModuleCount * 4
+      val expectedReleaseInventoryFiles = primaryArtifactCount * 6
+      require(
+        intendedPublicModuleCount == 4 && expectedReleaseInventoryFiles == 96,
+        s"unexpected three-line release inventory: modules=$intendedPublicModuleCount files=$expectedReleaseInventoryFiles"
+      )
       val internalProjects = Vector(
         "root" -> (publish / skip).value,
         "integrationTests" -> (integrationTests / publish / skip).value,
@@ -355,7 +362,7 @@ lazy val root = project
       }
 
       streams.value.log.info(
-        s"AUXIFY_RELEASE_READINESS_PASS scala=$line public=${publicProjects.map(_._1).mkString(",")} internalSkipped=${internalProjects.size} primaries=9 simulation=${simulationRepository.nonEmpty} credentials=none"
+        s"AUXIFY_RELEASE_READINESS_PASS scala=$line public=${publicProjects.map(_._1).mkString(",")} internalSkipped=${internalProjects.size} intendedModules=$intendedPublicModuleCount expectedFiles=$expectedReleaseInventoryFiles simulation=${simulationRepository.nonEmpty} credentials=none"
       )
     }
   )

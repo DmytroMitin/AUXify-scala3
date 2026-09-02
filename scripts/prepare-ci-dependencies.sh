@@ -6,9 +6,10 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
-macro_paradise_commit="4f07eb6cb738455e19c5a9551e99a4f4e5010a6b"
+macro_paradise_commit="b8b11f19bd9eb6d0302bf1efd8b6fecffcf5173f"
 quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
-quasiquotes_commit="c4345b50e004f83a9c09a5732c33837a35422a4f"
+quasiquotes_commit="feef88ec8dd70eaf49ddce02019b7538f87799b6"
+quasiquotes_shared_build_scala_version="3.3.8"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
 fail() {
@@ -20,13 +21,14 @@ fail() {
   fail "run scripts/prepare-ci-dependencies.sh from the product root"
 
 case "$scala_version" in
-  3.3.8|3.8.4) ;;
-  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8 or 3.8.4" ;;
+  3.3.8|3.8.4|3.9.0) ;;
+  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8, 3.8.4, or 3.9.0" ;;
 esac
 
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
 printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$macro_paradise_commit"
 printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$quasiquotes_commit"
+printf 'QUASIQUOTES_SHARED_BUILD_SCALA_VERSION=%s\n' "$quasiquotes_shared_build_scala_version"
 
 for command in git sbt java; do
   command -v "$command" >/dev/null 2>&1 ||
@@ -81,10 +83,12 @@ clone_at_commit \
 (
   cd "$quasiquotes_checkout"
   sbt -batch \
-    "++$scala_version!" \
+    "++$quasiquotes_shared_build_scala_version!" \
     "core/publishLocal" \
     "set neutralScalameta / publish / skip := false" \
-    "neutralScalameta/publishLocal" \
+    "neutralScalameta/publishLocal"
+  sbt -batch \
+    "++$scala_version!" \
     "set dottyInternal / publish / skip := false" \
     "dottyInternal/publishLocal"
 )

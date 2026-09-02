@@ -10,7 +10,7 @@ enablePlugins(macroparadise.sbt.MacroParadisePrecompiledPlugin)
 
 scalaVersion := {
   require(
-    Set("3.3.8", "3.8.4")(selectedScalaVersion),
+    Set("3.3.8", "3.8.4", "3.9.0")(selectedScalaVersion),
     s"unsupported exact external-consumer Scala version: $selectedScalaVersion"
   )
   selectedScalaVersion

@@ -15,8 +15,8 @@ fail() {
   fail "run scripts/verify-milestone1.sh from the product root"
 
 case "$scala_version" in
-  3.3.8|3.8.4) ;;
-  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8 or 3.8.4" ;;
+  3.3.8|3.8.4|3.9.0) ;;
+  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8, 3.8.4, or 3.9.0" ;;
 esac
 
 run_sbt() {

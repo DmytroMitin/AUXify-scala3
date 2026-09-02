@@ -16,6 +16,7 @@ jobs:
         scala-version:
           - "3.3.8"
           - "3.8.4"
+          - "3.9.0"
     env:
       AUXIFY_SCALA_VERSION: ${{ matrix.scala-version }}
 

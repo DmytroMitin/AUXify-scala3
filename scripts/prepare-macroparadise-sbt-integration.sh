@@ -6,7 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
-macro_paradise_commit="66711048e132772b05b183bc4fff621340cacc58"
+macro_paradise_commit="b8b11f19bd9eb6d0302bf1efd8b6fecffcf5173f"
 
 fail() {
   printf 'Macro-Paradise sbt integration preparation failed: %s\n' "$1" >&2
