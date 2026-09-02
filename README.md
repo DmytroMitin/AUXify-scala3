@@ -25,7 +25,7 @@ developer line.
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
-| Stacked `@apply` + `@aux` | Positive bounded composition slice implemented; qualification partial | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style family; a distinct real late-second-handler rejection is not constructible because the two source decoders have the same admission predicate, so no pair-specific rollback claim is made |
+| Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -194,12 +194,15 @@ semantics.
 The common bounded `Add` family also compiles with `@apply` and `@aux` in
 either source order and exposes both the contextual materializer and the
 `Aux` alias. Direct `apply` and direct type `Aux` conflicts are independent.
-This pair is not yet recorded as fully qualified: the two handlers use the
-same normalized source-shape admission predicate, so there is no real source
-inside their common target envelope where the first handler succeeds and the
-second decoder rejects. The existing coordinator rollback proof remains the
-separate `@apply` + `@delegated` late-rejection case; no fake throwing handler
-or weakened profile was added to manufacture an `@apply` + `@aux` result.
+This bounded pair is qualified because both handlers now consume the same
+production source-recognition result before feature-specific lowering and
+placement. Within this exact common target envelope, there is therefore no
+source-shape state where the first handler succeeds source decoding and the
+second fails source decoding. Remaining lowering, placement, lifecycle, and
+unexpected-failure classes retain the Macro-Paradise coordinator's existing
+rollback contract, independently exercised by the real `@apply` +
+`@delegated` late-rejection regression. This is not a claim about arbitrary
+annotation composition, target profiles, failures, or semantic bound equality.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
