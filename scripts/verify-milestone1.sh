@@ -48,8 +48,9 @@ self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXX
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
 delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
 composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.XXXXXX")"
+aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$aux_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -203,6 +204,41 @@ if grep -Eq \
   fail "delegated negative compile emitted an uncaught stack frame"
 fi
 
+if run_sbt 'negativeAuxUnsupported / Compile / compile' >"$aux_negative_log" 2>&1; then
+  aux_negative_status=0
+else
+  aux_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled aux first-slice source-shape diagnostics ---'
+cat "$aux_negative_log"
+
+[[ "$aux_negative_status" -ne 0 ]] ||
+  fail "negativeAuxUnsupported compiled successfully; unsupported aux shapes were admitted"
+
+for expected_diagnostic in \
+  'unsupported @aux source shape for `MismatchedEnclosingBounds`: enclosing type-parameter upper bounds must be the same named type' \
+  'unsupported @aux source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias' \
+  'unsupported @aux source shape for `LowerBoundedResult`: result type member `Out` must not define a lower bound' \
+  'unsupported @aux source shape for `MismatchedResult`: result type member `Out` upper bound must match enclosing bound `Nat`' \
+  'unsupported @aux source shape for `MultipleResults`: requires exactly one direct type member; found 2' \
+  'unsupported @aux source shape for `PolymorphicResult`: result type member `Out` must not declare type parameters'; do
+  grep -Fq -- "$expected_diagnostic" "$aux_negative_log" ||
+    fail "aux negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$aux_negative_log"; then
+  fail "aux negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$aux_negative_log"; then
+  fail "aux negative compile emitted an uncaught stack frame"
+fi
+
 run_sbt 'negativeCompositionLateRejection / clean'
 if run_sbt 'negativeCompositionLateRejection / Compile / compile' >"$composition_negative_log" 2>&1; then
   composition_negative_status=0
@@ -282,7 +318,10 @@ external_root=""
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_PAIR_ROLLBACK_NOT_RUN'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

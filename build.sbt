@@ -164,6 +164,11 @@ lazy val negativeCompositionLateRejection = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeAuxUnsupported = project
+  .in(file("negative-aux-unsupported"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)
@@ -220,7 +225,8 @@ lazy val root = project
         "negativeSelfConflict" -> (negativeSelfConflict / publish / skip).value,
         "negativeSelfUnsupported" -> (negativeSelfUnsupported / publish / skip).value,
         "negativeDelegatedUnsupported" -> (negativeDelegatedUnsupported / publish / skip).value,
-        "negativeCompositionLateRejection" -> (negativeCompositionLateRejection / publish / skip).value
+        "negativeCompositionLateRejection" -> (negativeCompositionLateRejection / publish / skip).value,
+        "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value
       )
       val publicProjects = Vector(
         "macroAnnotations" -> (macroAnnotations / publish / skip).value,
@@ -349,7 +355,7 @@ lazy val root = project
       }
 
       streams.value.log.info(
-        s"AUXIFY_RELEASE_READINESS_PASS scala=$line public=${publicProjects.map(_._1).mkString(",")} internalSkipped=${internalProjects.size} primaries=8 simulation=${simulationRepository.nonEmpty} credentials=none"
+        s"AUXIFY_RELEASE_READINESS_PASS scala=$line public=${publicProjects.map(_._1).mkString(",")} internalSkipped=${internalProjects.size} primaries=9 simulation=${simulationRepository.nonEmpty} credentials=none"
       )
     }
   )

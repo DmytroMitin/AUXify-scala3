@@ -1,5 +1,9 @@
 package com.github.dmytromitin.auxify.macros.internal
 
+import dotty.tools.dotc.core.Contexts.Context
+
+import quasiquotes.definitions.dotty.AuxTypeAliasPeerBridge
+
 import scala.annotation.nowarn
 import scala.meta.*
 import scala.meta.dialects.Scala3
@@ -32,3 +36,24 @@ private[internal] object AuxDefinitionBuilder:
     val refinement: Type = t"$target { ..$refinementMembers }"
 
     q"type $aliasName[..$allTypeParameters] = $refinement"
+
+  def lower(
+      shape: AuxSourceShapeDecoder.Shape
+  )(using Context): Either[
+    AuxTypeAliasPeerBridge.Failure,
+    AuxTypeAliasPeerBridge.Lowered
+  ] =
+    val sourceDefinition = definition(shape)
+    AuxTypeAliasPeerBridge.lower(
+      sourceDefinition,
+      expectedAliasName = "Aux",
+      expectedFirstParameterName = shape.firstTypeParameterName,
+      expectedFirstUpperBoundName = shape.upperBoundTypeName,
+      expectedSecondParameterName = shape.secondTypeParameterName,
+      expectedSecondUpperBoundName = shape.upperBoundTypeName,
+      expectedOutputParameterName = shape.generatedResultParameterName,
+      expectedOutputUpperBoundName = shape.upperBoundTypeName,
+      expectedTargetName = shape.typeClassName,
+      expectedRefinementMemberName = shape.resultTypeMemberName,
+      virtualSourceName = s"AuxifyGenerated${shape.typeClassName}Aux.scala"
+    )

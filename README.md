@@ -1,7 +1,7 @@
 # AUXify-scala3
 
-AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@self`,
-and `@delegated` development milestones. The current product is qualified on
+AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@aux`,
+`@self`, and `@delegated` development milestones. The current product is qualified on
 exact Scala 3.3.8 and Scala 3.8.4 with JDK 25. Scala 3.8.4 remains the default
 developer line.
 
@@ -21,10 +21,11 @@ developer line.
 | --- | --- | --- |
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8 and Scala 3.8.4 with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8 and Scala 3.8.4 with JDK 25 |
-| `@aux` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8 and Scala 3.8.4 with JDK 25 |
 | `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
+| Stacked `@apply` + `@aux` | Positive bounded composition slice implemented; qualification partial | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style family; a distinct real late-second-handler rejection is not constructible because the two source decoders have the same admission predicate, so no pair-specific rollback claim is made |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -43,7 +44,7 @@ AUXify or, preferably when it has broader value, a separate reusable project.
 That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
-The supported `@apply`, `@self`, and `@delegated` slices and their dependencies
+The supported `@apply`, `@aux`, `@self`, and `@delegated` slices and their dependencies
 remain development, local-source-built artifacts. They are not claimed to be
 stable or available from a remote artifact repository.
 
@@ -105,6 +106,34 @@ preserved, so a renamed `Combine[L <: Natural, R <: Natural]` with abstract
 multiple result members, aliases, modifiers, and differing or complex bounds
 remain outside this first slice.
 
+The first public `@aux` slice accepts that same exact bounded result-member
+family and adds a direct companion type alias. For example:
+
+```scala
+import com.github.dmytromitin.auxify.macros.aux
+
+@aux
+trait Add[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  def apply(n: N, m: M): Out
+```
+
+conceptually adds:
+
+```scala
+type Aux[N <: Nat, M <: Nat, Out0 <: Nat] =
+  Add[N, M] { type Out = Out0 }
+```
+
+Trait, parameter, bound, and result-member names are source-derived. The added
+result parameter is selected deterministically from the result-member stem to
+avoid direct source-name collisions, but its exact spelling is not a public
+compatibility guarantee. An existing direct companion type `Aux` is preserved;
+a same-spelling term is in a separate namespace. Multiple result members,
+aliases, any explicitly declared lower bounds, differing or compound bounds,
+polymorphic result members, inherited discovery, and semantic alias expansion are outside
+this first slice.
+
 The first supported `@delegated` slice is:
 
 ```scala
@@ -161,6 +190,16 @@ to this pair and their common one-invariant-unbounded-parameter,
 one-eligible-method family; it does not admit arbitrary handlers, other
 annotation stacks, broader target profiles, or overload-aware conflict
 semantics.
+
+The common bounded `Add` family also compiles with `@apply` and `@aux` in
+either source order and exposes both the contextual materializer and the
+`Aux` alias. Direct `apply` and direct type `Aux` conflicts are independent.
+This pair is not yet recorded as fully qualified: the two handlers use the
+same normalized source-shape admission predicate, so there is no real source
+inside their common target envelope where the first handler succeeds and the
+second decoder rejects. The existing coordinator rollback proof remains the
+separate `@apply` + `@delegated` late-rejection case; no fake throwing handler
+or weakened profile was added to manufacture an `@apply` + `@aux` result.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
