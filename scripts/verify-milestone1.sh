@@ -48,10 +48,11 @@ self_conflict_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-conflict-negative.XXXXX
 self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative.XXXXXX")"
 delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
 composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.XXXXXX")"
+apply_instance_composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-composition-negative.XXXXXX")"
 aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
 instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$aux_negative_log" "$instance_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -325,6 +326,42 @@ if [[ -d "$composition_classes" ]] && find "$composition_classes" -type f \
   fail "late composition rejection left partial class or TASTy output"
 fi
 
+run_sbt 'negativeApplyInstanceComposition / clean'
+if run_sbt 'negativeApplyInstanceComposition / Compile / compile' >"$apply_instance_composition_negative_log" 2>&1; then
+  apply_instance_composition_negative_status=0
+else
+  apply_instance_composition_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled apply-instance late rejection and rollback ---'
+cat "$apply_instance_composition_negative_log"
+
+[[ "$apply_instance_composition_negative_status" -ne 0 ]] ||
+  fail "negativeApplyInstanceComposition compiled successfully; the late instance rejection was lost"
+
+grep -Fq \
+  'unsupported @instance source shape for `LateInstanceRejection`: requires exactly two direct body members; found 3' \
+  "$apply_instance_composition_negative_log" ||
+  fail "apply-instance late rejection omitted the deterministic instance decoder diagnostic"
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$apply_instance_composition_negative_log"; then
+  fail "apply-instance late rejection emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$apply_instance_composition_negative_log"; then
+  fail "apply-instance late rejection emitted an uncaught stack frame"
+fi
+
+apply_instance_composition_classes="$product_root/negative-apply-instance-composition/target/scala-$scala_version/classes"
+if [[ -d "$apply_instance_composition_classes" ]] && find "$apply_instance_composition_classes" -type f \
+  \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+  fail "apply-instance late rejection left partial class or TASTy output"
+fi
+
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
@@ -374,6 +411,8 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

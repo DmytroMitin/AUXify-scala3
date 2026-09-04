@@ -64,6 +64,18 @@ trait Choice[Element]:
   def select(left: Element, right: Element): Element
 
 @apply
+@instance
+trait ApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+
+@instance
+@apply
+trait InstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+
+@apply
 @delegated
 trait ApplyThenDelegated[A]:
   def show(a: A): String
@@ -122,6 +134,18 @@ object ExternalApp:
       Choice.instance("external", (left, right) => s"$left/$right")
     assert(renamed.fallback == "external")
     assert(renamed.select("left", "right") == "left/right")
+
+    val composed: ApplyThenInstance[Int] =
+      ApplyThenInstance.instance(0, _ + _)
+    given ApplyThenInstance[Int] = composed
+    assert(ApplyThenInstance[Int].eq(composed))
+    assert(composed.combine(20, 22) == 42)
+
+    val reverseComposed: InstanceThenApply[String] =
+      InstanceThenApply.instance("external", (left, right) => s"$left/$right")
+    given InstanceThenApply[String] = reverseComposed
+    assert(InstanceThenApply[String].eq(reverseComposed))
+    assert(reverseComposed.select("left", "right") == "left/right")
 
     assert(ApplyThenDelegated[Int].show(7) == "apply-first:7")
     assert(ApplyThenDelegated.show(7) == "apply-first:7")

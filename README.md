@@ -26,6 +26,7 @@ remains the default developer line.
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
+| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass only on the common one-invariant-unbounded-parameter first-slice `@instance` family |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -174,6 +175,33 @@ Classes/objects, variance or bounds, abstract vals/vars/types, concrete or extra
 members, reordered methods, multiple or contextual/default clauses, method type
 parameters, modifiers/annotations, and broader Scala-2 `@instance` behavior remain
 outside this first slice.
+
+Simple `@apply` and the first `@instance` slice may be stacked in either source
+order on that exact common family:
+
+```scala
+@apply
+@instance
+trait ApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+
+@instance
+@apply
+trait InstanceThenApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+```
+
+Both forms expose the contextual `apply` materializer and the `instance`
+factory. Existing unrelated companion members and the factory's by-name carrier
+semantics are preserved. A direct companion `apply` suppresses only generated
+`apply`; a direct companion `instance` suppresses only generated `instance`.
+An unsupported `@instance` body remains a controlled rejection even though the
+same enclosing trait is admissible to simple `@apply`; the source-ordered
+transaction leaves no partial class or TASTy output. This is qualification of
+this pair and closed source envelope only. It does not imply composition with
+`@aux`, `@self`, `@delegated`, `@syntax`, or arbitrary annotation stacks.
 
 The first supported `@delegated` slice is:
 

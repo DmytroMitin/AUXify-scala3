@@ -164,6 +164,11 @@ lazy val negativeCompositionLateRejection = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeApplyInstanceComposition = project
+  .in(file("negative-apply-instance-composition"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val negativeAuxUnsupported = project
   .in(file("negative-aux-unsupported"))
   .dependsOn(macroAnnotations)
@@ -238,6 +243,7 @@ lazy val root = project
         "negativeSelfUnsupported" -> (negativeSelfUnsupported / publish / skip).value,
         "negativeDelegatedUnsupported" -> (negativeDelegatedUnsupported / publish / skip).value,
         "negativeCompositionLateRejection" -> (negativeCompositionLateRejection / publish / skip).value,
+        "negativeApplyInstanceComposition" -> (negativeApplyInstanceComposition / publish / skip).value,
         "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value,
         "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value
       )
