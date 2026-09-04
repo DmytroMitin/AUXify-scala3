@@ -1,4 +1,4 @@
-import com.github.dmytromitin.auxify.macros.{apply, aux, delegated, self}
+import com.github.dmytromitin.auxify.macros.{apply, aux, delegated, instance, self}
 
 @apply
 trait Show[A]:
@@ -53,6 +53,16 @@ object Render:
   given Render[Int] with
     def render(a: Int): String = a.toString
 
+@instance
+trait Monoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+
+@instance
+trait Choice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+
 @apply
 @delegated
 trait ApplyThenDelegated[A]:
@@ -94,6 +104,25 @@ object ExternalApp:
     assert(generatedSelf eq selfQualified)
 
     assert(Render.render(42) == "42")
+
+    var emptyEvaluations = 0
+    val intAddition: Monoid[Int] = Monoid.instance(
+      {
+        emptyEvaluations += 1
+        0
+      },
+      _ + _
+    )
+    assert(emptyEvaluations == 0)
+    assert(intAddition.empty == 0)
+    assert(emptyEvaluations == 1)
+    assert(intAddition.combine(20, 22) == 42)
+
+    val renamed: Choice[String] =
+      Choice.instance("external", (left, right) => s"$left/$right")
+    assert(renamed.fallback == "external")
+    assert(renamed.select("left", "right") == "left/right")
+
     assert(ApplyThenDelegated[Int].show(7) == "apply-first:7")
     assert(ApplyThenDelegated.show(7) == "apply-first:7")
     assert(ApplyThenDelegated.preserved == 41)

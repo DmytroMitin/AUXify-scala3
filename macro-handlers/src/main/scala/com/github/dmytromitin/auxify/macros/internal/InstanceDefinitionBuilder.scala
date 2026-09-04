@@ -1,11 +1,26 @@
 package com.github.dmytromitin.auxify.macros.internal
 
+import dotty.tools.dotc.core.Contexts.Context
+
+import quasiquotes.definitions.dotty.InstanceFactoryPeerBridge
+
 import scala.annotation.nowarn
 import scala.meta.*
 import scala.meta.dialects.Scala3
 
 @nowarn("cat=deprecation")
 private[internal] object InstanceDefinitionBuilder:
+  def lower(
+      shape: InstanceSourceShapeDecoder.SourceShape
+  )(using Context): Either[
+    InstanceFactoryPeerBridge.Failure,
+    InstanceFactoryPeerBridge.Lowered
+  ] =
+    InstanceFactoryPeerBridge.lower(
+      definition(shape),
+      s"AuxifyGenerated${shape.traitName}Instance.scala"
+    )
+
   def definition(
       shape: InstanceSourceShapeDecoder.SourceShape
   ): Defn.Def =

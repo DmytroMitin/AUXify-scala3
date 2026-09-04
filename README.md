@@ -1,7 +1,7 @@
 # AUXify-scala3
 
 AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@aux`,
-`@self`, and `@delegated` development milestones. The current product is qualified on
+`@instance`, `@self`, and `@delegated` development milestones. The current product is qualified on
 exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25. Scala 3.8.4
 remains the default developer line.
 
@@ -22,7 +22,7 @@ remains the default developer line.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Characterized / not yet implemented | Not part of the supported product milestone |
+| `@instance` | Supported first development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
@@ -44,7 +44,7 @@ AUXify or, preferably when it has broader value, a separate reusable project.
 That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
-The supported `@apply`, `@aux`, `@self`, and `@delegated` slices and their dependencies
+The supported `@apply`, `@aux`, `@instance`, `@self`, and `@delegated` slices and their dependencies
 remain development, local-source-built artifacts. They are not claimed to be
 stable or available from a remote artifact repository.
 
@@ -133,6 +133,47 @@ a same-spelling term is in a separate namespace. Multiple result members,
 aliases, any explicitly declared lower bounds, differing or compound bounds,
 polymorphic result members, inherited discovery, and semantic alias expansion are outside
 this first slice.
+
+The first public `@instance` slice is:
+
+```scala
+import com.github.dmytromitin.auxify.macros.instance
+
+@instance
+trait Monoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+```
+
+It conceptually adds this factory to the companion:
+
+```scala
+def instance[A](
+    emptyValue: => A,
+    combineFunction: (A, A) => A
+): Monoid[A] =
+  new Monoid[A]:
+    override def empty: A = emptyValue
+    override def combine(a: A, a1: A): A =
+      combineFunction(a, a1)
+```
+
+Trait, type-parameter, method, and ordinary parameter names are source-derived.
+The generated carrier names are selected deterministically to avoid direct source
+name collisions, but their spelling is not a public compatibility guarantee. The
+parameterless carrier is by-name, so constructing an instance does not evaluate it.
+An existing direct companion member named `instance` is preserved under the current
+bounded syntactic conflict policy; unrelated companion members are preserved too.
+
+This slice requires exactly one invariant, unbounded enclosing type parameter and
+exactly two direct body members in source order: one public, unannotated,
+non-polymorphic abstract parameterless method returning that type parameter, then
+one public, unannotated, non-polymorphic abstract method with one ordinary clause of
+exactly two non-defaulted, unmodified parameters and the same parameter/result type.
+Classes/objects, variance or bounds, abstract vals/vars/types, concrete or extra
+members, reordered methods, multiple or contextual/default clauses, method type
+parameters, modifiers/annotations, and broader Scala-2 `@instance` behavior remain
+outside this first slice.
 
 The first supported `@delegated` slice is:
 

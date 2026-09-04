@@ -49,8 +49,9 @@ self_unsupported_log="$(mktemp "${TMPDIR:-/tmp}/auxify-self-unsupported-negative
 delegated_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-negative.XXXXXX")"
 composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.XXXXXX")"
 aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
+instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$aux_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$aux_negative_log" "$instance_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -239,6 +240,55 @@ if grep -Eq \
   fail "aux negative compile emitted an uncaught stack frame"
 fi
 
+if run_sbt 'negativeInstanceUnsupported / Compile / compile' >"$instance_negative_log" 2>&1; then
+  instance_negative_status=0
+else
+  instance_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled instance source-shape diagnostics ---'
+cat "$instance_negative_log"
+
+[[ "$instance_negative_status" -ne 0 ]] ||
+  fail "negativeInstanceUnsupported compiled successfully; unsupported instance shapes were admitted"
+
+for expected_diagnostic in \
+  'found class `ClassTarget`' \
+  'found 2 type parameters' \
+  'type parameter `A` is covariant' \
+  'type parameter `A` has an explicit or contextual bound' \
+  'unsupported @instance source shape for `Concrete`: direct method `empty` must be abstract' \
+  'unsupported @instance source shape for `Polymorphic`: direct method `combine` must not declare method type parameters' \
+  'unsupported @instance source shape for `Reversed`: parameterless method `combine` must declare no parameter clauses; found 1' \
+  'unsupported @instance source shape for `EmptyClause`: parameterless method `empty` must declare no parameter clauses; found 1' \
+  'unsupported @instance source shape for `WrongArity`: binary method `combine` requires exactly two ordinary parameters; found 1' \
+  'unsupported @instance source shape for `ContextualClause`: binary method `combine` parameter clause must be ordinary and non-contextual' \
+  'unsupported @instance source shape for `Defaulted`: binary method `combine` parameter `a` must be ordinary, non-defaulted, and unmodified' \
+  'unsupported @instance source shape for `WrongParameter`: binary method `combine` parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongEmptyResult`: parameterless method `empty` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongBinaryResult`: binary method `combine` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `ExtraVal`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `ExtraVar`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `ExtraType`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `ExtraNested`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `ProtectedMethod`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `AnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers'; do
+  grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
+    fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$instance_negative_log"; then
+  fail "instance negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$instance_negative_log"; then
+  fail "instance negative compile emitted an uncaught stack frame"
+fi
+
 run_sbt 'negativeCompositionLateRejection / clean'
 if run_sbt 'negativeCompositionLateRejection / Compile / compile' >"$composition_negative_log" 2>&1; then
   composition_negative_status=0
@@ -319,6 +369,7 @@ printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'

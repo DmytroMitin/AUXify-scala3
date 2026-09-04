@@ -169,6 +169,11 @@ lazy val negativeAuxUnsupported = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeInstanceUnsupported = project
+  .in(file("negative-instance-unsupported"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)
@@ -233,7 +238,8 @@ lazy val root = project
         "negativeSelfUnsupported" -> (negativeSelfUnsupported / publish / skip).value,
         "negativeDelegatedUnsupported" -> (negativeDelegatedUnsupported / publish / skip).value,
         "negativeCompositionLateRejection" -> (negativeCompositionLateRejection / publish / skip).value,
-        "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value
+        "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value,
+        "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value
       )
       val publicProjects = Vector(
         "macroAnnotations" -> (macroAnnotations / publish / skip).value,

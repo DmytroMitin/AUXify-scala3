@@ -1,10 +1,70 @@
 package com.github.dmytromitin.auxify.macros.internal
 
+import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
+
 import scala.annotation.nowarn
 import scala.meta.*
 
 @nowarn("cat=deprecation")
 class InstanceDefinitionBuilderSuite extends munit.FunSuite:
+  test("lowers the canonical factory through C014 with generated provenance") {
+    withContext:
+      val lowered = InstanceDefinitionBuilder
+        .lower(
+          shape(
+            traitName = "Monoid",
+            typeParameterName = "A",
+            parameterlessMethodName = "empty",
+            binaryMethodName = "combine",
+            firstParameterName = "a",
+            secondParameterName = "a1",
+            parameterlessCarrierName = "emptyValue",
+            binaryCarrierName = "combineFunction"
+          )
+        )
+        .fold(problem => fail(s"${problem.code}: ${problem.detail}"), identity)
+
+      assertEquals(lowered.virtualSourceName, "AuxifyGeneratedMonoidInstance.scala")
+      assertEquals(
+        lowered.generatedSource,
+        "def instance[A](emptyValue: => A, combineFunction: (A, A) => A): Monoid[A] = new Monoid[A] { override def empty: A = emptyValue; override def combine(a: A, a1: A): A = combineFunction(a, a1) }"
+      )
+      assertEquals(lowered.tree.name.toString, "instance")
+      assert(lowered.tree.source.exists, clue(lowered.tree))
+      assertEquals(lowered.tree.source.path, lowered.virtualSourceName)
+      assertEquals(lowered.tree.source.content.mkString, lowered.generatedSource)
+  }
+
+  test("lowers coherently renamed source-derived names through C014") {
+    withContext:
+      val lowered = InstanceDefinitionBuilder
+        .lower(
+          shape(
+            traitName = "Choice",
+            typeParameterName = "Element",
+            parameterlessMethodName = "fallback",
+            binaryMethodName = "select",
+            firstParameterName = "left",
+            secondParameterName = "right",
+            parameterlessCarrierName = "emptyValue",
+            binaryCarrierName = "combineFunction"
+          )
+        )
+        .fold(problem => fail(s"${problem.code}: ${problem.detail}"), identity)
+
+      assertEquals(lowered.virtualSourceName, "AuxifyGeneratedChoiceInstance.scala")
+      assertEquals(lowered.tree.name.toString, "instance")
+      assert(lowered.generatedSource.contains("Choice[Element]"), clue(lowered.generatedSource))
+      assert(
+        lowered.generatedSource.contains("override def fallback"),
+        clue(lowered.generatedSource)
+      )
+      assert(
+        lowered.generatedSource.contains("override def select"),
+        clue(lowered.generatedSource)
+      )
+  }
+
   test("builds the canonical typed instance factory") {
     val definition = InstanceDefinitionBuilder.definition(
       shape(
@@ -236,3 +296,7 @@ class InstanceDefinitionBuilderSuite extends munit.FunSuite:
           List(expectedTypeParameterName)
         )
       case other => fail(s"expected applied target, found $other")
+
+  private def withContext[A](run: Context ?=> A): A =
+    val base = new ContextBase
+    run(using base.initialCtx)

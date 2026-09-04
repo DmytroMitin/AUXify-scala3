@@ -8,7 +8,7 @@ product_root="$(cd "$script_dir/.." && pwd -P)"
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
 macro_paradise_commit="b8b11f19bd9eb6d0302bf1efd8b6fecffcf5173f"
 quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
-quasiquotes_commit="feef88ec8dd70eaf49ddce02019b7538f87799b6"
+quasiquotes_commit="34c2a29875e74cd6193933fff40e9a8a16764208"
 quasiquotes_shared_build_scala_version="3.3.8"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
