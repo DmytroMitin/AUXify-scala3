@@ -96,3 +96,71 @@ class AuxScalametaCharacterizationSuite extends munit.FunSuite:
     )
     assertEquals(alias.body.syntax, refinement.syntax)
   }
+
+  test("two-member characterization preserves source order through independent fresh-name collisions") {
+    val traitName = Type.Name("BiEvidence")
+    val aliasName = Type.Name("Aux")
+    val firstName = Type.Name("Result0")
+    val secondName = Type.Name("Carry0")
+    val resultMemberName = Type.Name("Result")
+    val carryMemberName = Type.Name("Carry")
+    val upperBound = Type.Name("Domain")
+    val generatedParameterNames = selectGeneratedParameterNames(
+      List(resultMemberName, carryMemberName),
+      Set(firstName.value, secondName.value, resultMemberName.value, carryMemberName.value)
+    )
+    val resultParameterName = generatedParameterNames.head
+    val carryParameterName = generatedParameterNames(1)
+
+    val originalParameters: List[Type.Param] = List(
+      tparam"$firstName <: $upperBound",
+      tparam"$secondName <: $upperBound"
+    )
+    val generatedParameters: List[Type.Param] = List(
+      tparam"$resultParameterName <: $upperBound",
+      tparam"$carryParameterName <: $upperBound"
+    )
+    val target: Type = t"$traitName[$firstName, $secondName]"
+    val memberEqualities: List[Stat] = List(
+      q"type $resultMemberName = $resultParameterName",
+      q"type $carryMemberName = $carryParameterName"
+    )
+    val refinement: Type = t"$target { ..$memberEqualities }"
+    val alias: Defn.Type =
+      q"type $aliasName[..${originalParameters ++ generatedParameters}] = $refinement"
+
+    assertEquals(
+      alias.syntax,
+      """type Aux[Result0 <: Domain, Carry0 <: Domain, Result1 <: Domain, Carry1 <: Domain] = BiEvidence[Result0, Carry0] {
+        |  type Result = Result1
+        |  type Carry = Carry1
+        |}""".stripMargin
+    )
+    assertEquals(
+      alias.tparamClause.values.map(_.name.value),
+      List("Result0", "Carry0", "Result1", "Carry1")
+    )
+    assertEquals(generatedParameterNames.map(_.value), List("Result1", "Carry1"))
+    assertEquals(target.syntax, "BiEvidence[Result0, Carry0]")
+    assertEquals(
+      memberEqualities.map(_.syntax),
+      List("type Result = Result1", "type Carry = Carry1")
+    )
+    assertEquals(alias.body.syntax, refinement.syntax)
+  }
+
+  private def selectGeneratedParameterNames(
+      members: List[Type.Name],
+      initiallyOccupied: Set[String]
+  ): List[Type.Name] =
+    members
+      .foldLeft((initiallyOccupied, List.empty[Type.Name])):
+        case ((occupied, selected), member) =>
+          val generated = Iterator
+            .from(0)
+            .map(index => s"${member.value}$index")
+            .find(candidate => !occupied(candidate))
+            .map(Type.Name(_))
+            .getOrElse(fail(s"could not freshen ${member.value}"))
+          (occupied + generated.value, selected :+ generated)
+      ._2
