@@ -69,6 +69,40 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
     )
   }
 
+  test("Scala 3 quasiquotes characterize the strict one-abstract-val factory") {
+    val characterized = characterizeAbstractVal(
+      traitName = "HasValue",
+      typeParameterName = "A",
+      memberName = "value",
+      factoryName = "instance",
+      occupiedTermNames = Set("instance", "value")
+    )
+
+    assertEquals(
+      characterized.definition.syntax,
+      "def instance[A](valueValue: A): HasValue[A] = new HasValue[A] { override val value: A = valueValue }"
+    )
+    assertEquals(characterized.carrier.decltpe.map(_.syntax), Some("A"))
+    assert(!characterized.carrier.decltpe.exists(_.isInstanceOf[Type.ByName]))
+    assertEquals(characterized.implementation.templ.stats.map(_.syntax), List("override val value: A = valueValue"))
+  }
+
+  test("abstract-val characterization renames coherently and freshens a colliding readable carrier") {
+    val characterized = characterizeAbstractVal(
+      traitName = "Container",
+      typeParameterName = "Element",
+      memberName = "valueValue",
+      factoryName = "make",
+      occupiedTermNames = Set("make", "valueValue")
+    )
+
+    assertEquals(characterized.carrier.name.value, "valueValue1")
+    assertEquals(
+      characterized.definition.syntax,
+      "def make[Element](valueValue1: Element): Container[Element] = new Container[Element] { override val valueValue: Element = valueValue1 }"
+    )
+  }
+
   private final case class Characterized(
       typeParameter: Type.Param,
       target: Type,
@@ -79,6 +113,52 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
       implementation: Term.NewAnonymous,
       definition: Defn.Def
   )
+
+  private final case class CharacterizedAbstractVal(
+      carrier: Term.Param,
+      implementation: Term.NewAnonymous,
+      definition: Defn.Def
+  )
+
+  private def characterizeAbstractVal(
+      traitName: String,
+      typeParameterName: String,
+      memberName: String,
+      factoryName: String,
+      occupiedTermNames: Set[String]
+  ): CharacterizedAbstractVal =
+    val targetName = Type.Name(traitName)
+    val typeName = Type.Name(typeParameterName)
+    val memberPattern = Pat.Var(Term.Name(memberName))
+    val factory = Term.Name(factoryName)
+    val carrierName = Term.Name(
+      freshCarrierName("valueValue", occupiedTermNames)
+    )
+    val typeParameter: Type.Param = tparam"$typeName"
+    val target: Type = t"$targetName[$typeName]"
+    val carrier: Term.Param = param"$carrierName: $typeName"
+    val implementationMember: Defn.Val =
+      q"override val $memberPattern: $typeName = $carrierName"
+    val parent = Init(target, Name.Anonymous(), List.empty[Term.ArgClause])
+    val implementationStats: List[Stat] = List(implementationMember)
+    val implementation: Term.NewAnonymous =
+      q"new $parent { ..$implementationStats }"
+    val typeParameters = List(typeParameter)
+    val parameters = List(carrier)
+    val definition: Defn.Def =
+      q"def $factory[..$typeParameters](..$parameters): $target = $implementation"
+
+    CharacterizedAbstractVal(carrier, implementation, definition)
+
+  private def freshCarrierName(
+      stem: String,
+      occupied: Set[String]
+  ): String =
+    (0 to occupied.size)
+      .iterator
+      .map(index => if index == 0 then stem else s"$stem$index")
+      .find(name => !occupied.contains(name))
+      .getOrElse(stem)
 
   private def characterize(
       traitName: String,
