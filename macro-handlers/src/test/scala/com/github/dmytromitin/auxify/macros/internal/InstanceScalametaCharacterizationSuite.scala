@@ -152,6 +152,61 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
     )
   }
 
+  test("Scala 3 quasiquotes characterize the strict curried-method instance factory") {
+    val characterized = characterizeCurriedMethod(
+      traitName = "Curried",
+      typeParameterName = "A",
+      methodName = "combine",
+      firstParameterName = "a",
+      secondParameterName = "b",
+      factoryName = "instance",
+      occupiedTermNames = Set("instance", "combine", "a", "b")
+    )
+
+    assertEquals(
+      characterized.definition.syntax,
+      "def instance[A](combineFunction: A => A => A): Curried[A] = new Curried[A] { override def combine(a: A)(b: A): A = combineFunction(a)(b) }"
+    )
+    characterized.carrier.decltpe match
+      case Some(Type.Function(List(Type.Name("A")), Type.Function(List(Type.Name("A")), Type.Name("A")))) => ()
+      case other => fail(s"expected nested unary function carrier, found $other")
+    characterized.definition.paramClauseGroups match
+      case List(group) =>
+        assertEquals(group.tparamClause.values.map(_.name.value), List("A"))
+        assertEquals(group.paramClauses.map(_.values.map(_.name.value)), List(List("combineFunction")))
+        assert(group.paramClauses.forall(_.mod.isEmpty))
+      case other => fail(s"expected one factory clause group, found $other")
+    assertEquals(characterized.target.syntax, "Curried[A]")
+    assertEquals(characterized.implementation.templ.inits.map(_.tpe.syntax), List("Curried[A]"))
+    assertEquals(characterized.implementation.templ.stats, List(characterized.overrideMember))
+    assert(characterized.overrideMember.paramClauseGroups.flatMap(_.paramClauses).forall(_.mod.isEmpty))
+    assertEquals(
+      characterized.overrideMember.paramClauseGroups.flatMap(_.paramClauses).map(_.values.map(_.syntax)),
+      List(List("a: A"), List("b: A"))
+    )
+    characterized.overrideMember.body match
+      case Term.Apply(Term.Apply(Term.Name("combineFunction"), List(Term.Name("a"))), List(Term.Name("b"))) => ()
+      case other => fail(s"expected two successive carrier applications, found ${other.syntax}")
+  }
+
+  test("curried-method characterization renames coherently and freshens a colliding readable carrier") {
+    val characterized = characterizeCurriedMethod(
+      traitName = "Chain",
+      typeParameterName = "Element",
+      methodName = "append",
+      firstParameterName = "left",
+      secondParameterName = "right",
+      factoryName = "make",
+      occupiedTermNames = Set("make", "append", "combineFunction", "left", "right")
+    )
+
+    assertEquals(characterized.carrier.name.value, "combineFunction1")
+    assertEquals(
+      characterized.definition.syntax,
+      "def make[Element](combineFunction1: Element => Element => Element): Chain[Element] = new Chain[Element] { override def append(left: Element)(right: Element): Element = combineFunction1(left)(right) }"
+    )
+  }
+
   private final case class Characterized(
       typeParameter: Type.Param,
       target: Type,
@@ -178,6 +233,64 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
       implementation: Term.NewAnonymous,
       definition: Defn.Def
   )
+
+  private final case class CharacterizedCurriedMethod(
+      carrier: Term.Param,
+      target: Type,
+      overrideMember: Defn.Def,
+      implementation: Term.NewAnonymous,
+      definition: Defn.Def
+  )
+
+  private def characterizeCurriedMethod(
+      traitName: String,
+      typeParameterName: String,
+      methodName: String,
+      firstParameterName: String,
+      secondParameterName: String,
+      factoryName: String,
+      occupiedTermNames: Set[String]
+  ): CharacterizedCurriedMethod =
+    val targetName = Type.Name(traitName)
+    val typeName = Type.Name(typeParameterName)
+    val memberName = Term.Name(methodName)
+    val firstName = Term.Name(firstParameterName)
+    val secondName = Term.Name(secondParameterName)
+    val factory = Term.Name(factoryName)
+    val carrierName = Term.Name(
+      freshCarrierName("combineFunction", occupiedTermNames)
+    )
+    val typeParameter: Type.Param = tparam"$typeName"
+    val target: Type = t"$targetName[$typeName]"
+    val nestedFunctionType: Type =
+      Type.Function(
+        List(typeName),
+        Type.Function(List(typeName), typeName)
+      )
+    val carrier: Term.Param = param"$carrierName: $nestedFunctionType"
+    val firstParameter: Term.Param = param"$firstName: $typeName"
+    val secondParameter: Term.Param = param"$secondName: $typeName"
+    val nestedApplication: Term =
+      Term.Apply(
+        Term.Apply(carrierName, List(firstName)),
+        List(secondName)
+      )
+    val overrideMember: Defn.Def =
+      q"override def $memberName($firstParameter)($secondParameter): $typeName = $nestedApplication"
+    val parent = Init(target, Name.Anonymous(), List.empty[Term.ArgClause])
+    val implementationStats: List[Stat] = List(overrideMember)
+    val implementation: Term.NewAnonymous =
+      q"new $parent { ..$implementationStats }"
+    val definition: Defn.Def =
+      q"def $factory[$typeParameter]($carrier): $target = $implementation"
+
+    CharacterizedCurriedMethod(
+      carrier,
+      target,
+      overrideMember,
+      implementation,
+      definition
+    )
 
   private def characterizeAbstractType(
       traitName: String,
