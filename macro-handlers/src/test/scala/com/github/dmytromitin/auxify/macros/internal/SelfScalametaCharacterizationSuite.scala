@@ -74,33 +74,54 @@ class SelfScalametaCharacterizationSuite extends munit.FunSuite:
     assertEquals(result.fBoundEquality.map(_.syntax), Some("type ThisNode = node.ThisNode"))
   }
 
-  test("four lower-bound and F-bound combinations retain their semantic distinctions") {
-    val combinations = List(
-      (true, true, Some("self.type"), "Nat {\n  type Self = self.Self\n}"),
-      (true, false, Some("self.type"), "Nat"),
-      (false, true, None, "Nat {\n  type Self = self.Self\n}"),
-      (false, false, None, "Nat")
-    )
-
-    combinations.foreach: (lowerBound, fBound, expectedLower, expectedUpper) =>
-      val result = characterize(
-        traitName = "Nat",
+  test("three non-default option rows differ from the renamed default on only the selected bounds") {
+    def optionRow(lowerBound: Boolean, fBound: Boolean): Characterization =
+      characterize(
+        traitName = "Domain",
         typeParameterNames = Nil,
-        selfMemberName = "Self",
-        inputSelf = Self(Name.Anonymous(), None),
+        selfMemberName = "Element",
+        inputSelf = Self(Term.Name("owner$2"), None),
         originalBody = Nil,
         lowerBound = lowerBound,
         fBound = fBound
       )
 
-      assertEquals(result.lowerBound.map(_.syntax), expectedLower)
-      assertEquals(result.upperBound.syntax, expectedUpper)
-      assertEquals(result.fBoundEquality.nonEmpty, fBound)
-      val expectedMember =
-        expectedLower match
-          case Some(value) => s"type Self >: $value <: $expectedUpper"
-          case None => s"type Self <: $expectedUpper"
-      assertEquals(result.generatedMember.syntax, expectedMember)
+    val default = optionRow(lowerBound = true, fBound = true)
+    val lowerOnly = optionRow(lowerBound = true, fBound = false)
+    val fBoundOnly = optionRow(lowerBound = false, fBound = true)
+    val neither = optionRow(lowerBound = false, fBound = false)
+
+    assertEquals(
+      default.generatedMember.syntax,
+      "type Element >: owner$2.type <: Domain {\n  type Element = owner$2.Element\n}"
+    )
+    assertEquals(
+      lowerOnly.generatedMember.syntax,
+      "type Element >: owner$2.type <: Domain"
+    )
+    assertEquals(
+      fBoundOnly.generatedMember.syntax,
+      "type Element <: Domain {\n  type Element = owner$2.Element\n}"
+    )
+    assertEquals(neither.generatedMember.syntax, "type Element <: Domain")
+
+    assertEquals(lowerOnly.lowerBound.map(_.syntax), default.lowerBound.map(_.syntax))
+    assertEquals(lowerOnly.fBoundEquality, None)
+    assertEquals(fBoundOnly.lowerBound, None)
+    assertEquals(
+      fBoundOnly.fBoundEquality.map(_.syntax),
+      default.fBoundEquality.map(_.syntax)
+    )
+    assertEquals(neither.lowerBound, None)
+    assertEquals(neither.fBoundEquality, None)
+    assertEquals(
+      List(default, lowerOnly, fBoundOnly, neither).map(_.target.syntax).distinct,
+      List("Domain")
+    )
+    assertEquals(
+      List(default, lowerOnly, fBoundOnly, neither).map(_.outputSelf.name.value).distinct,
+      List("owner$2")
+    )
   }
 
   test("a named self alias is preserved while an anonymous self obtains neutral intent") {
