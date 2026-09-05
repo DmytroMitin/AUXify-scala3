@@ -17,14 +17,14 @@ class AddOutScalametaCharacterizationSuite extends munit.FunSuite:
       firstTypeParameterName = "N",
       secondTypeParameterName = "M",
       upperBoundName = "Nat",
-      typeMemberName = "Out",
+      typeMemberNames = List("Out"),
       contextualParameterName = "inst"
     )
 
     assertEquals(characterized.definition.syntax, CanonicalSource)
     assertEquals(characterized.typeParameters.map(_.syntax), List("N <: Nat", "M <: Nat"))
     assertEquals(characterized.target.syntax, "Add[N, M]")
-    assertEquals(characterized.selectedType.syntax, "inst.Out")
+    assertEquals(characterized.selectedTypes.map(_.syntax), List("inst.Out"))
     assertEquals(
       characterized.refinedType.syntax,
       """Add[N, M] {
@@ -43,7 +43,7 @@ class AddOutScalametaCharacterizationSuite extends munit.FunSuite:
       firstTypeParameterName = "Left",
       secondTypeParameterName = "Right",
       upperBoundName = "Domain",
-      typeMemberName = "Result",
+      typeMemberNames = List("Result"),
       contextualParameterName = "evidence"
     )
 
@@ -55,10 +55,85 @@ class AddOutScalametaCharacterizationSuite extends munit.FunSuite:
     )
   }
 
+  test("two-member full apply preserves both ordered evidence selections") {
+    val rows = List(
+      (
+        "BiApply",
+        "N",
+        "M",
+        "Nat",
+        List("Out", "Carry"),
+        "inst",
+        """def apply[N <: Nat, M <: Nat](using inst: BiApply[N, M]): BiApply[N, M] {
+          |  type Out = inst.Out
+          |  type Carry = inst.Carry
+          |} = inst""".stripMargin
+      ),
+      (
+        "BiEvidence",
+        "Left",
+        "Right",
+        "Domain",
+        List("Result", "Remainder"),
+        "evidence",
+        """def apply[Left <: Domain, Right <: Domain](using evidence: BiEvidence[Left, Right]): BiEvidence[Left, Right] {
+          |  type Result = evidence.Result
+          |  type Remainder = evidence.Remainder
+          |} = evidence""".stripMargin
+      )
+    )
+
+    rows.foreach:
+      (className, first, second, bound, members, evidence, expectedSource) =>
+        val characterized = characterize(
+          className,
+          first,
+          second,
+          bound,
+          members,
+          evidence
+        )
+
+        assertEquals(characterized.definition.syntax, expectedSource)
+        assertEquals(
+          characterized.typeParameters.map(_.name.value),
+          List(first, second)
+        )
+        assertEquals(
+          characterized.selectedTypes.map(_.syntax),
+          members.map(member => s"$evidence.$member")
+        )
+        characterized.definition.paramClauseGroups match
+          case List(group) =>
+            assertEquals(group.tparamClause.values, characterized.typeParameters)
+            group.paramClauses match
+              case List(clause) =>
+                assert(clause.mod.exists(_.isInstanceOf[Mod.Using]))
+                assertEquals(clause.values.map(_.name.value), List(evidence))
+                assertEquals(
+                  clause.values.head.decltpe.map(_.syntax),
+                  Some(characterized.target.syntax)
+                )
+              case other => fail(s"expected one contextual clause, found $other")
+          case other => fail(s"expected one parameter-clause group, found $other")
+        characterized.refinedType match
+          case Type.Refine(Some(base), refinements) =>
+            assertEquals(base.syntax, characterized.target.syntax)
+            assertEquals(
+              refinements.collect:
+                case member: Defn.Type => member.name.value -> member.body.syntax,
+              members.map(member => member -> s"$evidence.$member")
+            )
+          case other => fail(s"expected a two-member refined result, found $other")
+        characterized.definition.body match
+          case Term.Name(name) => assertEquals(name, evidence)
+          case other => fail(s"expected body Term.Name($evidence), found $other")
+  }
+
   private final case class Characterized(
       typeParameters: List[Type.Param],
       target: Type,
-      selectedType: Type,
+      selectedTypes: List[Type],
       refinedType: Type,
       definition: Defn.Def
   )
@@ -68,14 +143,14 @@ class AddOutScalametaCharacterizationSuite extends munit.FunSuite:
       firstTypeParameterName: String,
       secondTypeParameterName: String,
       upperBoundName: String,
-      typeMemberName: String,
+      typeMemberNames: List[String],
       contextualParameterName: String
   ): Characterized =
     val classNameTree = Type.Name(className)
     val firstTypeParameterNameTree = Type.Name(firstTypeParameterName)
     val secondTypeParameterNameTree = Type.Name(secondTypeParameterName)
     val upperBoundNameTree = Type.Name(upperBoundName)
-    val typeMemberNameTree = Type.Name(typeMemberName)
+    val typeMemberNameTrees = typeMemberNames.map(Type.Name(_))
     val contextualParameterNameTree = Term.Name(contextualParameterName)
 
     val firstTypeParameter: Type.Param =
@@ -86,17 +161,19 @@ class AddOutScalametaCharacterizationSuite extends munit.FunSuite:
     val typeArguments =
       List(firstTypeParameterNameTree, secondTypeParameterNameTree)
     val target: Type = t"$classNameTree[..$typeArguments]"
-    val selectedType: Type =
-      t"$contextualParameterNameTree.$typeMemberNameTree"
-    val refinedType: Type =
-      t"$target { type $typeMemberNameTree = $selectedType }"
+    val selectedTypes: List[Type] =
+      typeMemberNameTrees.map(member => t"$contextualParameterNameTree.$member")
+    val equalities: List[Stat] =
+      typeMemberNameTrees.zip(selectedTypes).map: (member, selected) =>
+        q"type $member = $selected"
+    val refinedType: Type = t"$target { ..$equalities }"
     val definition: Defn.Def =
       q"def apply[..$typeParameters](using $contextualParameterNameTree: $target): $refinedType = $contextualParameterNameTree"
 
     Characterized(
       typeParameters,
       target,
-      selectedType,
+      selectedTypes,
       refinedType,
       definition
     )
