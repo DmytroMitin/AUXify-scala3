@@ -30,7 +30,12 @@ trait Concrete[A]:
   def combine(a: A, a1: A): A
 
 @instance
-trait Polymorphic[A]:
+trait PolyEmpty[A]:
+  def empty[B]: A
+  def combine(a: A, a1: A): A
+
+@instance
+trait PolyCombine[A]:
   def empty: A
   def combine[B](a: A, a1: A): A
 

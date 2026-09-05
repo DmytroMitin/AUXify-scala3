@@ -241,6 +241,7 @@ if grep -Eq \
   fail "aux negative compile emitted an uncaught stack frame"
 fi
 
+run_sbt 'negativeInstanceUnsupported / clean'
 if run_sbt 'negativeInstanceUnsupported / Compile / compile' >"$instance_negative_log" 2>&1; then
   instance_negative_status=0
 else
@@ -259,7 +260,8 @@ for expected_diagnostic in \
   'type parameter `A` is covariant' \
   'type parameter `A` has an explicit or contextual bound' \
   'unsupported @instance source shape for `Concrete`: direct method `empty` must be abstract' \
-  'unsupported @instance source shape for `Polymorphic`: direct method `combine` must not declare method type parameters' \
+  'unsupported @instance source shape for `PolyEmpty`: direct method `empty` must not declare method type parameters' \
+  'unsupported @instance source shape for `PolyCombine`: direct method `combine` must not declare method type parameters' \
   'unsupported @instance source shape for `Reversed`: parameterless method `combine` must declare no parameter clauses; found 1' \
   'unsupported @instance source shape for `EmptyClause`: parameterless method `empty` must declare no parameter clauses; found 1' \
   'unsupported @instance source shape for `WrongArity`: binary method `combine` requires exactly two ordinary parameters; found 1' \
@@ -288,6 +290,12 @@ if grep -Eq \
   '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
   "$instance_negative_log"; then
   fail "instance negative compile emitted an uncaught stack frame"
+fi
+
+instance_classes="$product_root/negative-instance-unsupported/target/scala-$scala_version/classes"
+if [[ -d "$instance_classes" ]] && find "$instance_classes" -type f \
+  \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+  fail "instance rejection left partial class or TASTy output"
 fi
 
 run_sbt 'negativeCompositionLateRejection / clean'

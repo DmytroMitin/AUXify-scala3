@@ -139,12 +139,21 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       "direct method `empty` must be abstract"
     ),
     (
-      "polymorphic binary method",
-      """trait Polymorphic[A]:
+      "polymorphic parameterless-role method",
+      """trait PolyEmpty[A]:
+        |  def empty[B]: A
+        |  def combine(a: A, a1: A): A
+        |""".stripMargin,
+      "PolyEmpty",
+      "direct method `empty` must not declare method type parameters"
+    ),
+    (
+      "polymorphic binary-role method",
+      """trait PolyCombine[A]:
         |  def empty: A
         |  def combine[B](a: A, a1: A): A
         |""".stripMargin,
-      "Polymorphic",
+      "PolyCombine",
       "direct method `combine` must not declare method type parameters"
     ),
     (
@@ -261,6 +270,70 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     test(s"rejects $label") {
       assertRejected(decodeEither(source, traitName), traitName, reason)
     }
+  }
+
+  test("uses normalized method type parameters and rejects the first polymorphic method at its position") {
+    val singlePolymorphicRows = List(
+      (
+        """trait PolyEmpty[A]:
+          |  def empty[B]: A
+          |  def combine(a: A, a1: A): A
+          |""".stripMargin,
+        "PolyEmpty",
+        0,
+        "empty"
+      ),
+      (
+        """trait PolyCombine[A]:
+          |  def empty: A
+          |  def combine[B](a: A, a1: A): A
+          |""".stripMargin,
+        "PolyCombine",
+        1,
+        "combine"
+      )
+    )
+
+    singlePolymorphicRows.foreach { case (source, traitName, methodIndex, methodName) =>
+      val (classView, bodyView) = decodeViews(source, traitName)
+      val method = bodyView.members(methodIndex).method.getOrElse(
+        fail(s"missing normalized method evidence for $traitName.$methodName")
+      )
+
+      assertEquals(method.typeParameters.map(_.name), List("B"))
+      val diagnostic = InstanceSourceShapeDecoder
+        .decode(classView, bodyView)
+        .left
+        .toOption
+        .getOrElse(fail(s"$traitName unexpectedly decoded"))
+      assertEquals(
+        diagnostic.message,
+        s"unsupported @instance source shape for `$traitName`: direct method `$methodName` must not declare method type parameters"
+      )
+      assertEquals(diagnostic.pos, method.pos)
+    }
+
+    val (classView, bodyView) = decodeViews(
+      """trait BothPoly[A]:
+        |  def empty[B]: A
+        |  def combine[C](a: A, a1: A): A
+        |""".stripMargin,
+      "BothPoly"
+    )
+    val methods = bodyView.members.map(
+      _.method.getOrElse(fail("missing normalized method evidence for BothPoly"))
+    )
+    assertEquals(methods.map(_.typeParameters.map(_.name)), List(List("B"), List("C")))
+    val diagnostic = InstanceSourceShapeDecoder
+      .decode(classView, bodyView)
+      .left
+      .toOption
+      .getOrElse(fail("BothPoly unexpectedly decoded"))
+    assertEquals(
+      diagnostic.message,
+      "unsupported @instance source shape for `BothPoly`: direct method `empty` must not declare method type parameters"
+    )
+    assertEquals(diagnostic.pos, methods.head.pos)
   }
 
   test("rejects malformed normalized method evidence") {
