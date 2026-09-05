@@ -103,6 +103,55 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
     )
   }
 
+  test("Scala 3 quasiquotes characterize the one-abstract-type-member factory") {
+    val characterized = characterizeAbstractType(
+      traitName = "HasOut",
+      enclosingTypeParameterName = "A",
+      memberName = "Out",
+      factoryName = "instance",
+      occupiedTypeNames = Set("A", "Out")
+    )
+
+    assertEquals(characterized.generatedTypeParameter.name.value, "Out0")
+    assertEquals(characterized.target.syntax, "HasOut[A]")
+    assertEquals(
+      characterized.refinedReturnType.syntax,
+      """HasOut[A] {
+        |  type Out = Out0
+        |}""".stripMargin
+    )
+    assertEquals(characterized.returnEquality.syntax, "type Out = Out0")
+    assertEquals(characterized.implementationAlias.syntax, "type Out = Out0")
+    assertEquals(
+      characterized.definition.syntax,
+      """def instance[A, Out0]: HasOut[A] {
+        |  type Out = Out0
+        |} = new HasOut[A] { type Out = Out0 }""".stripMargin
+    )
+    assertEquals(
+      characterized.implementation.templ.stats.map(_.syntax),
+      List("type Out = Out0")
+    )
+  }
+
+  test("abstract-type characterization renames coherently and freshens a colliding readable type parameter") {
+    val characterized = characterizeAbstractType(
+      traitName = "Container",
+      enclosingTypeParameterName = "Element0",
+      memberName = "Element",
+      factoryName = "make",
+      occupiedTypeNames = Set("Element0", "Element")
+    )
+
+    assertEquals(characterized.generatedTypeParameter.name.value, "Element1")
+    assertEquals(
+      characterized.definition.syntax,
+      """def make[Element0, Element1]: Container[Element0] {
+        |  type Element = Element1
+        |} = new Container[Element0] { type Element = Element1 }""".stripMargin
+    )
+  }
+
   private final case class Characterized(
       typeParameter: Type.Param,
       target: Type,
@@ -119,6 +168,67 @@ class InstanceScalametaCharacterizationSuite extends munit.FunSuite:
       implementation: Term.NewAnonymous,
       definition: Defn.Def
   )
+
+  private final case class CharacterizedAbstractType(
+      generatedTypeParameter: Type.Param,
+      target: Type,
+      refinedReturnType: Type,
+      returnEquality: Defn.Type,
+      implementationAlias: Defn.Type,
+      implementation: Term.NewAnonymous,
+      definition: Defn.Def
+  )
+
+  private def characterizeAbstractType(
+      traitName: String,
+      enclosingTypeParameterName: String,
+      memberName: String,
+      factoryName: String,
+      occupiedTypeNames: Set[String]
+  ): CharacterizedAbstractType =
+    val targetName = Type.Name(traitName)
+    val enclosingTypeName = Type.Name(enclosingTypeParameterName)
+    val memberTypeName = Type.Name(memberName)
+    val generatedTypeName = Type.Name(
+      freshTypeParameterName(memberName, occupiedTypeNames)
+    )
+    val factory = Term.Name(factoryName)
+    val enclosingTypeParameter: Type.Param = tparam"$enclosingTypeName"
+    val generatedTypeParameter: Type.Param = tparam"$generatedTypeName"
+    val target: Type = t"$targetName[$enclosingTypeName]"
+    val returnEquality: Defn.Type =
+      q"type $memberTypeName = $generatedTypeName"
+    val refinedReturnType: Type =
+      t"$target { type $memberTypeName = $generatedTypeName }"
+    val implementationAlias: Defn.Type =
+      q"type $memberTypeName = $generatedTypeName"
+    val parent = Init(target, Name.Anonymous(), List.empty[Term.ArgClause])
+    val implementationStats: List[Stat] = List(implementationAlias)
+    val implementation: Term.NewAnonymous =
+      q"new $parent { ..$implementationStats }"
+    val typeParameters = List(enclosingTypeParameter, generatedTypeParameter)
+    val definition: Defn.Def =
+      q"def $factory[..$typeParameters]: $refinedReturnType = $implementation"
+
+    CharacterizedAbstractType(
+      generatedTypeParameter,
+      target,
+      refinedReturnType,
+      returnEquality,
+      implementationAlias,
+      implementation,
+      definition
+    )
+
+  private def freshTypeParameterName(
+      memberName: String,
+      occupied: Set[String]
+  ): String =
+    (0 to occupied.size)
+      .iterator
+      .map(index => s"$memberName$index")
+      .find(name => !occupied.contains(name))
+      .getOrElse(s"${memberName}0")
 
   private def characterizeAbstractVal(
       traitName: String,
