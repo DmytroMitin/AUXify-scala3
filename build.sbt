@@ -40,7 +40,7 @@ ThisBuild / developers := List(
 ThisBuild / pomIncludeRepository := (_ => false)
 
 val macroParadiseVersion =
-  sys.props.getOrElse("macroparadise.version", "0.1.1-SNAPSHOT")
+  sys.props.getOrElse("macroparadise.version", "0.1.1")
 val quasiquotesVersion =
   sys.props.getOrElse("quasiquotes.version", "0.3.0-SNAPSHOT")
 val scalaMetaVersion = "4.17.3"
@@ -343,11 +343,36 @@ lazy val root = project
         "<version>4.17.3</version>"
       ).foreach(token => require(handlerPom.contains(token), s"handler POM missing required dependency token: $token"))
       val handlerPomXml = scala.xml.XML.loadString(handlerPom)
+      def dependencyVersion(artifactId: String): Option[String] =
+        (handlerPomXml \\ "dependency")
+          .find(node => (node \ "artifactId").text == artifactId)
+          .map(node => (node \ "version").text)
+
+      require(
+        dependencyVersion(s"macroparadise-scala3-plugin-api_$line").contains(macroParadiseVersion),
+        s"handler POM Macro-Paradise API version does not match $macroParadiseVersion"
+      )
+      require(
+        dependencyVersion(s"quasiquotes-scala3-dotty-internal_$line").contains(quasiquotesVersion),
+        s"handler POM Quasiquotes version does not match $quasiquotesVersion"
+      )
+      if (!sys.props.contains("macroparadise.version")) {
+        require(
+          macroParadiseVersion == "0.1.1",
+          s"default development build requires released Macro-Paradise 0.1.1, found $macroParadiseVersion"
+        )
+      }
+      if (!sys.props.contains("quasiquotes.version")) {
+        require(
+          quasiquotesVersion == "0.3.0-SNAPSHOT",
+          s"default development build requires Quasiquotes 0.3.0-SNAPSHOT, found $quasiquotesVersion"
+        )
+      }
       val munitDependencies = (handlerPomXml \\ "dependency").filter(node =>
         (node \ "artifactId").text == "munit_3"
       )
       require(
-        munitDependencies.forall(node => (node \ "scope").text == "test"),
+        munitDependencies.nonEmpty && munitDependencies.forall(node => (node \ "scope").text == "test"),
         "MUnit leaked into the handler POM outside test scope"
       )
 
