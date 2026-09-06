@@ -46,8 +46,10 @@ That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
 The supported `@apply`, `@aux`, `@instance`, `@self`, and `@delegated` slices
-remain AUXify development artifacts. Macro-Paradise 0.1.1 is a public Maven
-dependency; AUXify and its Quasiquotes 0.3.0-SNAPSHOT integration remain
+remain AUXify development artifacts. The generic Macro-Paradise sbt plugin
+0.1.1 is public, while ordinary AUXify development uses a coherently
+source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT graph at the pinned
+accepted commit. AUXify and its Quasiquotes 0.3.0-SNAPSHOT integration remain
 local-development artifacts.
 
 ### Development module coordinates
@@ -199,12 +201,14 @@ broader Scala-2 `@instance` behavior remain outside this slice.
 
 Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
 Scala-3.3.8 parser's experimental method-level `erased`) through its normalized
-unsupported-modifier evidence. Such sources remain outside the supported
-`@instance` and `@delegated` contracts, but the current handlers cannot reliably
-reject them at admission: `infix` rows can compile and `erased` rows can fail
-only during later compiler checks. Do not rely on either behavior. The pending
-normalized method-modifier evidence gate must land before this boundary can be
-made deterministically fail-closed without raw compiler/source heuristics.
+unsupported-modifier evidence. Ordinary AUXify development therefore uses the
+accepted Macro-Paradise compiler/API 0.2.0-SNAPSHOT graph, built coherently from
+the pinned commit. With that graph, `@instance`, `@delegated`, and both source
+orders of `@apply` plus `@instance` reject the modifier-bearing role at
+admission with an AUXify-owned diagnostic and no partial output. The public
+0.1.1 dependency remains the release-shaped compatibility point; it is not the
+development hardening graph, and AUXify makes no claim that 0.2.0-SNAPSHOT is
+published remotely.
 
 Simple `@apply` and the bounded `@instance` slice may be stacked in either source
 order on that exact common family, with or without the optional final inherited
@@ -333,15 +337,17 @@ class or object targets remain later parity work.
 ## Using supported annotations from an sbt project
 
 The current external-consumer proof covers exact Scala 3.3.8, Scala 3.8.4, and
-Scala 3.9.0 LTS on JDK 25. Macro-Paradise 0.1.1 is consumed from its public
-Maven release. AUXify 0.1.0-SNAPSHOT and the required Quasiquotes
-0.3.0-SNAPSHOT integration remain development artifacts.
+Scala 3.9.0 LTS on JDK 25. The public Macro-Paradise sbt plugin remains 0.1.1;
+the selected compiler/API product is the accepted 0.2.0-SNAPSHOT development
+graph built from the pinned peer commit. AUXify 0.1.0-SNAPSHOT and the required
+Quasiquotes 0.3.0-SNAPSHOT integration remain development artifacts.
 
 ### Preferred development setup with the Macro-Paradise sbt plugin
 
-From an AUXify checkout, prepare the pinned Quasiquotes artifacts and publish
-the AUXify marker and handler to the local Ivy repository. The Macro-Paradise
-compiler/API and generic sbt plugin resolve from the public 0.1.1 release:
+From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API and
+Quasiquotes artifacts, then publish the AUXify marker and handler to the local
+Ivy repository. The generic Macro-Paradise sbt plugin resolves from its public
+0.1.1 release:
 
 ```sh
 AUXIFY_SCALA_VERSION=3.8.4 ./scripts/prepare-ci-dependencies.sh
@@ -354,17 +360,18 @@ qualified line. Omitting both selectors retains the default Scala 3.8.4 behavior
 Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the
 checked-in, reproducible helper for this local-development setup. It accepts
 exactly `AUXIFY_SCALA_VERSION=3.3.8`, `AUXIFY_SCALA_VERSION=3.8.4`, or
-`AUXIFY_SCALA_VERSION=3.9.0`, clones the exact pinned public Quasiquotes
-revision into a disposable temporary directory, verifies it, and publishes
-only the unreleased Quasiquotes artifacts that AUXify currently consumes into
-the local repository. It does not source-build or locally publish
-Macro-Paradise.
+`AUXIFY_SCALA_VERSION=3.9.0`, clones the exact pinned Macro-Paradise and
+Quasiquotes revisions into a disposable temporary directory, verifies both
+commit identities, and locally publishes the accepted Macro-Paradise
+0.2.0-SNAPSHOT compiler/API plus the unreleased Quasiquotes artifacts that
+AUXify currently consumes.
 
-The generic sbt plugin selects Macro-Paradise compiler/API version `0.1.1`
-through exact full-cross modules. Deliberate post-release experiments can still
-select another compiler/API version with `-Dmacroparadise.version=...`; any
-corresponding non-public artifacts must be prepared explicitly by that
-experiment.
+The generic sbt plugin selects Macro-Paradise compiler/API version
+`0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate experiments can
+still select another compiler/API version with `-Dmacroparadise.version=...`;
+any corresponding non-public artifacts must be prepared explicitly by that
+experiment. Release-shaped AUXify 0.1.0 verification continues to require the
+public Macro-Paradise 0.1.1 compiler/API dependency.
 
 The two sbt tasks then publish AUXify's own modules locally:
 
@@ -374,8 +381,9 @@ The two sbt tasks then publish AUXify's own modules locally:
   dependency metadata that lets sbt resolve its transitive classpath. It is
   published separately for each of the three exact compiler lines.
 
-These operations publish only AUXify and Quasiquotes development artifacts
-locally. They do not publish to Maven Central or another remote repository.
+These operations publish Macro-Paradise, AUXify, and Quasiquotes development
+artifacts locally. They do not publish to Maven Central or another remote
+repository.
 
 Pin sbt in the external project's `project/build.properties`:
 
@@ -472,7 +480,7 @@ lazy val root = project
     libraryDependencies ++= Seq(
       "com.github.dmytromitin" %% "auxify-scala3-macro-annotations" % auxifyVersion,
       compilerPlugin(
-        ("com.github.dmytromitin" % "macroparadise-scala3-plugin" % "0.1.1")
+        ("com.github.dmytromitin" % "macroparadise-scala3-plugin" % "0.2.0-SNAPSHOT")
           .cross(CrossVersion.full)
       ),
       (("com.github.dmytromitin" % "auxify-scala3-macro-handlers" % auxifyVersion)
@@ -605,8 +613,9 @@ AUXify-owned build policy—such as multiple handler bundles, feature selection,
 cross-version coordination, or migration tooling—that cannot be expressed
 cleanly through the generic settings. The peer has qualified and released the
 generic plugin and exact-full-cross compiler artifacts as Macro-Paradise 0.1.1.
-AUXify's own bounded development proof covers all three exact compiler lines
-with JDK 25.
+AUXify retains that public release boundary while its modifier-hardening
+development proof uses the accepted 0.2.0-SNAPSHOT compiler/API source graph
+across all three exact compiler lines with JDK 25.
 
 For example, `src/main/scala/ShowApp.scala` can contain:
 
@@ -641,10 +650,11 @@ The proven milestone creates a missing companion, or preserves an existing
 companion and adds the materializer when it has no direct member named
 `apply`. An existing direct `apply` is preserved and is not duplicated.
 
-The implementation depends on the public Scala 3 Macro-Paradise 0.1.1 compiler
-plugin and unreleased Quasiquotes 0.3.0-SNAPSHOT libraries. Preparing
-Quasiquotes and AUXify through local publication remains a development-only
-step; this README makes no claim that those artifacts are remotely available.
+The development implementation depends on the source-built Scala 3
+Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and unreleased Quasiquotes
+0.3.0-SNAPSHOT libraries. Preparing Macro-Paradise, Quasiquotes, and AUXify
+through local publication remains a development-only step; this README makes
+no claim that those snapshot artifacts are remotely available.
 
 The verified `@apply` target remains deliberately narrow: a top-level,
 non-sealed ordinary trait with no constructor or value parameters, using

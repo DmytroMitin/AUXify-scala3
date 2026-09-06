@@ -51,8 +51,11 @@ composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.
 apply_instance_composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-composition-negative.XXXXXX")"
 aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
 instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX")"
+instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-modifier-negative.XXXXXX")"
+delegated_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-modifier-negative.XXXXXX")"
+apply_instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-modifier-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -386,6 +389,74 @@ if [[ -d "$apply_instance_composition_classes" ]] && find "$apply_instance_compo
   fail "apply-instance late rejection left partial class or TASTy output"
 fi
 
+verify_method_modifier_negative() {
+  local project="$1"
+  local label="$2"
+  local output_directory="$3"
+  local log_file="$4"
+  shift 4
+
+  run_sbt "$project / clean"
+  if run_sbt "$project / Compile / compile" >"$log_file" 2>&1; then
+    local compile_status=0
+  else
+    local compile_status=$?
+  fi
+
+  printf '%s\n' "--- controlled $label method-modifier rejection ---"
+  cat "$log_file"
+
+  [[ "$compile_status" -ne 0 ]] ||
+    fail "$project compiled successfully; modifier-bearing source was admitted"
+
+  local expected_diagnostic
+  for expected_diagnostic in "$@"; do
+    grep -Fq -- "$expected_diagnostic" "$log_file" ||
+      fail "$project omitted expected diagnostic: $expected_diagnostic"
+  done
+
+  if grep -Eiq \
+    'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+    "$log_file"; then
+    fail "$project emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+  fi
+
+  if grep -Eq \
+    '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+    "$log_file"; then
+    fail "$project emitted an uncaught stack frame"
+  fi
+
+  if [[ -d "$output_directory" ]] && find "$output_directory" -type f \
+    \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+    fail "$project rejection left partial class or TASTy output"
+  fi
+}
+
+verify_method_modifier_negative \
+  negativeInstanceMethodModifiers \
+  instance \
+  "$product_root/negative-instance-method-modifiers/target/scala-$scala_version/classes" \
+  "$instance_modifier_negative_log" \
+  'unsupported @instance source shape for `InfixEmpty`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixCombine`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers'
+
+verify_method_modifier_negative \
+  negativeDelegatedMethodModifiers \
+  delegated \
+  "$product_root/negative-delegated-method-modifiers/target/scala-$scala_version/classes" \
+  "$delegated_modifier_negative_log" \
+  'unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers'
+
+verify_method_modifier_negative \
+  negativeApplyInstanceMethodModifiers \
+  apply-instance \
+  "$product_root/negative-apply-instance-method-modifiers/target/scala-$scala_version/classes" \
+  "$apply_instance_modifier_negative_log" \
+  'unsupported @instance source shape for `InfixApplyThenInstance`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixInstanceThenApply`: direct method `empty` must be public, unannotated, and free of unsupported modifiers'
+
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
@@ -439,6 +510,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

@@ -28,7 +28,7 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
     assertEquals(observed, expected)
   }
 
-  test("released normalized views make accepted infix roles look modifier-free") {
+  test("corrected normalized views expose infix on every accepted method role") {
     val plainInstance = directMethods(
       """trait Plain[A]:
         |  def empty: A
@@ -58,9 +58,13 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
       "InfixShow"
     ).head
 
-    assertEquals(infixInstance.map(_.modifiers), plainInstance.map(_.modifiers))
-    assertEquals(infixDelegated.modifiers, plainDelegated.modifiers)
-    assert(infixInstance.forall(_.modifiers.unsupportedFlags.isEmpty))
+    assert(plainInstance.forall(_.modifiers.unsupportedFlags.isEmpty))
+    assert(plainDelegated.modifiers.unsupportedFlags.isEmpty)
+    assertEquals(
+      infixInstance.map(_.modifiers.unsupportedFlags),
+      List.fill(3)(List("infix"))
+    )
+    assertEquals(infixDelegated.modifiers.unsupportedFlags, List("infix"))
     assertEquals(
       infixInstance.map(_.status),
       List(
@@ -76,7 +80,7 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
     assert(infixDelegated.resultTypePos.span.exists)
   }
 
-  test("Scala 3.3.8 released views make accepted erased roles look modifier-free") {
+  test("Scala 3.3.8 corrected views expose erased on every accepted method role") {
     if scala.util.Properties.versionNumberString == "3.3.8" then
       val plain = directMethods(
         """trait Plain[A]:
@@ -95,8 +99,11 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
         "Erased"
       )
 
-      assertEquals(erased.map(_.modifiers), plain.map(_.modifiers))
-      assert(erased.forall(_.modifiers.unsupportedFlags.isEmpty))
+      assert(plain.forall(_.modifiers.unsupportedFlags.isEmpty))
+      assertEquals(
+        erased.map(_.modifiers.unsupportedFlags),
+        List.fill(3)(List("erased"))
+      )
       assertEquals(erased.map(_.status), plain.map(_.status))
       assert(erased.forall(_.pos.span.exists))
   }

@@ -4,7 +4,6 @@ import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
-import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
@@ -58,46 +57,100 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
-  test("characterizes current admission of an invisible infix abstract role") {
-    withExpansionInput(
-      """@current
-        |trait InfixEmptyMonoid[A]:
-        |  infix def empty: A
-        |  def combine(a: A, a1: A): A
-        |""".stripMargin,
-      "InfixEmptyMonoid"
-    ) { (input, _, _, context) =>
-      given Context = context
-      val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
-        case other => fail(s"expected current structured admission, found $other")
-      assertEquals(method.name.toString, "instance")
-      assert(
-        generatedOverrides(method).forall(_.mods.flags == (Flags.Method | Flags.Override))
+  test("rejects normalized infix evidence on every instance method role") {
+    List(
+      (
+        "InfixEmptyMonoid",
+        """@current
+          |trait InfixEmptyMonoid[A]:
+          |  infix def empty: A
+          |  def combine(a: A, a1: A): A
+          |""".stripMargin,
+        "direct method `empty`"
+      ),
+      (
+        "InfixCombineMonoid",
+        """@current
+          |trait InfixCombineMonoid[A]:
+          |  def empty: A
+          |  infix def combine(a: A, a1: A): A
+          |""".stripMargin,
+        "direct method `combine`"
+      ),
+      (
+        "InfixConcreteMonoid",
+        """@current
+          |trait InfixConcreteMonoid[A]:
+          |  def empty: A
+          |  def combine(a: A, a1: A): A
+          |  infix def twice(a: A): A = combine(a, a)
+          |""".stripMargin,
+        "inherited concrete method `twice`"
       )
-    }
+    ).foreach: (traitName, source, role) =>
+      withExpansionInput(
+        source,
+        traitName
+      ) { (input, primary, _, context) =>
+        given Context = context
+        new InstanceHandler().expand(input) match
+          case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+            assertEquals(
+              diagnostics.map(_.message),
+              List(
+                s"unsupported @instance source shape for `$traitName`: $role must be public, unannotated, and free of unsupported modifiers"
+              )
+            )
+            assert(fallback.eq(primary), clue(fallback))
+          case other => fail(s"expected controlled normalized rejection, found $other")
+      }
   }
 
-  test("characterizes Scala 3.3.8 handler admission of invisible erased roles") {
+  test("rejects Scala 3.3.8 normalized erased evidence on every instance method role") {
     if scala.util.Properties.versionNumberString == "3.3.8" then
-      withExpansionInput(
-        """@current
-          |trait ErasedInstance[A]:
-          |  erased def empty: A
-          |  erased def combine(a: A, a1: A): A
-          |  erased def twice(a: A): A = combine(a, a)
-          |""".stripMargin,
-        "ErasedInstance"
-      ) { (input, _, _, context) =>
-        given Context = context
-        val method = new InstanceHandler().expand(input) match
-          case ExpansionOutcome.Structured(output) => generatedInstance(output)
-          case other => fail(s"expected current structured admission, found $other")
-        assertEquals(method.name.toString, "instance")
-        assert(
-          generatedOverrides(method).forall(_.mods.flags == (Flags.Method | Flags.Override))
+      List(
+        (
+          "ErasedEmptyMonoid",
+          """@current
+            |trait ErasedEmptyMonoid[A]:
+            |  erased def empty: A
+            |  def combine(a: A, a1: A): A
+            |""".stripMargin,
+          "direct method `empty`"
+        ),
+        (
+          "ErasedCombineMonoid",
+          """@current
+            |trait ErasedCombineMonoid[A]:
+            |  def empty: A
+            |  erased def combine(a: A, a1: A): A
+            |""".stripMargin,
+          "direct method `combine`"
+        ),
+        (
+          "ErasedConcreteMonoid",
+          """@current
+            |trait ErasedConcreteMonoid[A]:
+            |  def empty: A
+            |  def combine(a: A, a1: A): A
+            |  erased def twice(a: A): A = combine(a, a)
+            |""".stripMargin,
+          "inherited concrete method `twice`"
         )
-      }
+      ).foreach: (traitName, source, role) =>
+        withExpansionInput(source, traitName) { (input, primary, _, context) =>
+          given Context = context
+          new InstanceHandler().expand(input) match
+            case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+              assertEquals(
+                diagnostics.map(_.message),
+                List(
+                  s"unsupported @instance source shape for `$traitName`: $role must be public, unannotated, and free of unsupported modifiers"
+                )
+              )
+              assert(fallback.eq(primary), clue(fallback))
+            case other => fail(s"expected controlled normalized rejection, found $other")
+        }
   }
 
   test("derives coherently renamed source names") {
@@ -280,9 +333,3 @@ class InstanceHandlerSuite extends munit.FunSuite:
         case method: DefDef if method.name.toString == "instance" => method
       }
       .getOrElse(fail("missing generated instance method"))
-
-  private def generatedOverrides(factory: DefDef)(using Context): List[DefDef] =
-    factory.rhs match
-      case New(template: Template) =>
-        template.body.collect { case method: DefDef => method }
-      case other => fail(s"missing generated anonymous instance in $other")

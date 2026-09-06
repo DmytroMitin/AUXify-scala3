@@ -40,7 +40,7 @@ ThisBuild / developers := List(
 ThisBuild / pomIncludeRepository := (_ => false)
 
 val macroParadiseVersion =
-  sys.props.getOrElse("macroparadise.version", "0.1.1")
+  sys.props.getOrElse("macroparadise.version", "0.2.0-SNAPSHOT")
 val quasiquotesVersion =
   sys.props.getOrElse("quasiquotes.version", "0.3.0-SNAPSHOT")
 val scalaMetaVersion = "4.17.3"
@@ -169,6 +169,21 @@ lazy val negativeApplyInstanceComposition = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeInstanceMethodModifiers = project
+  .in(file("negative-instance-method-modifiers"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
+lazy val negativeDelegatedMethodModifiers = project
+  .in(file("negative-delegated-method-modifiers"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
+lazy val negativeApplyInstanceMethodModifiers = project
+  .in(file("negative-apply-instance-method-modifiers"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val negativeAuxUnsupported = project
   .in(file("negative-aux-unsupported"))
   .dependsOn(macroAnnotations)
@@ -244,6 +259,9 @@ lazy val root = project
         "negativeDelegatedUnsupported" -> (negativeDelegatedUnsupported / publish / skip).value,
         "negativeCompositionLateRejection" -> (negativeCompositionLateRejection / publish / skip).value,
         "negativeApplyInstanceComposition" -> (negativeApplyInstanceComposition / publish / skip).value,
+        "negativeInstanceMethodModifiers" -> (negativeInstanceMethodModifiers / publish / skip).value,
+        "negativeDelegatedMethodModifiers" -> (negativeDelegatedMethodModifiers / publish / skip).value,
+        "negativeApplyInstanceMethodModifiers" -> (negativeApplyInstanceMethodModifiers / publish / skip).value,
         "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value,
         "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value
       )
@@ -358,8 +376,8 @@ lazy val root = project
       )
       if (!sys.props.contains("macroparadise.version")) {
         require(
-          macroParadiseVersion == "0.1.1",
-          s"default development build requires released Macro-Paradise 0.1.1, found $macroParadiseVersion"
+          macroParadiseVersion == "0.2.0-SNAPSHOT",
+          s"default development build requires accepted Macro-Paradise 0.2.0-SNAPSHOT, found $macroParadiseVersion"
         )
       }
       if (!sys.props.contains("quasiquotes.version")) {

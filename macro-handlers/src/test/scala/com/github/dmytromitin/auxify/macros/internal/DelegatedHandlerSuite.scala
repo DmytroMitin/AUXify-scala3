@@ -4,7 +4,6 @@ import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
-import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
@@ -54,24 +53,29 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
-  test("characterizes current admission of an invisible infix abstract role") {
+  test("rejects normalized infix evidence on the delegated method role") {
     withExpansionInput(
       """@current
         |trait InfixShow[A]:
         |  infix def show(a: A): String
         |""".stripMargin,
       "InfixShow"
-    ) { (input, _, _, context) =>
+    ) { (input, primary, _, context) =>
       given Context = context
-      val method = new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedMethod(output, "show")
-        case other => fail(s"expected current structured admission, found $other")
-      assertEquals(method.name.toString, "show")
-      assertEquals(method.mods.flags, Flags.Method)
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
+            )
+          )
+          assert(fallback.eq(primary), clue(fallback))
+        case other => fail(s"expected controlled normalized rejection, found $other")
     }
   }
 
-  test("characterizes Scala 3.3.8 handler admission of an invisible erased role") {
+  test("rejects Scala 3.3.8 normalized erased evidence on the delegated method role") {
     if scala.util.Properties.versionNumberString == "3.3.8" then
       withExpansionInput(
         """@current
@@ -79,13 +83,18 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           |  erased def show(a: A): String
           |""".stripMargin,
         "ErasedShow"
-      ) { (input, _, _, context) =>
+      ) { (input, primary, _, context) =>
         given Context = context
-        val method = new DelegatedHandler().expand(input) match
-          case ExpansionOutcome.Structured(output) => generatedMethod(output, "show")
-          case other => fail(s"expected current structured admission, found $other")
-        assertEquals(method.name.toString, "show")
-        assertEquals(method.mods.flags, Flags.Method)
+        new DelegatedHandler().expand(input) match
+          case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+            assertEquals(
+              diagnostics.map(_.message),
+              List(
+                "unsupported @delegated source shape for `ErasedShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
+              )
+            )
+            assert(fallback.eq(primary), clue(fallback))
+          case other => fail(s"expected controlled normalized rejection, found $other")
       }
   }
 
