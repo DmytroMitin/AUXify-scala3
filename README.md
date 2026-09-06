@@ -197,6 +197,15 @@ signatures, reordered abstract methods, extra members, multiple or
 contextual/default clauses, method type parameters, modifiers/annotations, and
 broader Scala-2 `@instance` behavior remain outside this slice.
 
+Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
+Scala-3.3.8 parser's experimental method-level `erased`) through its normalized
+unsupported-modifier evidence. Such sources remain outside the supported
+`@instance` and `@delegated` contracts, but the current handlers cannot reliably
+reject them at admission: `infix` rows can compile and `erased` rows can fail
+only during later compiler checks. Do not rely on either behavior. The pending
+normalized method-modifier evidence gate must land before this boundary can be
+made deterministically fail-closed without raw compiler/source heuristics.
+
 Simple `@apply` and the bounded `@instance` slice may be stacked in either source
 order on that exact common family, with or without the optional final inherited
 concrete unary method:

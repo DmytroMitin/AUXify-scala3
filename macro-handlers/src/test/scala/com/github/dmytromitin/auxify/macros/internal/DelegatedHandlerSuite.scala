@@ -4,6 +4,7 @@ import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
+import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
@@ -51,6 +52,41 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
       assertEquals(method.trailingParamss.map(_.map(_.name.toString)), List(List("a"), List("inst")))
     }
+  }
+
+  test("characterizes current admission of an invisible infix abstract role") {
+    withExpansionInput(
+      """@current
+        |trait InfixShow[A]:
+        |  infix def show(a: A): String
+        |""".stripMargin,
+      "InfixShow"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(output) => generatedMethod(output, "show")
+        case other => fail(s"expected current structured admission, found $other")
+      assertEquals(method.name.toString, "show")
+      assertEquals(method.mods.flags, Flags.Method)
+    }
+  }
+
+  test("characterizes Scala 3.3.8 handler admission of an invisible erased role") {
+    if scala.util.Properties.versionNumberString == "3.3.8" then
+      withExpansionInput(
+        """@current
+          |trait ErasedShow[A]:
+          |  erased def show(a: A): String
+          |""".stripMargin,
+        "ErasedShow"
+      ) { (input, _, _, context) =>
+        given Context = context
+        val method = new DelegatedHandler().expand(input) match
+          case ExpansionOutcome.Structured(output) => generatedMethod(output, "show")
+          case other => fail(s"expected current structured admission, found $other")
+        assertEquals(method.name.toString, "show")
+        assertEquals(method.mods.flags, Flags.Method)
+      }
   }
 
   test("appends the generated method after preserving unrelated companion members") {

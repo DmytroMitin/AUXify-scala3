@@ -4,6 +4,7 @@ import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
+import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
@@ -55,6 +56,48 @@ class InstanceHandlerSuite extends munit.FunSuite:
         List("emptyValue", "combineFunction")
       )
     }
+  }
+
+  test("characterizes current admission of an invisible infix abstract role") {
+    withExpansionInput(
+      """@current
+        |trait InfixEmptyMonoid[A]:
+        |  infix def empty: A
+        |  def combine(a: A, a1: A): A
+        |""".stripMargin,
+      "InfixEmptyMonoid"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case other => fail(s"expected current structured admission, found $other")
+      assertEquals(method.name.toString, "instance")
+      assert(
+        generatedOverrides(method).forall(_.mods.flags == (Flags.Method | Flags.Override))
+      )
+    }
+  }
+
+  test("characterizes Scala 3.3.8 handler admission of invisible erased roles") {
+    if scala.util.Properties.versionNumberString == "3.3.8" then
+      withExpansionInput(
+        """@current
+          |trait ErasedInstance[A]:
+          |  erased def empty: A
+          |  erased def combine(a: A, a1: A): A
+          |  erased def twice(a: A): A = combine(a, a)
+          |""".stripMargin,
+        "ErasedInstance"
+      ) { (input, _, _, context) =>
+        given Context = context
+        val method = new InstanceHandler().expand(input) match
+          case ExpansionOutcome.Structured(output) => generatedInstance(output)
+          case other => fail(s"expected current structured admission, found $other")
+        assertEquals(method.name.toString, "instance")
+        assert(
+          generatedOverrides(method).forall(_.mods.flags == (Flags.Method | Flags.Override))
+        )
+      }
   }
 
   test("derives coherently renamed source names") {
@@ -237,3 +280,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
         case method: DefDef if method.name.toString == "instance" => method
       }
       .getOrElse(fail("missing generated instance method"))
+
+  private def generatedOverrides(factory: DefDef)(using Context): List[DefDef] =
+    factory.rhs match
+      case New(template: Template) =>
+        template.body.collect { case method: DefDef => method }
+      case other => fail(s"missing generated anonymous instance in $other")
