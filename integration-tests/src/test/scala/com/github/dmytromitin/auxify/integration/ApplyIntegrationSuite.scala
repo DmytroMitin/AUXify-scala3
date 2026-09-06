@@ -27,3 +27,10 @@ class ApplyIntegrationSuite extends munit.FunSuite:
     assert(ExistingApply[String](using existingInstance) eq existingInstance)
     assertEquals(ExistingApply.calls, 1)
   }
+
+  test("simple apply remains body-independent for the inherited concrete-method family") {
+    val selected = AppliedDerivedMonoid[Int]
+
+    assertEquals(selected.twice(21), 42)
+    assertEquals(AppliedDerivedMonoid.preserved, 84)
+  }

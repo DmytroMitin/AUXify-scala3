@@ -70,3 +70,77 @@ object ExistingBoth:
       def empty: A = value
       def combine(a: A, a1: A): A = combineFunction(a, a1)
   val retained = 13
+
+@apply
+@instance
+trait DerivedApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+
+object DerivedApplyThenInstance:
+  val preservedBefore = 141
+  val preservedAfter = 143
+
+@instance
+@apply
+trait DerivedInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def duplicate(value: Element): Element = select(value, value)
+
+object DerivedInstanceThenApply:
+  val preserved = 184
+
+@apply
+@instance
+trait DerivedExistingApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+
+object DerivedExistingApplyThenInstance:
+  var applyCalls = 0
+  def apply[A](using value: DerivedExistingApplyThenInstance[A]): DerivedExistingApplyThenInstance[A] =
+    applyCalls += 1
+    value
+  val retained = 107
+
+@instance
+@apply
+trait DerivedExistingInstanceThenApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+
+object DerivedExistingInstanceThenApply:
+  var instanceCalls = 0
+  def instance[A](
+      value: A,
+      combineFunction: (A, A) => A
+  ): DerivedExistingInstanceThenApply[A] =
+    instanceCalls += 1
+    new DerivedExistingInstanceThenApply[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
+  val retained = 111
+
+@apply
+@instance
+trait DerivedExistingBoth[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+
+object DerivedExistingBoth:
+  var applyCalls = 0
+  var instanceCalls = 0
+  def apply[A](using value: DerivedExistingBoth[A]): DerivedExistingBoth[A] =
+    applyCalls += 1
+    value
+  def instance[A](value: A, combineFunction: (A, A) => A): DerivedExistingBoth[A] =
+    instanceCalls += 1
+    new DerivedExistingBoth[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
+  val retained = 113

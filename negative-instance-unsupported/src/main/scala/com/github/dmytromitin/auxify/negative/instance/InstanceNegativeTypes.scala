@@ -113,3 +113,102 @@ trait AnnotatedMethod[A]:
   def empty: A
   @deprecated("unsupported", "")
   def combine(a: A, a1: A): A
+
+@instance
+trait ThirdAbstract[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A
+
+@instance
+trait TwoConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+  def thrice(a: A): A = combine(twice(a), a)
+
+@instance
+trait ConcreteVal[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  val extra: A = ???
+
+@instance
+trait ConcreteVar[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  var extra: A = ???
+
+@instance
+trait ConcreteLazyVal[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  lazy val extra: A = ???
+
+@instance
+trait PolyConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice[B](a: A): A = combine(a, a)
+
+@instance
+trait ProtectedConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  protected def twice(a: A): A = combine(a, a)
+
+@instance
+trait PrivateConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  private def twice(a: A): A = combine(a, a)
+
+@instance
+trait AnnotatedConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  @deprecated("unsupported", "")
+  def twice(a: A): A = combine(a, a)
+
+@instance
+trait InlineConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  inline def twice(a: A): A = combine(a, a)
+
+@instance
+trait WrongConcreteArity[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A, a1: A): A = combine(a, a1)
+
+@instance
+trait WrongConcreteParameter[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: Other): A = empty
+
+@instance
+trait WrongConcreteResult[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): Other = ???
+
+@instance
+trait DefaultedConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A = empty): A = combine(a, a)
+
+@instance
+trait ContextualConcrete[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(using a: A): A = combine(a, a)
+
+@instance
+trait ConcretePlusUnsupported[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+  trait Nested

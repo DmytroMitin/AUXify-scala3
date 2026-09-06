@@ -29,3 +29,15 @@ object ExistingApply:
   def apply[T](using inst: ExistingApply[T]): ExistingApply[T] =
     calls += 1
     inst
+
+@apply
+trait AppliedDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+
+object AppliedDerivedMonoid:
+  val preserved = 84
+  given AppliedDerivedMonoid[Int] with
+    def empty: Int = 0
+    def combine(a: Int, a1: Int): Int = a + a1

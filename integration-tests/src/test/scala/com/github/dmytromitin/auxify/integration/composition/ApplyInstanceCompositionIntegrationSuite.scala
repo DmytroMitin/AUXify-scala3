@@ -65,3 +65,55 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(ExistingBoth.instanceCalls, 1)
     assertEquals(ExistingBoth.retained, 13)
   }
+
+  test("apply then instance supports the inherited concrete-method envelope") {
+    val constructed = DerivedApplyThenInstance.instance(0, _ + _)
+    given DerivedApplyThenInstance[Int] = constructed
+
+    assert(DerivedApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.twice(21), 42)
+    assertEquals(DerivedApplyThenInstance.preservedBefore, 141)
+    assertEquals(DerivedApplyThenInstance.preservedAfter, 143)
+  }
+
+  test("instance then apply supports a renamed inherited concrete method") {
+    val constructed = DerivedInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given DerivedInstanceThenApply[String] = constructed
+
+    assert(DerivedInstanceThenApply[String].eq(constructed))
+    assertEquals(constructed.duplicate("same"), "same/same")
+    assertEquals(DerivedInstanceThenApply.preserved, 184)
+  }
+
+  test("a concrete-family existing apply preserves only apply") {
+    val constructed = DerivedExistingApplyThenInstance.instance(0, _ + _)
+    given DerivedExistingApplyThenInstance[Int] = constructed
+
+    assert(DerivedExistingApplyThenInstance[Int].eq(constructed))
+    assertEquals(DerivedExistingApplyThenInstance.applyCalls, 1)
+    assertEquals(constructed.twice(21), 42)
+    assertEquals(DerivedExistingApplyThenInstance.retained, 107)
+  }
+
+  test("a concrete-family existing instance preserves only instance") {
+    given DerivedExistingInstanceThenApply[Int] =
+      DerivedExistingInstanceThenApply.instance(0, _ + _)
+
+    val selected = DerivedExistingInstanceThenApply[Int]
+    assertEquals(selected.twice(21), 42)
+    assertEquals(DerivedExistingInstanceThenApply.instanceCalls, 1)
+    assertEquals(DerivedExistingInstanceThenApply.retained, 111)
+  }
+
+  test("a concrete-family pair of existing methods remains deterministic") {
+    given DerivedExistingBoth[Int] = DerivedExistingBoth.instance(0, _ + _)
+
+    val selected = DerivedExistingBoth[Int]
+    assertEquals(selected.twice(21), 42)
+    assertEquals(DerivedExistingBoth.applyCalls, 1)
+    assertEquals(DerivedExistingBoth.instanceCalls, 1)
+    assertEquals(DerivedExistingBoth.retained, 113)
+  }

@@ -74,6 +74,54 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("admits one third-position concrete unary method without changing the factory shape") {
+    val decoded = decode(
+      """trait DerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "DerivedMonoid"
+    )
+
+    assertEquals(
+      decoded,
+      InstanceSourceShapeDecoder.SourceShape(
+        traitName = "DerivedMonoid",
+        enclosingTypeParameterName = "A",
+        parameterlessMethodName = "empty",
+        binaryMethodName = "combine",
+        binaryFirstParameterName = "a",
+        binarySecondParameterName = "a1",
+        parameterlessCarrierName = "emptyValue",
+        binaryCarrierName = "combineFunction"
+      )
+    )
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): DerivedMonoid[A] = new DerivedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("derives renamed concrete-method evidence and includes it in carrier freshness") {
+    val decoded = decode(
+      """trait DerivedChoice[Element]:
+        |  def fallback: Element
+        |  def select(left: Element, right: Element): Element
+        |  def emptyValue(combineFunction: Element): Element = select(combineFunction, combineFunction)
+        |""".stripMargin,
+      "DerivedChoice"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue1")
+    assertEquals(decoded.binaryCarrierName, "combineFunction1")
+    assertEquals(decoded.parameterlessMethodName, "fallback")
+    assertEquals(decoded.binaryMethodName, "select")
+  }
+
   private val rejectedShapes = List(
     (
       "variant enclosing type parameter",
@@ -118,7 +166,128 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |  val extra: A
         |""".stripMargin,
       "Extra",
-      "requires exactly two direct body members; found 3"
+      "direct body member at index 2 must be a method; found val"
+    ),
+    (
+      "third abstract method",
+      """trait ThirdAbstract[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A
+        |""".stripMargin,
+      "ThirdAbstract",
+      "inherited method `twice` must be concrete"
+    ),
+    (
+      "two concrete methods",
+      """trait TwoConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |  def thrice(a: A): A = combine(twice(a), a)
+        |""".stripMargin,
+      "TwoConcrete",
+      "requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4"
+    ),
+    (
+      "polymorphic concrete method",
+      """trait PolyConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice[B](a: A): A = combine(a, a)
+        |""".stripMargin,
+      "PolyConcrete",
+      "inherited concrete method `twice` must not declare method type parameters"
+    ),
+    (
+      "protected concrete method",
+      """trait ProtectedConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  protected def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "ProtectedConcrete",
+      "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "private concrete method",
+      """trait PrivateConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  private def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "PrivateConcrete",
+      "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "annotated concrete method",
+      """trait AnnotatedConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  @deprecated def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "AnnotatedConcrete",
+      "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "inline concrete method",
+      """trait InlineConcrete[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  inline def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "InlineConcrete",
+      "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "wrong concrete parameter count",
+      """trait ConcreteArity[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A, a1: A): A = combine(a, a1)
+        |""".stripMargin,
+      "ConcreteArity",
+      "inherited concrete method `twice` requires exactly one ordinary parameter; found 2"
+    ),
+    (
+      "wrong concrete parameter type",
+      """trait ConcreteParameter[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: Other): A = empty
+        |""".stripMargin,
+      "ConcreteParameter",
+      "inherited concrete method `twice` parameter `a` must use enclosing type parameter `A`"
+    ),
+    (
+      "wrong concrete result type",
+      """trait ConcreteResult[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): Other = ???
+        |""".stripMargin,
+      "ConcreteResult",
+      "inherited concrete method `twice` result type must use enclosing type parameter `A`"
+    ),
+    (
+      "defaulted concrete parameter",
+      """trait ConcreteDefault[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A = empty): A = combine(a, a)
+        |""".stripMargin,
+      "ConcreteDefault",
+      "inherited concrete method `twice` parameter `a` must be ordinary, non-defaulted, and unmodified"
+    ),
+    (
+      "contextual concrete clause",
+      """trait ConcreteContextual[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(using a: A): A = combine(a, a)
+        |""".stripMargin,
+      "ConcreteContextual",
+      "inherited concrete method `twice` parameter clause must be ordinary and non-contextual"
     ),
     (
       "non-method member",

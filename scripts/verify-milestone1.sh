@@ -270,12 +270,28 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `WrongParameter`: binary method `combine` parameter `a` must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `WrongEmptyResult`: parameterless method `empty` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `WrongBinaryResult`: binary method `combine` result type must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `ExtraVal`: requires exactly two direct body members; found 3' \
-  'unsupported @instance source shape for `ExtraVar`: requires exactly two direct body members; found 3' \
-  'unsupported @instance source shape for `ExtraType`: requires exactly two direct body members; found 3' \
-  'unsupported @instance source shape for `ExtraNested`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `ExtraVal`: direct body member at index 2 must be a method; found val' \
+  'unsupported @instance source shape for `ExtraVar`: direct body member at index 2 must be a method; found var' \
+  'unsupported @instance source shape for `ExtraType`: direct body member at index 2 must be a method; found type' \
+  'unsupported @instance source shape for `ExtraNested`: direct body member at index 2 must be a method; found nested trait' \
   'unsupported @instance source shape for `ProtectedMethod`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `AnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers'; do
+  'unsupported @instance source shape for `AnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `ThirdAbstract`: inherited method `twice` must be concrete' \
+  'unsupported @instance source shape for `TwoConcrete`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `ConcreteVal`: direct body member at index 2 must be a method; found val' \
+  'unsupported @instance source shape for `ConcreteVar`: direct body member at index 2 must be a method; found var' \
+  'unsupported @instance source shape for `ConcreteLazyVal`: direct body member at index 2 must be a method; found val' \
+  'unsupported @instance source shape for `PolyConcrete`: inherited concrete method `twice` must not declare method type parameters' \
+  'unsupported @instance source shape for `ProtectedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `PrivateConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `AnnotatedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InlineConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `WrongConcreteArity`: inherited concrete method `twice` requires exactly one ordinary parameter; found 2' \
+  'unsupported @instance source shape for `WrongConcreteParameter`: inherited concrete method `twice` parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `twice` parameter `a` must be ordinary, non-defaulted, and unmodified' \
+  'unsupported @instance source shape for `ContextualConcrete`: inherited concrete method `twice` parameter clause must be ordinary and non-contextual' \
+  'unsupported @instance source shape for `ConcretePlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4'; do
   grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
     fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -348,7 +364,7 @@ cat "$apply_instance_composition_negative_log"
   fail "negativeApplyInstanceComposition compiled successfully; the late instance rejection was lost"
 
 grep -Fq \
-  'unsupported @instance source shape for `LateInstanceRejection`: requires exactly two direct body members; found 3' \
+  'unsupported @instance source shape for `LateInstanceRejection`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
   "$apply_instance_composition_negative_log" ||
   fail "apply-instance late rejection omitted the deterministic instance decoder diagnostic"
 
@@ -415,12 +431,14 @@ printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

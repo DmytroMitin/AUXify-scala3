@@ -51,70 +51,53 @@ private[internal] object InstanceSourceShapeDecoder:
           bodyView.members match
             case List(parameterlessMember, binaryMember) =>
               for
-                parameterlessMethod <- directMethod(
+                shape <- decodeAbstractRoles(
                   traitName,
-                  index = 0,
-                  parameterlessMember
+                  typeParameter.name,
+                  parameterlessMember,
+                  binaryMember,
+                  Set.empty
                 )
-                _ <- eligibleMethod(traitName, parameterlessMethod)
-                _ <- parameterlessTopology(traitName, parameterlessMethod)
-                _ <- enclosingResult(
+              yield shape
+            case List(parameterlessMember, binaryMember, inheritedMember) =>
+              for
+                inheritedMethod <- directMethod(
                   traitName,
-                  "parameterless",
-                  parameterlessMethod,
-                  typeParameter.name
+                  index = 2,
+                  inheritedMember
                 )
-                binaryMethod <- directMethod(
+                _ <- eligibleInheritedMethod(traitName, inheritedMethod)
+                inheritedParameter <- inheritedTopology(
                   traitName,
-                  index = 1,
-                  binaryMember
+                  inheritedMethod
                 )
-                _ <- eligibleMethod(traitName, binaryMethod)
-                binaryParameters <- binaryTopology(traitName, binaryMethod)
-                _ <- binaryParameter(
+                _ <- inheritedParameterType(
                   traitName,
-                  binaryMethod,
-                  binaryParameters.head,
-                  typeParameter.name
-                )
-                _ <- binaryParameter(
-                  traitName,
-                  binaryMethod,
-                  binaryParameters(1),
+                  inheritedMethod,
+                  inheritedParameter,
                   typeParameter.name
                 )
                 _ <- enclosingResult(
                   traitName,
-                  "binary",
-                  binaryMethod,
+                  "inherited concrete",
+                  inheritedMethod,
                   typeParameter.name
                 )
-                occupied = Set(
-                  "instance",
-                  parameterlessMethod.name,
-                  binaryMethod.name,
-                  binaryParameters.head.name,
-                  binaryParameters(1).name
+                shape <- decodeAbstractRoles(
+                  traitName,
+                  typeParameter.name,
+                  parameterlessMember,
+                  binaryMember,
+                  Set(inheritedMethod.name, inheritedParameter.name)
                 )
-                parameterlessCarrier = freshCarrierName("emptyValue", occupied)
-                binaryCarrier = freshCarrierName(
-                  "combineFunction",
-                  occupied + parameterlessCarrier
-                )
-              yield SourceShape(
-                traitName = traitName,
-                enclosingTypeParameterName = typeParameter.name,
-                parameterlessMethodName = parameterlessMethod.name,
-                binaryMethodName = binaryMethod.name,
-                binaryFirstParameterName = binaryParameters.head.name,
-                binarySecondParameterName = binaryParameters(1).name,
-                parameterlessCarrierName = parameterlessCarrier,
-                binaryCarrierName = binaryCarrier
-              )
+              yield shape
             case members =>
               unsupported(
                 traitName,
-                s"requires exactly two direct body members; found ${members.size}",
+                if members.size < 2 then
+                  s"requires exactly two direct body members; found ${members.size}"
+                else
+                  s"requires exactly two direct body members or exactly three with one supported inherited concrete method; found ${members.size}",
                 bodyView.pos
               )
         case _ =>
@@ -123,6 +106,75 @@ private[internal] object InstanceSourceShapeDecoder:
             "requires exactly one invariant unbounded enclosing type parameter",
             classView.classPos
           )
+
+  private def decodeAbstractRoles(
+      traitName: String,
+      enclosingTypeParameterName: String,
+      parameterlessMember: DirectMember,
+      binaryMember: DirectMember,
+      additionallyOccupied: Set[String]
+  ): Either[ExpansionDiagnostic, SourceShape] =
+    for
+      parameterlessMethod <- directMethod(
+        traitName,
+        index = 0,
+        parameterlessMember
+      )
+      _ <- eligibleMethod(traitName, parameterlessMethod)
+      _ <- parameterlessTopology(traitName, parameterlessMethod)
+      _ <- enclosingResult(
+        traitName,
+        "parameterless",
+        parameterlessMethod,
+        enclosingTypeParameterName
+      )
+      binaryMethod <- directMethod(
+        traitName,
+        index = 1,
+        binaryMember
+      )
+      _ <- eligibleMethod(traitName, binaryMethod)
+      binaryParameters <- binaryTopology(traitName, binaryMethod)
+      _ <- binaryParameter(
+        traitName,
+        binaryMethod,
+        binaryParameters.head,
+        enclosingTypeParameterName
+      )
+      _ <- binaryParameter(
+        traitName,
+        binaryMethod,
+        binaryParameters(1),
+        enclosingTypeParameterName
+      )
+      _ <- enclosingResult(
+        traitName,
+        "binary",
+        binaryMethod,
+        enclosingTypeParameterName
+      )
+      occupied = Set(
+        "instance",
+        parameterlessMethod.name,
+        binaryMethod.name,
+        binaryParameters.head.name,
+        binaryParameters(1).name
+      ) ++ additionallyOccupied
+      parameterlessCarrier = freshCarrierName("emptyValue", occupied)
+      binaryCarrier = freshCarrierName(
+        "combineFunction",
+        occupied + parameterlessCarrier
+      )
+    yield SourceShape(
+      traitName = traitName,
+      enclosingTypeParameterName = enclosingTypeParameterName,
+      parameterlessMethodName = parameterlessMethod.name,
+      binaryMethodName = binaryMethod.name,
+      binaryFirstParameterName = binaryParameters.head.name,
+      binarySecondParameterName = binaryParameters(1).name,
+      parameterlessCarrierName = parameterlessCarrier,
+      binaryCarrierName = binaryCarrier
+    )
 
   private def directMethod(
       traitName: String,
@@ -179,6 +231,92 @@ private[internal] object InstanceSourceShapeDecoder:
         method.pos
       )
     else Right(())
+
+  private def eligibleInheritedMethod(
+      traitName: String,
+      method: DirectMethod
+  ): Either[ExpansionDiagnostic, Unit] =
+    if
+      method.modifiers.visibility != DirectVisibility.Public ||
+        method.modifiers.hasAnnotations ||
+        method.modifiers.annotationCount != 0 ||
+        method.modifiers.unsupportedFlags.nonEmpty
+    then
+      unsupported(
+        traitName,
+        s"inherited concrete method `${method.name}` must be public, unannotated, and free of unsupported modifiers",
+        method.pos
+      )
+    else if method.status != DirectMethodStatus.Concrete then
+      unsupported(
+        traitName,
+        s"inherited method `${method.name}` must be concrete",
+        method.pos
+      )
+    else if method.typeParameters.nonEmpty then
+      unsupported(
+        traitName,
+        s"inherited concrete method `${method.name}` must not declare method type parameters",
+        method.pos
+      )
+    else Right(())
+
+  private def inheritedTopology(
+      traitName: String,
+      method: DirectMethod
+  ): Either[ExpansionDiagnostic, DirectMethodParameter] =
+    method.parameterClauses match
+      case List(clause) =>
+        if clause.isContextual || clause.isImplicit || clause.isGiven then
+          unsupported(
+            traitName,
+            s"inherited concrete method `${method.name}` parameter clause must be ordinary and non-contextual",
+            clause.pos
+          )
+        else if clause.parameters.size != 1 then
+          unsupported(
+            traitName,
+            s"inherited concrete method `${method.name}` requires exactly one ordinary parameter; found ${clause.parameters.size}",
+            clause.pos
+          )
+        else Right(clause.parameters.head)
+      case clauses =>
+        unsupported(
+          traitName,
+          s"inherited concrete method `${method.name}` requires exactly one ordinary parameter clause; found ${clauses.size}",
+          method.pos
+        )
+
+  private def inheritedParameterType(
+      traitName: String,
+      method: DirectMethod,
+      parameter: DirectMethodParameter,
+      enclosingTypeParameterName: String
+  ): Either[ExpansionDiagnostic, Unit] =
+    if
+      !normalizedNameAvailable(parameter.name) ||
+        parameter.hasDefault ||
+        parameter.isContextual ||
+        parameter.isImplicit ||
+        parameter.isGiven ||
+        parameter.isVal ||
+        parameter.isVar
+    then
+      unsupported(
+        traitName,
+        s"inherited concrete method `${method.name}` parameter `${parameter.name}` must be ordinary, non-defaulted, and unmodified",
+        parameter.pos
+      )
+    else
+      parameter.parameterType match
+        case DirectTypeShape.EnclosingTypeParameter(name, _)
+            if name == enclosingTypeParameterName => Right(())
+        case _ =>
+          unsupported(
+            traitName,
+            s"inherited concrete method `${method.name}` parameter `${parameter.name}` must use enclosing type parameter `$enclosingTypeParameterName`",
+            parameter.typePos
+          )
 
   private def parameterlessTopology(
       traitName: String,

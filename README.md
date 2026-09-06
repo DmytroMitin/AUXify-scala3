@@ -22,11 +22,11 @@ remains the default developer line.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Supported first development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; optionally followed by exactly one public concrete unary `(A): A` method that is inherited rather than copied; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
-| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass only on the common one-invariant-unbounded-parameter first-slice `@instance` family |
+| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including its optional final inherited concrete unary method |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -166,18 +166,39 @@ parameterless carrier is by-name, so constructing an instance does not evaluate 
 An existing direct companion member named `instance` is preserved under the current
 bounded syntactic conflict policy; unrelated companion members are preserved too.
 
+The same factory also supports one bounded inherited-method extension:
+
+```scala
+@instance
+trait DerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def twice(a: A): A = combine(a, a)
+```
+
+The concrete method must be the third and final direct member. It must be public,
+unannotated, non-polymorphic, free of unsupported modifiers, and have exactly one
+ordinary non-defaulted `A` parameter and result `A`. The factory remains the same
+two-override factory shown above: `twice` is inherited from the trait, so its body
+is not inspected, copied, re-authored, or lowered. Calling
+`DerivedMonoid.instance(0, _ + _).twice(21)` therefore dispatches through the
+generated `combine` override and returns `42`.
+
 This slice requires exactly one invariant, unbounded enclosing type parameter and
-exactly two direct body members in source order: one public, unannotated,
+exactly two or three direct body members in source order: one public, unannotated,
 non-polymorphic abstract parameterless method returning that type parameter, then
 one public, unannotated, non-polymorphic abstract method with one ordinary clause of
-exactly two non-defaulted, unmodified parameters and the same parameter/result type.
-Classes/objects, variance or bounds, abstract vals/vars/types, concrete or extra
-members, reordered methods, multiple or contextual/default clauses, method type
-parameters, modifiers/annotations, and broader Scala-2 `@instance` behavior remain
-outside this first slice.
+exactly two non-defaulted, unmodified parameters and the same parameter/result type,
+optionally followed by the bounded concrete unary method above. Classes/objects,
+variance or bounds, abstract vals/vars/types, concrete vals/vars/lazy vals, multiple
+concrete methods, concrete methods in other source positions or with other
+signatures, reordered abstract methods, extra members, multiple or
+contextual/default clauses, method type parameters, modifiers/annotations, and
+broader Scala-2 `@instance` behavior remain outside this slice.
 
-Simple `@apply` and the first `@instance` slice may be stacked in either source
-order on that exact common family:
+Simple `@apply` and the bounded `@instance` slice may be stacked in either source
+order on that exact common family, with or without the optional final inherited
+concrete unary method:
 
 ```scala
 @apply

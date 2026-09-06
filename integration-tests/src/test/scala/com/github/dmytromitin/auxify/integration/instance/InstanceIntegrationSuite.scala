@@ -41,3 +41,26 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(values.emptyValue, 7)
     assertEquals(values.merge(20, 22), 22)
   }
+
+  test("inherits the bounded concrete method and dispatches through combine") {
+    var combineCalls = 0
+    val derived = DerivedMonoid.instance[Int](
+      0,
+      (left, right) =>
+        combineCalls += 1
+        left + right
+    )
+
+    assertEquals(derived.twice(21), 42)
+    assertEquals(combineCalls, 1)
+    assertEquals(DerivedMonoid.preserved, 84)
+  }
+
+  test("inherits a coherently renamed concrete unary method") {
+    val derived = DerivedChoice.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+
+    assertEquals(derived.duplicate("same"), "same/same")
+  }
