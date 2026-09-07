@@ -70,6 +70,12 @@ trait DerivedMonoid[A]:
   def twice(a: A): A = combine(a, a)
 
 @instance
+trait ZeroMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+@instance
 trait WrappedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -106,6 +112,20 @@ trait DerivedInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   def duplicate(value: Element): Element = select(value, value)
+
+@apply
+@instance
+trait ZeroApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+@instance
+@apply
+trait ZeroInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def defaultValue: Element = fallback
 
 @apply
 @instance
@@ -184,6 +204,19 @@ object ExternalApp:
     val derived: DerivedMonoid[Int] = DerivedMonoid.instance(0, _ + _)
     assert(derived.twice(21) == 42)
 
+    var zeroEvaluations = 0
+    val zero: ZeroMonoid[Int] = ZeroMonoid.instance(
+      {
+        zeroEvaluations += 1
+        zeroEvaluations
+      },
+      _ + _
+    )
+    assert(zeroEvaluations == 0)
+    assert(zero.zero == 1)
+    assert(zero.empty == 2)
+    assert(zeroEvaluations == 2)
+
     val wrapped: WrappedMonoid[Int] = WrappedMonoid.instance(0, _ + _)
     val wrappedItem: wrapped.Item = 42
     assert(wrappedItem == 42)
@@ -218,6 +251,19 @@ object ExternalApp:
     given DerivedInstanceThenApply[String] = derivedReverse
     assert(DerivedInstanceThenApply[String].eq(derivedReverse))
     assert(derivedReverse.duplicate("same") == "same/same")
+
+    val zeroComposed = ZeroApplyThenInstance.instance[Int](0, _ + _)
+    given ZeroApplyThenInstance[Int] = zeroComposed
+    assert(ZeroApplyThenInstance[Int].eq(zeroComposed))
+    assert(zeroComposed.zero == 0)
+
+    val zeroReverse = ZeroInstanceThenApply.instance[String](
+      "external",
+      (left, right) => s"$left/$right"
+    )
+    given ZeroInstanceThenApply[String] = zeroReverse
+    assert(ZeroInstanceThenApply[String].eq(zeroReverse))
+    assert(zeroReverse.defaultValue == "external")
 
     val aliasComposed = AliasApplyThenInstance.instance[Int](0, _ + _)
     given AliasApplyThenInstance[Int] = aliasComposed

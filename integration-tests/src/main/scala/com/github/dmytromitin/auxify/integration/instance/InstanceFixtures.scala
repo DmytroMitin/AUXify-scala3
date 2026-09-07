@@ -30,6 +30,35 @@ object DerivedMonoid:
   val preserved = 84
 
 @instance
+trait ZeroMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+object ZeroMonoid:
+  val preserved = 105
+
+@instance
+trait ZeroChoice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def defaultValue: Element = fallback
+
+@instance
+trait ExistingZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+object ExistingZero:
+  var instanceCalls = 0
+  def instance[A](value: A, combineFunction: (A, A) => A): ExistingZero[A] =
+    instanceCalls += 1
+    new ExistingZero[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
+
+@instance
 trait DerivedChoice[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element

@@ -200,6 +200,24 @@ is not inspected, copied, re-authored, or lowered. Calling
 `DerivedMonoid.instance(0, _ + _).twice(21)` therefore dispatches through the
 generated `combine` override and returns `42`.
 
+Post-0.1.0 `main` also supports the parameterless counterpart:
+
+```scala
+@instance
+trait ZeroMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+```
+
+The concrete parameterless method must be the third and final direct member,
+public, unannotated, non-polymorphic, free of unsupported modifiers, declare no
+parameter clauses, and return the enclosing type parameter exactly. It is
+inherited from the trait and dispatches through the generated `empty` override;
+the factory still authors only the two overrides shown above. In particular,
+`def zero(): A`, `infix def zero: A`, and modifier-bearing alternatives are not
+admitted.
+
 Post-0.1.0 `main` also supports one final inherited concrete alias:
 
 ```scala
@@ -222,7 +240,8 @@ exactly two or three direct body members in source order: one public, unannotate
 non-polymorphic abstract parameterless method returning that type parameter, then
 one public, unannotated, non-polymorphic abstract method with one ordinary clause of
 exactly two non-defaulted, unmodified parameters and the same parameter/result type,
-optionally followed by the bounded concrete unary method or concrete alias above. Classes/objects,
+optionally followed by the bounded concrete unary method, concrete parameterless
+method, or concrete alias above. Classes/objects,
 variance or bounds, abstract vals/vars/types, concrete vals/vars/lazy vals, multiple
 concrete members, concrete members in other source positions or with other
 signatures, reordered abstract methods, extra members, multiple or

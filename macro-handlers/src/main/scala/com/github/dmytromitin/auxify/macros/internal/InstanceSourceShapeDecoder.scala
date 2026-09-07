@@ -76,29 +76,49 @@ private[internal] object InstanceSourceShapeDecoder:
                       inheritedMember
                     )
                     _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-                    inheritedParameter <- inheritedTopology(
-                      traitName,
-                      inheritedMethod
-                    )
-                    _ <- inheritedParameterType(
-                      traitName,
-                      inheritedMethod,
-                      inheritedParameter,
-                      typeParameter.name
-                    )
-                    _ <- enclosingResult(
-                      traitName,
-                      "inherited concrete",
-                      inheritedMethod,
-                      typeParameter.name
-                    )
-                    shape <- decodeAbstractRoles(
-                      traitName,
-                      typeParameter.name,
-                      parameterlessMember,
-                      binaryMember,
-                      Set(inheritedMethod.name, inheritedParameter.name)
-                    )
+                    shape <- inheritedMethod.parameterClauses match
+                      case Nil =>
+                        for
+                          _ <- enclosingResult(
+                            traitName,
+                            "inherited concrete",
+                            inheritedMethod,
+                            typeParameter.name
+                          )
+                          decoded <- decodeAbstractRoles(
+                            traitName,
+                            typeParameter.name,
+                            parameterlessMember,
+                            binaryMember,
+                            Set(inheritedMethod.name)
+                          )
+                        yield decoded
+                      case _ =>
+                        for
+                          inheritedParameter <- inheritedTopology(
+                            traitName,
+                            inheritedMethod
+                          )
+                          _ <- inheritedParameterType(
+                            traitName,
+                            inheritedMethod,
+                            inheritedParameter,
+                            typeParameter.name
+                          )
+                          _ <- enclosingResult(
+                            traitName,
+                            "inherited concrete",
+                            inheritedMethod,
+                            typeParameter.name
+                          )
+                          decoded <- decodeAbstractRoles(
+                            traitName,
+                            typeParameter.name,
+                            parameterlessMember,
+                            binaryMember,
+                            Set(inheritedMethod.name, inheritedParameter.name)
+                          )
+                        yield decoded
                   yield shape
                 case DirectMemberKind.Type =>
                   for

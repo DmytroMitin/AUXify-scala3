@@ -56,6 +56,42 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(DerivedMonoid.preserved, 84)
   }
 
+  test("inherits the concrete parameterless method and dispatches through the by-name empty override") {
+    var evaluations = 0
+    val zero = ZeroMonoid.instance[Int](
+      {
+        evaluations += 1
+        evaluations
+      },
+      _ + _
+    )
+
+    assertEquals(evaluations, 0)
+    assertEquals(zero.zero, 1)
+    assertEquals(zero.empty, 2)
+    assertEquals(evaluations, 2)
+    assertEquals(zero.combine(20, 22), 42)
+    assertEquals(ZeroMonoid.preserved, 105)
+  }
+
+  test("inherits a coherently renamed concrete parameterless method") {
+    val choice = ZeroChoice.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+
+    assertEquals(choice.defaultValue, "fallback")
+    assertEquals(choice.select("left", "right"), "left/right")
+  }
+
+  test("preserves a direct existing instance for the concrete parameterless family") {
+    val zero = ExistingZero.instance[Int](6, _ + _)
+
+    assertEquals(zero.zero, 6)
+    assertEquals(zero.combine(20, 22), 42)
+    assertEquals(ExistingZero.instanceCalls, 1)
+  }
+
   test("inherits a coherently renamed concrete unary method") {
     val derived = DerivedChoice.instance[String](
       "fallback",

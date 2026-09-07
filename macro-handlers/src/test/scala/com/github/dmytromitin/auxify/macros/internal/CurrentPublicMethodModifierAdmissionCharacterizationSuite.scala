@@ -15,15 +15,17 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
       typeChecks("""trait T[A] { infix def empty: A; def combine(a: A, a1: A): A }"""),
       typeChecks("""trait T[A] { def empty: A; infix def combine(a: A, a1: A): A }"""),
       typeChecks("""trait T[A] { def empty: A; def combine(a: A, a1: A): A; infix def twice(a: A): A = combine(a, a) }"""),
+      typeChecks("""trait T[A] { def empty: A; def combine(a: A, a1: A): A; infix def zero: A = empty }"""),
       typeChecks("""trait T[A] { infix def show(a: A): String }"""),
       typeChecks("""import scala.language.experimental.erasedDefinitions; trait T[A] { erased def empty: A; def combine(a: A, a1: A): A }"""),
       typeChecks("""import scala.language.experimental.erasedDefinitions; trait T[A] { def empty: A; erased def combine(a: A, a1: A): A }"""),
       typeChecks("""import scala.language.experimental.erasedDefinitions; trait T[A] { def empty: A; def combine(a: A, a1: A): A; erased def twice(a: A): A = combine(a, a) }"""),
+      typeChecks("""import scala.language.experimental.erasedDefinitions; trait T[A] { def empty: A; def combine(a: A, a1: A): A; erased def zero: A = empty }"""),
       typeChecks("""import scala.language.experimental.erasedDefinitions; trait T[A] { erased def show(a: A): String }""")
     )
     val expected =
-      if scala.util.Properties.versionNumberString == "3.3.8" then List.fill(8)(true)
-      else List(true, true, true, true, false, false, false, false)
+      if scala.util.Properties.versionNumberString == "3.3.8" then List.fill(10)(true)
+      else List(true, true, true, true, true, false, false, false, false, false)
 
     assertEquals(observed, expected)
   }

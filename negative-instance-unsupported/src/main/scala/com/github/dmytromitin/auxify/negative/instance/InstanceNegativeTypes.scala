@@ -207,10 +207,102 @@ trait ContextualConcrete[A]:
   def twice(using a: A): A = combine(a, a)
 
 @instance
+trait AbstractZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A
+
+@instance
+trait EmptyClauseZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero(): A = empty
+
+@instance
+trait BinaryZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero(a: A, a1: A): A = combine(a, a1)
+
+@instance
+trait WrongZeroResult[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: Other = ???
+
+@instance
+trait PolyZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero[B]: A = empty
+
+@instance
+trait PrivateZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  private def zero: A = empty
+
+@instance
+trait ProtectedZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  protected def zero: A = empty
+
+@instance
+trait AnnotatedZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  @deprecated("unsupported", "")
+  def zero: A = empty
+
+@instance
+trait FinalZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  final def zero: A = empty
+
+@instance
+trait OverrideZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  override def zero: A = empty
+
+@instance
+trait InlineZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  inline def zero: A = empty
+
+@instance
+trait TransparentInlineZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  transparent inline def zero: A = empty
+
+@instance
+trait ImplicitZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  implicit def zero: A = empty
+
+@instance
+trait ZeroFirst[A]:
+  def zero: A = empty
+  def empty: A
+  def combine(a: A, a1: A): A
+
+@instance
 trait ConcretePlusUnsupported[A]:
   def empty: A
   def combine(a: A, a1: A): A
   def twice(a: A): A = combine(a, a)
+  trait Nested
+
+@instance
+trait ZeroPlusUnsupported[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
   trait Nested
 
 @instance

@@ -94,6 +94,55 @@ object DerivedInstanceThenApply:
 
 @apply
 @instance
+trait ZeroApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+object ZeroApplyThenInstance:
+  val preservedBefore = 201
+  val preservedAfter = 203
+
+@instance
+@apply
+trait ZeroInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def defaultValue: Element = fallback
+
+object ZeroInstanceThenApply:
+  val preserved = 205
+
+@apply
+@instance
+trait ZeroExistingApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+object ZeroExistingApply:
+  var applyCalls = 0
+  def apply[A](using value: ZeroExistingApply[A]): ZeroExistingApply[A] =
+    applyCalls += 1
+    value
+
+@instance
+@apply
+trait ZeroExistingInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zero: A = empty
+
+object ZeroExistingInstance:
+  var instanceCalls = 0
+  def instance[A](value: A, combineFunction: (A, A) => A): ZeroExistingInstance[A] =
+    instanceCalls += 1
+    new ZeroExistingInstance[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
+
+@apply
+@instance
 trait DerivedExistingApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A

@@ -88,6 +88,53 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(DerivedInstanceThenApply.preserved, 184)
   }
 
+  test("apply then instance inherits the concrete parameterless method with by-name dispatch") {
+    var evaluations = 0
+    val constructed = ZeroApplyThenInstance.instance[Int](
+      {
+        evaluations += 1
+        evaluations
+      },
+      _ + _
+    )
+    given ZeroApplyThenInstance[Int] = constructed
+
+    assertEquals(evaluations, 0)
+    assert(ZeroApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.zero, 1)
+    assertEquals(constructed.empty, 2)
+    assertEquals(evaluations, 2)
+    assertEquals(ZeroApplyThenInstance.preservedBefore, 201)
+    assertEquals(ZeroApplyThenInstance.preservedAfter, 203)
+  }
+
+  test("instance then apply inherits a renamed concrete parameterless method") {
+    val constructed = ZeroInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given ZeroInstanceThenApply[String] = constructed
+
+    assert(ZeroInstanceThenApply[String].eq(constructed))
+    assertEquals(constructed.defaultValue, "fallback")
+    assertEquals(constructed.select("left", "right"), "left/right")
+    assertEquals(ZeroInstanceThenApply.preserved, 205)
+  }
+
+  test("parameterless-family apply and instance conflicts remain independent") {
+    val applyConflict = ZeroExistingApply.instance[Int](7, _ + _)
+    given ZeroExistingApply[Int] = applyConflict
+    assert(ZeroExistingApply[Int].eq(applyConflict))
+    assertEquals(applyConflict.zero, 7)
+    assertEquals(ZeroExistingApply.applyCalls, 1)
+
+    val instanceConflict = ZeroExistingInstance.instance[Int](8, _ + _)
+    given ZeroExistingInstance[Int] = instanceConflict
+    assert(ZeroExistingInstance[Int].eq(instanceConflict))
+    assertEquals(instanceConflict.zero, 8)
+    assertEquals(ZeroExistingInstance.instanceCalls, 1)
+  }
+
   test("a concrete-family existing apply preserves only apply") {
     val constructed = DerivedExistingApplyThenInstance.instance(0, _ + _)
     given DerivedExistingApplyThenInstance[Int] = constructed

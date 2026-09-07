@@ -27,3 +27,17 @@ trait InfixAliasInstanceThenApply[A]:
   def empty: A
   def combine(a: A, a1: A): A
   infix type Item = A
+
+@apply
+@instance
+trait InfixZeroApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix def zero: A = empty
+
+@instance
+@apply
+trait InfixZeroInstanceThenApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix def zero: A = empty

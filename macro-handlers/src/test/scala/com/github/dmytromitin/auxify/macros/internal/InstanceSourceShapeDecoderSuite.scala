@@ -114,6 +114,38 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("admits one third-position concrete parameterless method without changing the factory shape") {
+    val decoded = decode(
+      """trait ZeroMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def zero: A = empty
+        |""".stripMargin,
+      "ZeroMonoid"
+    )
+
+    assertEquals(
+      decoded,
+      InstanceSourceShapeDecoder.SourceShape(
+        traitName = "ZeroMonoid",
+        enclosingTypeParameterName = "A",
+        parameterlessMethodName = "empty",
+        binaryMethodName = "combine",
+        binaryFirstParameterName = "a",
+        binarySecondParameterName = "a1",
+        parameterlessCarrierName = "emptyValue",
+        binaryCarrierName = "combineFunction"
+      )
+    )
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): ZeroMonoid[A] = new ZeroMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
   test("derives renamed concrete-method evidence and includes it in carrier freshness") {
     val decoded = decode(
       """trait DerivedChoice[Element]:

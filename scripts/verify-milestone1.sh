@@ -295,7 +295,22 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `twice` parameter `a` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @instance source shape for `ContextualConcrete`: inherited concrete method `twice` parameter clause must be ordinary and non-contextual' \
+  'unsupported @instance source shape for `AbstractZero`: inherited method `zero` must be concrete' \
+  'unsupported @instance source shape for `EmptyClauseZero`: inherited concrete method `zero` requires exactly one ordinary parameter; found 0' \
+  'unsupported @instance source shape for `BinaryZero`: inherited concrete method `zero` requires exactly one ordinary parameter; found 2' \
+  'unsupported @instance source shape for `WrongZeroResult`: inherited concrete method `zero` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `PolyZero`: inherited concrete method `zero` must not declare method type parameters' \
+  'unsupported @instance source shape for `PrivateZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `ProtectedZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `AnnotatedZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `FinalZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `OverrideZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InlineZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `TransparentInlineZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `ImplicitZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `ZeroFirst`: inherited method `combine` must be concrete' \
   'unsupported @instance source shape for `ConcretePlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `ZeroPlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
   'unsupported @instance source shape for `NamedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
   'unsupported @instance source shape for `AppliedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
   'unsupported @instance source shape for `QualifiedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
@@ -452,7 +467,8 @@ verify_modifier_negative \
   "$instance_modifier_negative_log" \
   'unsupported @instance source shape for `InfixEmpty`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixCombine`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers'
+  'unsupported @instance source shape for `InfixConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers'
 
 verify_modifier_negative \
   negativeDelegatedMethodModifiers \
@@ -469,7 +485,9 @@ verify_modifier_negative \
   'unsupported @instance source shape for `InfixApplyThenInstance`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixInstanceThenApply`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixAliasApplyThenInstance`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixAliasInstanceThenApply`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers'
+  'unsupported @instance source shape for `InfixAliasInstanceThenApply`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixZeroApplyThenInstance`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixZeroInstanceThenApply`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers'
 
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \
@@ -549,6 +567,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
@@ -556,6 +575,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \

@@ -17,3 +17,9 @@ trait InfixConcrete[A]:
   def empty: A
   def combine(a: A, a1: A): A
   infix def twice(a: A): A = combine(a, a)
+
+@instance
+trait InfixZero[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix def zero: A = empty
