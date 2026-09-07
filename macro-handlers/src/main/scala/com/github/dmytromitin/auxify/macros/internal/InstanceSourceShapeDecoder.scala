@@ -4,6 +4,7 @@ import dotty.tools.dotc.util.SrcPos
 
 import paradise3.api.{
   AnnotatedClassBodyView,
+  AnnotatedClassTypeStructureView,
   AnnotatedClassView,
   ExpansionDiagnostic
 }
@@ -15,6 +16,11 @@ import paradise3.api.AnnotatedClassBodyView.{
   DirectMethodStatus,
   DirectTypeShape,
   DirectVisibility
+}
+import paradise3.api.AnnotatedClassTypeStructureView.{
+  Bound,
+  DirectTypeMember,
+  DirectTypeMemberKind
 }
 
 private[internal] object InstanceSourceShapeDecoder:
@@ -31,7 +37,8 @@ private[internal] object InstanceSourceShapeDecoder:
 
   def decode(
       classView: AnnotatedClassView,
-      bodyView: AnnotatedClassBodyView
+      bodyView: AnnotatedClassBodyView,
+      typeStructureView: Option[AnnotatedClassTypeStructureView] = None
   ): Either[ExpansionDiagnostic, SourceShape] =
     val traitName = classView.className
     if !normalizedNameAvailable(traitName) then
@@ -60,37 +67,73 @@ private[internal] object InstanceSourceShapeDecoder:
                 )
               yield shape
             case List(parameterlessMember, binaryMember, inheritedMember) =>
-              for
-                inheritedMethod <- directMethod(
-                  traitName,
-                  index = 2,
-                  inheritedMember
-                )
-                _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-                inheritedParameter <- inheritedTopology(
-                  traitName,
-                  inheritedMethod
-                )
-                _ <- inheritedParameterType(
-                  traitName,
-                  inheritedMethod,
-                  inheritedParameter,
-                  typeParameter.name
-                )
-                _ <- enclosingResult(
-                  traitName,
-                  "inherited concrete",
-                  inheritedMethod,
-                  typeParameter.name
-                )
-                shape <- decodeAbstractRoles(
-                  traitName,
-                  typeParameter.name,
-                  parameterlessMember,
-                  binaryMember,
-                  Set(inheritedMethod.name, inheritedParameter.name)
-                )
-              yield shape
+              inheritedMember.kind match
+                case DirectMemberKind.Method =>
+                  for
+                    inheritedMethod <- directMethod(
+                      traitName,
+                      index = 2,
+                      inheritedMember
+                    )
+                    _ <- eligibleInheritedMethod(traitName, inheritedMethod)
+                    inheritedParameter <- inheritedTopology(
+                      traitName,
+                      inheritedMethod
+                    )
+                    _ <- inheritedParameterType(
+                      traitName,
+                      inheritedMethod,
+                      inheritedParameter,
+                      typeParameter.name
+                    )
+                    _ <- enclosingResult(
+                      traitName,
+                      "inherited concrete",
+                      inheritedMethod,
+                      typeParameter.name
+                    )
+                    shape <- decodeAbstractRoles(
+                      traitName,
+                      typeParameter.name,
+                      parameterlessMember,
+                      binaryMember,
+                      Set(inheritedMethod.name, inheritedParameter.name)
+                    )
+                  yield shape
+                case DirectMemberKind.Type =>
+                  for
+                    typeStructure <- typeStructureView.toRight(
+                      ExpansionDiagnostic(
+                        s"unsupported @instance source shape for `$traitName`: direct body member at index 2 must provide normalized type-member evidence",
+                        inheritedMember.pos
+                      )
+                    )
+                    alias <- thirdPositionConcreteAlias(
+                      traitName,
+                      typeStructure,
+                      inheritedMember.pos
+                    )
+                    _ <- eligibleConcreteAlias(
+                      traitName,
+                      alias,
+                      typeParameter.name
+                    )
+                    shape <- decodeAbstractRoles(
+                      traitName,
+                      typeParameter.name,
+                      parameterlessMember,
+                      binaryMember,
+                      Set.empty
+                    )
+                  yield shape
+                case _ =>
+                  directMethod(traitName, index = 2, inheritedMember).flatMap(_ =>
+                    unsupported(
+                      traitName,
+                      "unreachable third-member classification",
+                      inheritedMember.pos
+                    )
+                  )
             case members =>
               unsupported(
                 traitName,
@@ -105,6 +148,72 @@ private[internal] object InstanceSourceShapeDecoder:
             traitName,
             "requires exactly one invariant unbounded enclosing type parameter",
             classView.classPos
+          )
+
+  private def thirdPositionConcreteAlias(
+      traitName: String,
+      typeStructureView: AnnotatedClassTypeStructureView,
+      fallbackPos: SrcPos
+  ): Either[ExpansionDiagnostic, DirectTypeMember] =
+    typeStructureView.directTypeMembers match
+      case List(alias) if alias.bodyIndex == 2 => Right(alias)
+      case members =>
+        unsupported(
+          traitName,
+          "direct body member at index 2 must be the only normalized direct type member",
+          members.find(_.bodyIndex == 2).map(_.pos).getOrElse(fallbackPos)
+        )
+
+  private def eligibleConcreteAlias(
+      traitName: String,
+      alias: DirectTypeMember,
+      enclosingTypeParameterName: String
+  ): Either[ExpansionDiagnostic, Unit] =
+    val aliasName = alias.name
+    if !normalizedNameAvailable(aliasName) then
+      unsupported(
+        traitName,
+        "inherited concrete type alias must have an available normalized name",
+        alias.pos
+      )
+    else if alias.kind != DirectTypeMemberKind.Alias then
+      unsupported(
+        traitName,
+        s"inherited type member `$aliasName` must be a concrete alias",
+        alias.pos
+      )
+    else if alias.typeParameters.nonEmpty then
+      unsupported(
+        traitName,
+        s"inherited concrete type alias `$aliasName` must not declare type parameters",
+        alias.pos
+      )
+    else if
+      alias.modifiers.visibility != DirectVisibility.Public ||
+        alias.modifiers.hasAnnotations ||
+        alias.modifiers.annotationCount != 0 ||
+        alias.modifiers.unsupportedFlags.nonEmpty
+    then
+      unsupported(
+        traitName,
+        s"inherited concrete type alias `$aliasName` must be public, unannotated, and free of unsupported modifiers",
+        alias.pos
+      )
+    else if alias.lowerBound != Bound.Absent || alias.upperBound != Bound.Absent then
+      unsupported(
+        traitName,
+        s"inherited concrete type alias `$aliasName` must not declare lower or upper bounds",
+        alias.pos
+      )
+    else
+      alias.aliasTarget match
+        case Some(DirectTypeShape.EnclosingTypeParameter(name, _))
+            if name == enclosingTypeParameterName => Right(())
+        case _ =>
+          unsupported(
+            traitName,
+            s"inherited concrete type alias `$aliasName` must target enclosing type parameter `$enclosingTypeParameterName`",
+            alias.pos
           )
 
   private def decodeAbstractRoles(

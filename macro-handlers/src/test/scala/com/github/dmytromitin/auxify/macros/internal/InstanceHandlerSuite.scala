@@ -2,6 +2,7 @@ package com.github.dmytromitin.auxify.macros.internal
 
 import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.Trees
+import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
@@ -54,6 +55,64 @@ class InstanceHandlerSuite extends munit.FunSuite:
         method.trailingParamss.flatten.map(_.name.toString),
         List("emptyValue", "combineFunction")
       )
+    }
+  }
+
+  test("admits a third-position concrete type alias without changing the factory roles") {
+    withExpansionInput(
+      """@current
+        |trait WrappedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |""".stripMargin,
+      "WrappedMonoid"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case other => fail(s"expected structured instance expansion, found $other")
+
+      assertEquals(method.name.toString, "instance")
+      assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
+      assertEquals(
+        method.trailingParamss.flatten.map(_.name.toString),
+        List("emptyValue", "combineFunction")
+      )
+      val authoredTypeDefinitions = scala.collection.mutable.ListBuffer.empty[String]
+      val traverser = new untpd.UntypedTreeTraverser:
+        override def traverse(tree: untpd.Tree)(using Context): Unit =
+          tree match
+            case definition: TypeDef =>
+              authoredTypeDefinitions += definition.name.toString
+            case _ => ()
+          traverseChildren(tree)
+      traverser.traverse(method.rhs)
+      assertEquals(authoredTypeDefinitions.toList, Nil)
+    }
+  }
+
+  test("rejects an infix concrete alias through normalized type-member modifiers") {
+    withExpansionInput(
+      """@current
+        |trait InfixItem[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  infix type Item = A
+        |""".stripMargin,
+      "InfixItem"
+    ) { (input, primary, _, context) =>
+      given Context = context
+      new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @instance source shape for `InfixItem`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+            )
+          )
+          assert(fallback.eq(primary), clue(fallback))
+        case other => fail(s"expected controlled normalized rejection, found $other")
     }
   }
 

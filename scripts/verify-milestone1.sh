@@ -276,7 +276,7 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `WrongBinaryResult`: binary method `combine` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `ExtraVal`: direct body member at index 2 must be a method; found val' \
   'unsupported @instance source shape for `ExtraVar`: direct body member at index 2 must be a method; found var' \
-  'unsupported @instance source shape for `ExtraType`: direct body member at index 2 must be a method; found type' \
+  'unsupported @instance source shape for `ExtraType`: inherited type member `Extra` must be a concrete alias' \
   'unsupported @instance source shape for `ExtraNested`: direct body member at index 2 must be a method; found nested trait' \
   'unsupported @instance source shape for `ProtectedMethod`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
@@ -295,7 +295,18 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `twice` parameter `a` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @instance source shape for `ContextualConcrete`: inherited concrete method `twice` parameter clause must be ordinary and non-contextual' \
-  'unsupported @instance source shape for `ConcretePlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4'; do
+  'unsupported @instance source shape for `ConcretePlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `NamedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `AppliedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `QualifiedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `PolymorphicAlias`: inherited concrete type alias `Item` must not declare type parameters' \
+  'unsupported @instance source shape for `PrivateAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `ProtectedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `AnnotatedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `AliasFirst`: inherited method `combine` must be concrete' \
+  'unsupported @instance source shape for `AliasPlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `TwoAliases`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4'; do
   grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
     fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -456,7 +467,9 @@ verify_modifier_negative \
   "$product_root/negative-apply-instance-method-modifiers/target/scala-$scala_version/classes" \
   "$apply_instance_modifier_negative_log" \
   'unsupported @instance source shape for `InfixApplyThenInstance`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixInstanceThenApply`: direct method `empty` must be public, unannotated, and free of unsupported modifiers'
+  'unsupported @instance source shape for `InfixInstanceThenApply`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixAliasApplyThenInstance`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `InfixAliasInstanceThenApply`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers'
 
 mapfile -d '' build_config_sources < <(
   git ls-files -z -- \

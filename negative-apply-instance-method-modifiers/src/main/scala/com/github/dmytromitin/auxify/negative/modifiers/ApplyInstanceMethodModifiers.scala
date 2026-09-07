@@ -13,3 +13,17 @@ trait InfixApplyThenInstance[A]:
 trait InfixInstanceThenApply[A]:
   infix def empty: A
   def combine(a: A, a1: A): A
+
+@apply
+@instance
+trait InfixAliasApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix type Item = A
+
+@instance
+@apply
+trait InfixAliasInstanceThenApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix type Item = A

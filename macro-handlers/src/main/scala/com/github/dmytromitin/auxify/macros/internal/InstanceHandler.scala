@@ -3,6 +3,7 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
+  AnnotatedClassBodyView,
   ExpansionCompositionPolicy,
   ExpansionInput,
   ExpansionOutcome,
@@ -54,7 +55,18 @@ private[internal] object InstanceHandler:
           case Left(diagnostic) =>
             ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
           case Right(bodyView) =>
-            InstanceSourceShapeDecoder.decode(classView, bodyView) match
+            val typeStructureView = bodyView.members match
+              case List(_, _, member)
+                  if member.kind == AnnotatedClassBodyView.DirectMemberKind.Type =>
+                input.annotatedClassTypeStructureView.map(Some(_))
+              case _ => Right(None)
+            typeStructureView.flatMap(typeStructure =>
+              InstanceSourceShapeDecoder.decode(
+                classView,
+                bodyView,
+                typeStructure
+              )
+            ) match
               case Left(diagnostic) =>
                 ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
               case Right(shape) =>

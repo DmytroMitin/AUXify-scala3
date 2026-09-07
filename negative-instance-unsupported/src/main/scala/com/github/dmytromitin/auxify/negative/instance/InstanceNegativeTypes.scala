@@ -212,3 +212,72 @@ trait ConcretePlusUnsupported[A]:
   def combine(a: A, a1: A): A
   def twice(a: A): A = combine(a, a)
   trait Nested
+
+@instance
+trait NamedAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = Other
+
+@instance
+trait AppliedAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = List[A]
+
+@instance
+trait QualifiedAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = scala.Predef.String
+
+@instance
+trait PolymorphicAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item[B] = A
+
+@instance
+trait PrivateAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  private type Item = A
+
+@instance
+trait ProtectedAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  protected type Item = A
+
+@instance
+trait AnnotatedAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  @deprecated("unsupported", "")
+  type Item = A
+
+@instance
+trait InfixAlias[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  infix type Item = A
+
+@instance
+trait AliasFirst[A]:
+  type Item = A
+  def empty: A
+  def combine(a: A, a1: A): A
+
+@instance
+trait AliasPlusUnsupported[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  val extra: A
+
+@instance
+trait TwoAliases[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  type Value = A

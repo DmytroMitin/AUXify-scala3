@@ -7,5 +7,5 @@ import com.github.dmytromitin.auxify.macros.{apply, instance}
 trait LateInstanceRejection[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A): A = combine(a, a)
+  type Item = A
   val extra: A

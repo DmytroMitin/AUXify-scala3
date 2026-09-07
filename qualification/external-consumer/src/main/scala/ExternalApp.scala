@@ -69,6 +69,18 @@ trait DerivedMonoid[A]:
   def combine(a: A, a1: A): A
   def twice(a: A): A = combine(a, a)
 
+@instance
+trait WrappedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+
+@instance
+trait WrappedChoice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  type Value = Element
+
 @apply
 @instance
 trait ApplyThenInstance[A]:
@@ -94,6 +106,20 @@ trait DerivedInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   def duplicate(value: Element): Element = select(value, value)
+
+@apply
+@instance
+trait AliasApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+
+@instance
+@apply
+trait AliasInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  type Value = Element
 
 @apply
 @delegated
@@ -158,6 +184,17 @@ object ExternalApp:
     val derived: DerivedMonoid[Int] = DerivedMonoid.instance(0, _ + _)
     assert(derived.twice(21) == 42)
 
+    val wrapped: WrappedMonoid[Int] = WrappedMonoid.instance(0, _ + _)
+    val wrappedItem: wrapped.Item = 42
+    assert(wrappedItem == 42)
+    assert(wrapped.combine(20, 22) == 42)
+
+    val wrappedChoice: WrappedChoice[String] =
+      WrappedChoice.instance("external", (left, right) => s"$left/$right")
+    val wrappedValue: wrappedChoice.Value = "typed"
+    assert(wrappedValue == "typed")
+    assert(wrappedChoice.select("left", "right") == "left/right")
+
     val composed: ApplyThenInstance[Int] =
       ApplyThenInstance.instance(0, _ + _)
     given ApplyThenInstance[Int] = composed
@@ -181,6 +218,21 @@ object ExternalApp:
     given DerivedInstanceThenApply[String] = derivedReverse
     assert(DerivedInstanceThenApply[String].eq(derivedReverse))
     assert(derivedReverse.duplicate("same") == "same/same")
+
+    val aliasComposed = AliasApplyThenInstance.instance[Int](0, _ + _)
+    given AliasApplyThenInstance[Int] = aliasComposed
+    val aliasComposedItem: aliasComposed.Item = 42
+    assert(aliasComposedItem == 42)
+    assert(AliasApplyThenInstance[Int].eq(aliasComposed))
+
+    val aliasReverse = AliasInstanceThenApply.instance[String](
+      "external",
+      (left, right) => s"$left/$right"
+    )
+    given AliasInstanceThenApply[String] = aliasReverse
+    val aliasReverseValue: aliasReverse.Value = "typed"
+    assert(aliasReverseValue == "typed")
+    assert(AliasInstanceThenApply[String].eq(aliasReverse))
 
     assert(ApplyThenDelegated[Int].show(7) == "apply-first:7")
     assert(ApplyThenDelegated.show(7) == "apply-first:7")

@@ -64,3 +64,44 @@ class InstanceIntegrationSuite extends munit.FunSuite:
 
     assertEquals(derived.duplicate("same"), "same/same")
   }
+
+  test("inherits a concrete type alias and preserves by-name factory semantics") {
+    var evaluations = 0
+    val wrapped = WrappedMonoid.instance[Int](
+      {
+        evaluations += 1
+        0
+      },
+      _ + _
+    )
+
+    val item: wrapped.Item = 42
+    val equality: wrapped.Item =:= Int = summon[wrapped.Item =:= Int]
+    assertEquals(equality(item), 42)
+    assertEquals(evaluations, 0)
+    assertEquals(wrapped.empty, 0)
+    assertEquals(evaluations, 1)
+    assertEquals(wrapped.combine(20, 22), 42)
+    assertEquals(WrappedMonoid.preserved, 126)
+  }
+
+  test("inherits a coherently renamed concrete type alias family") {
+    val wrapped = WrappedChoice.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+
+    val value: wrapped.Value = "typed"
+    assertEquals(value, "typed")
+    assertEquals(wrapped.fallback, "fallback")
+    assertEquals(wrapped.select("left", "right"), "left/right")
+  }
+
+  test("preserves a direct existing instance for the alias family") {
+    val wrapped = ExistingWrapped.instance[Int](6, _ + _)
+    val item: wrapped.Item = 6
+
+    assertEquals(item, 6)
+    assertEquals(wrapped.combine(20, 22), 42)
+    assertEquals(ExistingWrapped.instanceCalls, 1)
+  }

@@ -6,8 +6,16 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 import scala.meta.*
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
+import paradise3.api.{
+  AnnotatedClassBodyView,
+  AnnotatedClassTypeStructureView,
+  AnnotatedClassView
+}
 import paradise3.api.AnnotatedClassBodyView.DirectTypeShape
+import paradise3.api.AnnotatedClassTypeStructureView.{
+  Bound,
+  DirectTypeMemberKind
+}
 
 class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
   private val CanonicalSource =
@@ -120,6 +128,186 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryCarrierName, "combineFunction1")
     assertEquals(decoded.parameterlessMethodName, "fallback")
     assertEquals(decoded.binaryMethodName, "select")
+  }
+
+  test("admits one third-position concrete alias without changing the factory shape") {
+    val decoded = decode(
+      """trait WrappedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |""".stripMargin,
+      "WrappedMonoid"
+    )
+
+    assertEquals(
+      decoded,
+      InstanceSourceShapeDecoder.SourceShape(
+        traitName = "WrappedMonoid",
+        enclosingTypeParameterName = "A",
+        parameterlessMethodName = "empty",
+        binaryMethodName = "combine",
+        binaryFirstParameterName = "a",
+        binarySecondParameterName = "a1",
+        parameterlessCarrierName = "emptyValue",
+        binaryCarrierName = "combineFunction"
+      )
+    )
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): WrappedMonoid[A] = new WrappedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("uses normalized third-position alias evidence and rejects infix") {
+    List(false, true).foreach: infix =>
+      val traitName = if infix then "InfixItem" else "PlainItem"
+      val source =
+        s"""trait $traitName[A]:
+           |  def empty: A
+           |  def combine(a: A, a1: A): A
+           |  ${if infix then "infix " else ""}type Item = A
+           |""".stripMargin
+      val (classView, bodyView, typeStructureView) = decodeAllViews(source, traitName)
+      val alias = typeStructureView.directTypeMembers
+        .headOption
+        .getOrElse(fail(s"missing normalized alias evidence for $traitName"))
+
+      assertEquals(alias.name, "Item")
+      assertEquals(alias.bodyIndex, 2)
+      assertEquals(alias.kind, DirectTypeMemberKind.Alias)
+      assertEquals(alias.typeParameters, Nil)
+      assertEquals(alias.lowerBound, Bound.Absent)
+      assertEquals(alias.upperBound, Bound.Absent)
+      alias.aliasTarget match
+        case Some(DirectTypeShape.EnclosingTypeParameter("A", _)) => ()
+        case other => fail(s"unexpected alias target for $traitName: $other")
+      assertEquals(alias.modifiers.unsupportedFlags, if infix then List("infix") else Nil)
+
+      val decoded = InstanceSourceShapeDecoder.decode(
+        classView,
+        bodyView,
+        Some(typeStructureView)
+      )
+      if infix then
+        assertRejected(
+          decoded,
+          traitName,
+          "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+        )
+      else assert(decoded.isRight, clue(decoded))
+  }
+
+  test("rejects adjacent third-position type-member shapes through normalized evidence") {
+    val rows = List(
+      (
+        "AbstractItem",
+        "type Item",
+        "inherited type member `Item` must be a concrete alias"
+      ),
+      (
+        "NamedItem",
+        "type Item = String",
+        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      ),
+      (
+        "AppliedItem",
+        "type Item = List[A]",
+        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      ),
+      (
+        "QualifiedItem",
+        "type Item = scala.Predef.String",
+        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      ),
+      (
+        "PolymorphicItem",
+        "type Item[B] = A",
+        "inherited concrete type alias `Item` must not declare type parameters"
+      ),
+      (
+        "PrivateItem",
+        "private type Item = A",
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      ),
+      (
+        "ProtectedItem",
+        "protected type Item = A",
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      ),
+      (
+        "FinalItem",
+        "final type Item = A",
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      ),
+      (
+        "OverrideItem",
+        "override type Item = A",
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      ),
+      (
+        "OpaqueItem",
+        "opaque type Item = A",
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      )
+    )
+
+    rows.foreach: (traitName, aliasDeclaration, reason) =>
+      val source =
+        s"""trait $traitName[A]:
+           |  def empty: A
+           |  def combine(a: A, a1: A): A
+           |  $aliasDeclaration
+           |""".stripMargin
+      assertRejected(decodeEither(source, traitName), traitName, reason)
+  }
+
+  test("rejects annotated and malformed normalized alias facts") {
+    val source =
+      """trait AnnotatedItem[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      "AnnotatedItem"
+    )
+    val alias = typeStructureView.directTypeMembers.head
+
+    val invalidAliases = List(
+      (
+        alias.copy(
+          modifiers = alias.modifiers.copy(
+            hasAnnotations = true,
+            annotationCount = 1
+          )
+        ),
+        "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+      ),
+      (
+        alias.copy(lowerBound = Bound.Present(alias.aliasTarget.get)),
+        "inherited concrete type alias `Item` must not declare lower or upper bounds"
+      ),
+      (
+        alias.copy(upperBound = Bound.Present(alias.aliasTarget.get)),
+        "inherited concrete type alias `Item` must not declare lower or upper bounds"
+      )
+    )
+
+    invalidAliases.foreach: (invalidAlias, reason) =>
+      assertRejected(
+        InstanceSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          Some(typeStructureView.copy(directTypeMembers = List(invalidAlias)))
+        ),
+        "AnnotatedItem",
+        reason
+      )
   }
 
   private val rejectedShapes = List(
@@ -750,8 +938,37 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     decodeEither(source, traitName).fold(diagnostic => fail(diagnostic.message), identity)
 
   private def decodeEither(source: String, traitName: String) =
-    val (classView, bodyView) = decodeViews(source, traitName)
-    InstanceSourceShapeDecoder.decode(classView, bodyView)
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      traitName
+    )
+    InstanceSourceShapeDecoder.decode(
+      classView,
+      bodyView,
+      Some(typeStructureView)
+    )
+
+  private def decodeAllViews(
+      source: String,
+      traitName: String
+  ): (
+      AnnotatedClassView,
+      AnnotatedClassBodyView,
+      AnnotatedClassTypeStructureView
+  ) =
+    val unit = CompilationUnit(s"${traitName}InstanceDecoderFixture.scala", source)
+    given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
+    val primary = parsePrimary(unit, traitName)
+    val classView = AnnotatedClassView
+      .decode(primary)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    val bodyView = AnnotatedClassBodyView
+      .decode(primary)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    val typeStructureView = AnnotatedClassTypeStructureView
+      .decode(primary)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    (classView, bodyView, typeStructureView)
 
   private def decodeViews(
       source: String,
@@ -759,10 +976,7 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
   ): (AnnotatedClassView, AnnotatedClassBodyView) =
     val unit = CompilationUnit(s"${traitName}InstanceDecoderFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
-    val primary = new Parsers.Parser(unit.source).parse() match
-      case PackageDef(_, List(value: TypeDef)) => value
-      case value: TypeDef => value
-      case other => fail(s"missing primary TypeDef in $other")
+    val primary = parsePrimary(unit, traitName)
     val classView = AnnotatedClassView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
@@ -770,3 +984,12 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (classView, bodyView)
+
+  private def parsePrimary(
+      unit: CompilationUnit,
+      traitName: String
+  )(using Context): TypeDef =
+    new Parsers.Parser(unit.source).parse() match
+      case PackageDef(_, List(value: TypeDef)) => value
+      case value: TypeDef => value
+      case other => fail(s"missing primary TypeDef in $other")

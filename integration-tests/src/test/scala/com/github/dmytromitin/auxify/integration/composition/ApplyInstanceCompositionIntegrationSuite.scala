@@ -117,3 +117,40 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(DerivedExistingBoth.instanceCalls, 1)
     assertEquals(DerivedExistingBoth.retained, 113)
   }
+
+  test("apply then instance inherits the concrete alias") {
+    val constructed = AliasApplyThenInstance.instance[Int](0, _ + _)
+    given AliasApplyThenInstance[Int] = constructed
+    val item: constructed.Item = 42
+
+    assertEquals(item, 42)
+    assert(AliasApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.combine(20, 22), 42)
+    assertEquals(AliasApplyThenInstance.preserved, 241)
+  }
+
+  test("instance then apply inherits the renamed concrete alias") {
+    val constructed = AliasInstanceThenApply.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given AliasInstanceThenApply[String] = constructed
+    val value: constructed.Value = "typed"
+
+    assertEquals(value, "typed")
+    assert(AliasInstanceThenApply[String].eq(constructed))
+    assertEquals(constructed.select("left", "right"), "left/right")
+    assertEquals(AliasInstanceThenApply.preserved, 284)
+  }
+
+  test("alias-family existing apply and instance conflicts remain independent") {
+    val applyConflict = AliasExistingApply.instance[Int](0, _ + _)
+    given AliasExistingApply[Int] = applyConflict
+    assert(AliasExistingApply[Int].eq(applyConflict))
+    assertEquals(AliasExistingApply.applyCalls, 1)
+
+    val instanceConflict = AliasExistingInstance.instance[Int](0, _ + _)
+    given AliasExistingInstance[Int] = instanceConflict
+    assert(AliasExistingInstance[Int].eq(instanceConflict))
+    assertEquals(AliasExistingInstance.instanceCalls, 1)
+  }

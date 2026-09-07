@@ -144,3 +144,51 @@ object DerivedExistingBoth:
       def empty: A = value
       def combine(a: A, a1: A): A = combineFunction(a, a1)
   val retained = 113
+
+@apply
+@instance
+trait AliasApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+
+object AliasApplyThenInstance:
+  val preserved = 241
+
+@instance
+@apply
+trait AliasInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  type Value = Element
+
+object AliasInstanceThenApply:
+  val preserved = 284
+
+@apply
+@instance
+trait AliasExistingApply[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+
+object AliasExistingApply:
+  var applyCalls = 0
+  def apply[A](using value: AliasExistingApply[A]): AliasExistingApply[A] =
+    applyCalls += 1
+    value
+
+@instance
+@apply
+trait AliasExistingInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+
+object AliasExistingInstance:
+  var instanceCalls = 0
+  def instance[A](value: A, combineFunction: (A, A) => A): AliasExistingInstance[A] =
+    instanceCalls += 1
+    new AliasExistingInstance[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
