@@ -54,8 +54,9 @@ instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX
 instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-modifier-negative.XXXXXX")"
 delegated_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-modifier-negative.XXXXXX")"
 apply_instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-modifier-negative.XXXXXX")"
+type_member_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-type-member-modifier-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log" "$type_member_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -389,7 +390,7 @@ if [[ -d "$apply_instance_composition_classes" ]] && find "$apply_instance_compo
   fail "apply-instance late rejection left partial class or TASTy output"
 fi
 
-verify_method_modifier_negative() {
+verify_modifier_negative() {
   local project="$1"
   local label="$2"
   local output_directory="$3"
@@ -403,7 +404,7 @@ verify_method_modifier_negative() {
     local compile_status=$?
   fi
 
-  printf '%s\n' "--- controlled $label method-modifier rejection ---"
+  printf '%s\n' "--- controlled $label modifier rejection ---"
   cat "$log_file"
 
   [[ "$compile_status" -ne 0 ]] ||
@@ -433,7 +434,7 @@ verify_method_modifier_negative() {
   fi
 }
 
-verify_method_modifier_negative \
+verify_modifier_negative \
   negativeInstanceMethodModifiers \
   instance \
   "$product_root/negative-instance-method-modifiers/target/scala-$scala_version/classes" \
@@ -442,14 +443,14 @@ verify_method_modifier_negative \
   'unsupported @instance source shape for `InfixCombine`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers'
 
-verify_method_modifier_negative \
+verify_modifier_negative \
   negativeDelegatedMethodModifiers \
   delegated \
   "$product_root/negative-delegated-method-modifiers/target/scala-$scala_version/classes" \
   "$delegated_modifier_negative_log" \
   'unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers'
 
-verify_method_modifier_negative \
+verify_modifier_negative \
   negativeApplyInstanceMethodModifiers \
   apply-instance \
   "$product_root/negative-apply-instance-method-modifiers/target/scala-$scala_version/classes" \
@@ -482,6 +483,38 @@ for forbidden in \
       fail "could not inspect tracked build/config sources for forbidden dependency source coupling"
   fi
 done
+
+type_member_diagnostics=()
+for mode in Apply Aux ApplyAux AuxApply; do
+  case "$mode" in
+    Apply|ApplyAux) handler='full @apply' ;;
+    Aux|AuxApply) handler='@aux' ;;
+  esac
+  for shape in Bounded Unbounded BinaryAbstract Alias BinaryAlias; do
+    case "$shape" in
+      Bounded|Unbounded) reason='must be public, unannotated, and free of unsupported modifiers' ;;
+      BinaryAbstract) reason='must not declare type parameters' ;;
+      Alias|BinaryAlias) reason='must be abstract bounds, found alias' ;;
+    esac
+    type_member_diagnostics+=("unsupported $handler source shape for \`$mode$shape\`: result type member \`Out\` $reason")
+  done
+done
+verify_modifier_negative \
+  negativeTypeMemberModifiers \
+  'full-apply/aux and both composition orders' \
+  "$product_root/negative-type-member-modifiers/target/scala-$scala_version/classes" \
+  "$type_member_modifier_negative_log" \
+  "${type_member_diagnostics[@]}"
+
+# Every row must reach a source-positioned AUXify diagnostic at its type member.
+for mode in Apply Aux ApplyAux AuxApply; do
+  case "$mode" in Apply|Aux) member_line=7 ;; *) member_line=8 ;; esac
+  for shape in Bounded Unbounded BinaryAbstract Alias BinaryAlias; do
+    grep -Eq "$mode$shape\.scala:$member_line:[0-9]+" "$type_member_modifier_negative_log" ||
+      fail "missing type-member diagnostic position for $mode$shape"
+  done
+done
+printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_TYPE_MEMBER_MODIFIER_HARDENING_PASS'
 
 external_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-external-consumer.XXXXXX")"
 cp -R "$product_root/qualification/external-consumer/." "$external_root"

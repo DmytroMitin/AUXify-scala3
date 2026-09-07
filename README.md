@@ -108,7 +108,11 @@ member with no lower bound and that same named upper bound. Its source name is
 preserved, so a renamed `Combine[L <: Natural, R <: Natural]` with abstract
 `Result <: Natural` is supported too. Ordinary type-class methods are allowed;
 multiple result members, aliases, modifiers, and differing or complex bounds
-remain outside this first slice.
+remain outside this first slice. The exact compiler-valid `infix type Out <: Nat`
+form is rejected through normalized modifier evidence on Scala 3.3.8, 3.8.4,
+and 3.9.0 with the pinned Macro-Paradise 0.2.0-SNAPSHOT development graph.
+`@aux` and both supported `@apply` + `@aux` source orders enforce the same
+boundary with source-positioned diagnostics and no partial class/TASTy output.
 
 The first public `@aux` slice accepts that same exact bounded result-member
 family and adds a direct companion type alias. For example:
@@ -371,7 +375,13 @@ The generic sbt plugin selects Macro-Paradise compiler/API version
 still select another compiler/API version with `-Dmacroparadise.version=...`;
 any corresponding non-public artifacts must be prepared explicitly by that
 experiment. Release-shaped AUXify 0.1.0 verification continues to require the
-public Macro-Paradise 0.1.1 compiler/API dependency.
+public Macro-Paradise 0.1.1 compiler/API dependency as a compatibility rehearsal
+only. That release lacks normalized type-member `infix` and method-level
+`infix`/`erased` evidence, so it cannot prove the hardened admission contract.
+A future AUXify release retaining that contract requires a **public Macro-Paradise
+compiler/API release containing inputs 093/094**, as well as the required public
+Quasiquotes artifacts. No future Macro-Paradise version is selected here; the
+public generic sbt plugin 0.1.1 remains a separate build adapter.
 
 The two sbt tasks then publish AUXify's own modules locally:
 

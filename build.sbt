@@ -184,6 +184,11 @@ lazy val negativeApplyInstanceMethodModifiers = project
   .dependsOn(macroAnnotations)
   .settings(consumerSettings)
 
+lazy val negativeTypeMemberModifiers = project
+  .in(file("negative-type-member-modifiers"))
+  .dependsOn(macroAnnotations)
+  .settings(consumerSettings)
+
 lazy val negativeAuxUnsupported = project
   .in(file("negative-aux-unsupported"))
   .dependsOn(macroAnnotations)
@@ -262,6 +267,7 @@ lazy val root = project
         "negativeInstanceMethodModifiers" -> (negativeInstanceMethodModifiers / publish / skip).value,
         "negativeDelegatedMethodModifiers" -> (negativeDelegatedMethodModifiers / publish / skip).value,
         "negativeApplyInstanceMethodModifiers" -> (negativeApplyInstanceMethodModifiers / publish / skip).value,
+        "negativeTypeMemberModifiers" -> (negativeTypeMemberModifiers / publish / skip).value,
         "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value,
         "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value
       )
@@ -407,6 +413,9 @@ lazy val root = project
       }
       require(contaminated.isEmpty, s"generated POM contamination: ${contaminated.mkString(", ")}")
 
+      // This retained 0.1.1 graph rehearses coordinates/POM compatibility only.
+      // A future release retaining modifier hardening needs a public Macro-Paradise
+      // compiler/API release containing inputs 093/094; its version is not selected.
       if (version.value == "0.1.0") {
         require(macroParadiseVersion == "0.1.1", s"release-shaped build requires Macro-Paradise 0.1.1, found $macroParadiseVersion")
         require(quasiquotesVersion == "0.3.0", s"release-shaped build requires Quasiquotes 0.3.0, found $quasiquotesVersion")
