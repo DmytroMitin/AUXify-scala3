@@ -10,7 +10,7 @@ ThisBuild / scalaVersion := {
   selectedScalaVersion
 }
 ThisBuild / organization := "com.github.dmytromitin"
-ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / version := "0.2.0-SNAPSHOT"
 ThisBuild / organizationName := "Dmytro Mitin"
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / publish / skip := true
@@ -42,7 +42,7 @@ ThisBuild / pomIncludeRepository := (_ => false)
 val macroParadiseVersion =
   sys.props.getOrElse("macroparadise.version", "0.2.0-SNAPSHOT")
 val quasiquotesVersion =
-  sys.props.getOrElse("quasiquotes.version", "0.3.0-SNAPSHOT")
+  sys.props.getOrElse("quasiquotes.version", "0.3.0")
 val scalaMetaVersion = "4.17.3"
 val munitVersion = "1.0.4"
 
@@ -247,6 +247,11 @@ lazy val root = project
       )
     },
     verifyReleaseReadiness := {
+      val selectedBuildVersion = version.value
+      require(
+        Set("0.2.0-SNAPSHOT", "0.1.0")(selectedBuildVersion),
+        s"unexpected AUXify development/release-simulation version: $selectedBuildVersion"
+      )
       val intendedPublicModuleCount = 1 + supportedScalaVersions.size
       val primaryArtifactCount = intendedPublicModuleCount * 4
       val expectedReleaseInventoryFiles = primaryArtifactCount * 6
@@ -388,8 +393,8 @@ lazy val root = project
       }
       if (!sys.props.contains("quasiquotes.version")) {
         require(
-          quasiquotesVersion == "0.3.0-SNAPSHOT",
-          s"default development build requires Quasiquotes 0.3.0-SNAPSHOT, found $quasiquotesVersion"
+          quasiquotesVersion == "0.3.0",
+          s"default development build requires public Quasiquotes 0.3.0, found $quasiquotesVersion"
         )
       }
       val munitDependencies = (handlerPomXml \\ "dependency").filter(node =>

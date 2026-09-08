@@ -17,7 +17,7 @@ scalaVersion := {
 }
 
 val auxifyVersion =
-  sys.props.getOrElse("auxify.version", "0.1.0-SNAPSHOT")
+  sys.props.getOrElse("auxify.version", "0.2.0-SNAPSHOT")
 val macroParadiseVersion =
   sys.props.getOrElse("macroparadise.version", "0.2.0-SNAPSHOT")
 val releaseConsumerMode =

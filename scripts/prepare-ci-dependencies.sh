@@ -8,9 +8,7 @@ product_root="$(cd "$script_dir/.." && pwd -P)"
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
 macro_paradise_commit="9465d53ba62a13cc4e8d7ded32f05f13dab50d19"
 macro_paradise_version="0.2.0-SNAPSHOT"
-quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
-quasiquotes_commit="34c2a29875e74cd6193933fff40e9a8a16764208"
-quasiquotes_shared_build_scala_version="3.3.8"
+quasiquotes_version="0.3.0"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
 fail() {
@@ -29,8 +27,7 @@ esac
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
 printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$macro_paradise_commit"
 printf 'MACRO_PARADISE_DEVELOPMENT_VERSION=%s\n' "$macro_paradise_version"
-printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$quasiquotes_commit"
-printf 'QUASIQUOTES_SHARED_BUILD_SCALA_VERSION=%s\n' "$quasiquotes_shared_build_scala_version"
+printf 'QUASIQUOTES_PUBLIC_VERSION=%s\n' "$quasiquotes_version"
 
 for command in git sbt java; do
   command -v "$command" >/dev/null 2>&1 ||
@@ -58,7 +55,6 @@ clone_at_commit() {
 }
 
 macro_paradise_checkout="$dependency_root/macroparadise-scala3"
-quasiquotes_checkout="$dependency_root/quasiquotes-scala3"
 
 clone_at_commit \
   "$macro_paradise_repository" \
@@ -75,26 +71,7 @@ clone_at_commit \
     "plugin/publishLocal"
 )
 
-clone_at_commit \
-  "$quasiquotes_repository" \
-  "$quasiquotes_commit" \
-  "$quasiquotes_checkout" \
-  QUASIQUOTES
-
-(
-  cd "$quasiquotes_checkout"
-  sbt -batch \
-    "++$quasiquotes_shared_build_scala_version!" \
-    "core/publishLocal" \
-    "set neutralScalameta / publish / skip := false" \
-    "neutralScalameta/publishLocal"
-  sbt -batch \
-    "++$scala_version!" \
-    "set dottyInternal / publish / skip := false" \
-    "dottyInternal/publishLocal"
-)
-
 printf 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED scala=%s macro_paradise=%s quasiquotes=%s\n' \
   "$scala_version" \
   "$macro_paradise_version" \
-  "$quasiquotes_commit"
+  "${quasiquotes_version}-public"

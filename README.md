@@ -17,16 +17,16 @@ remains the default developer line.
 
 ## Annotation status
 
-| Annotation | Public status | Current boundary |
+| Annotation | Current-main status | Current boundary |
 | --- | --- | --- |
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; optionally followed by exactly one public concrete unary `(A): A` method or one concrete alias `type Item = A`, each inherited rather than copied; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; optionally followed by exactly one public concrete unary `(A): A` method, one concrete parameterless method returning `A`, or one concrete alias `type Item = A`, each inherited rather than copied; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
-| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including its optional final inherited concrete unary method or final concrete alias to the enclosing type parameter |
+| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including its optional final inherited concrete unary method, concrete parameterless method, or concrete alias to the enclosing type parameter |
 | `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -45,18 +45,18 @@ AUXify or, preferably when it has broader value, a separate reusable project.
 That prerequisite is a future design option, not a commitment by AUXify to
 build it.
 
-The supported `@apply`, `@aux`, `@instance`, `@self`, and `@delegated` slices
-remain AUXify development artifacts. The generic Macro-Paradise sbt plugin
-0.1.1 is public, while ordinary AUXify development uses a coherently
-source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT graph at the pinned
-accepted commit. AUXify and its Quasiquotes 0.3.0-SNAPSHOT integration remain
-local-development artifacts.
+The documented AUXify 0.1.0 compatibility slices are publicly released. Current
+`main` is the 0.2.0-SNAPSHOT development line and additionally contains the
+post-0.1.0 inherited concrete type-alias and parameterless-method `@instance`
+widenings plus normalized modifier-admission hardening. Ordinary development
+uses a coherently source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT graph
+at the pinned accepted commit and public Quasiquotes 0.3.0 from Maven Central.
 
 ### Development module coordinates
 
-- Marker: `com.github.dmytromitin:auxify-scala3-macro-annotations_3:0.1.0-SNAPSHOT`
+- Marker: `com.github.dmytromitin:auxify-scala3-macro-annotations_3:0.2.0-SNAPSHOT`
   — Scala 3 binary-crossed (`_3`).
-- Handler: `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:0.1.0-SNAPSHOT`
+- Handler: `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:0.2.0-SNAPSHOT`
   — exact-full-cross, with separately built `_3.3.8`, `_3.8.4`, and `_3.9.0` artifacts,
   because it participates in the compiler-sensitive handler universe.
 
@@ -64,12 +64,17 @@ Both coordinates are development/local-only at this stage.
 
 ### Release boundary
 
-The rehearsed AUXify 0.1.0 compatibility candidate remains fixed at source
-`341e0f33529a6d80edbd33fc0760c1dd79c40187`. It targets public
-Macro-Paradise 0.1.1 and does not include concrete type-alias `@instance`
-inheritance. The alias family documented below is post-0.1.0 work on `main` and
-depends on the coherent Macro-Paradise 0.2.0-SNAPSHOT development graph. It
-does not widen or rebase that 0.1.0 candidate.
+AUXify 0.1.0 is publicly available from Maven Central and from the GitHub
+`v0.1.0` tag and Release. The tag peels to release commit
+`36b789dda567a09e7413fbfa4bdcdacc13efaf1b`, whose frozen compatibility tree
+targets public Macro-Paradise 0.1.1 and Quasiquotes 0.3.0. The released marker
+is `com.github.dmytromitin:auxify-scala3-macro-annotations_3:0.1.0`; released
+handlers are `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:0.1.0`.
+
+That release does not include the concrete type-alias or concrete
+parameterless-method `@instance` inheritances documented below, nor the later
+normalized modifier-admission hardening. Those changes remain on the distinct
+post-release `main` line and do not widen, rebase, or rewrite the 0.1.0 release.
 
 For a supported generic trait such as:
 
@@ -260,7 +265,7 @@ development hardening graph, and AUXify makes no claim that 0.2.0-SNAPSHOT is
 published remotely.
 
 Simple `@apply` and the bounded `@instance` slice may be stacked in either source
-order on that exact common family, with or without either supported final inherited
+order on that exact common family, with or without one supported final inherited
 concrete member:
 
 ```scala
@@ -388,15 +393,16 @@ class or object targets remain later parity work.
 The current external-consumer proof covers exact Scala 3.3.8, Scala 3.8.4, and
 Scala 3.9.0 LTS on JDK 25. The public Macro-Paradise sbt plugin remains 0.1.1;
 the selected compiler/API product is the accepted 0.2.0-SNAPSHOT development
-graph built from the pinned peer commit. AUXify 0.1.0-SNAPSHOT and the required
-Quasiquotes 0.3.0-SNAPSHOT integration remain development artifacts.
+graph built from the pinned peer commit. AUXify 0.2.0-SNAPSHOT remains a local
+development artifact, while its default Quasiquotes 0.3.0 dependency resolves
+publicly from Maven Central.
 
 ### Preferred development setup with the Macro-Paradise sbt plugin
 
-From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API and
-Quasiquotes artifacts, then publish the AUXify marker and handler to the local
-Ivy repository. The generic Macro-Paradise sbt plugin resolves from its public
-0.1.1 release:
+From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API, then
+publish the AUXify marker and handler to the local Ivy repository. Quasiquotes
+0.3.0 and the generic Macro-Paradise sbt plugin resolve from their public
+releases:
 
 ```sh
 AUXIFY_SCALA_VERSION=3.8.4 ./scripts/prepare-ci-dependencies.sh
@@ -409,11 +415,10 @@ qualified line. Omitting both selectors retains the default Scala 3.8.4 behavior
 Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the
 checked-in, reproducible helper for this local-development setup. It accepts
 exactly `AUXIFY_SCALA_VERSION=3.3.8`, `AUXIFY_SCALA_VERSION=3.8.4`, or
-`AUXIFY_SCALA_VERSION=3.9.0`, clones the exact pinned Macro-Paradise and
-Quasiquotes revisions into a disposable temporary directory, verifies both
-commit identities, and locally publishes the accepted Macro-Paradise
-0.2.0-SNAPSHOT compiler/API plus the unreleased Quasiquotes artifacts that
-AUXify currently consumes.
+`AUXIFY_SCALA_VERSION=3.9.0`, clones the exact pinned Macro-Paradise revision
+into a disposable temporary directory, verifies its commit identity, and
+locally publishes the accepted Macro-Paradise 0.2.0-SNAPSHOT compiler/API.
+Quasiquotes 0.3.0 is not cloned or locally published by the default workflow.
 
 The generic sbt plugin selects Macro-Paradise compiler/API version
 `0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate experiments can
@@ -423,10 +428,11 @@ experiment. Release-shaped AUXify 0.1.0 verification continues to require the
 public Macro-Paradise 0.1.1 compiler/API dependency as a compatibility rehearsal
 only. That release lacks normalized type-member `infix` and method-level
 `infix`/`erased` evidence, so it cannot prove the hardened admission contract.
-A future AUXify release retaining that contract requires a **public Macro-Paradise
-compiler/API release containing inputs 093/094**, as well as the required public
-Quasiquotes artifacts. No future Macro-Paradise version is selected here; the
-public generic sbt plugin 0.1.1 remains a separate build adapter.
+A future AUXify release retaining that contract requires a **public
+Macro-Paradise compiler/API release containing inputs 093/094**. Quasiquotes
+0.3.0 already satisfies the public Quasiquotes dependency. No future
+Macro-Paradise version is selected here; the public generic sbt plugin 0.1.1
+remains a separate build adapter.
 
 The two sbt tasks then publish AUXify's own modules locally:
 
@@ -460,7 +466,7 @@ The preferred external `build.sbt` is:
 enablePlugins(macroparadise.sbt.MacroParadisePrecompiledPlugin)
 
 scalaVersion := "3.8.4"
-val auxifyVersion = "0.1.0-SNAPSHOT"
+val auxifyVersion = "0.2.0-SNAPSHOT"
 
 macroParadiseMarkerModules := Seq(
   "com.github.dmytromitin" %% "auxify-scala3-macro-annotations" % auxifyVersion
@@ -515,7 +521,7 @@ import java.nio.file.Files
 import java.security.MessageDigest
 
 ThisBuild / scalaVersion := "3.8.4"
-val auxifyVersion = "0.1.0-SNAPSHOT"
+val auxifyVersion = "0.2.0-SNAPSHOT"
 
 lazy val AuxifyHandler = config("auxifyHandler").hide
 
@@ -706,10 +712,10 @@ companion and adds the materializer when it has no direct member named
 `apply`. An existing direct `apply` is preserved and is not duplicated.
 
 The development implementation depends on the source-built Scala 3
-Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and unreleased Quasiquotes
-0.3.0-SNAPSHOT libraries. Preparing Macro-Paradise, Quasiquotes, and AUXify
-through local publication remains a development-only step; this README makes
-no claim that those snapshot artifacts are remotely available.
+Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and public Quasiquotes 0.3.0.
+Preparing Macro-Paradise and AUXify through local publication remains a
+development-only step; this README does not present either 0.2.0-SNAPSHOT
+coordinate as remotely available.
 
 The verified `@apply` target remains deliberately narrow: a top-level,
 non-sealed ordinary trait with no constructor or value parameters, using
