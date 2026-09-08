@@ -5,6 +5,21 @@ AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@aux`,
 exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25. Scala 3.8.4
 remains the default developer line.
 
+## Quick start
+
+The easiest way to try the released AUXify 0.1.0 line is the public
+[DmytroMitin/AUXify-scala3.g8](https://github.com/DmytroMitin/AUXify-scala3.g8)
+starter:
+
+```sh
+sbt new DmytroMitin/AUXify-scala3.g8
+```
+
+The generated project uses only public release coordinates. It defaults to
+exact Scala 3.9.0 and also supports exact Scala 3.3.8 and 3.8.4. It demonstrates
+the five released annotation families—`@apply`, `@aux`, `@instance`,
+`@delegated`, and `@self`—plus their released bounded composition examples.
+
 ## Related projects
 
 - [quasiquotes-scala3](https://github.com/DmytroMitin/quasiquotes-scala3) —
