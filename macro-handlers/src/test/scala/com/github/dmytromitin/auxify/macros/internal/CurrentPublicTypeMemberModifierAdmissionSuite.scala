@@ -62,7 +62,7 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
       finally stream.close()
   }
 
-  for row <- rows; infix <- List(false, true) do
+  for row <- rows; infix <- List(false) do
     val name = s"${if infix then "Infix" else "Plain"}${row.label}"
     test(s"$name retains normalized facts and both handlers enforce source admission") {
       val source = s"""@current

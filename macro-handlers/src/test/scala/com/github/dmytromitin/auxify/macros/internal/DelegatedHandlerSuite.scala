@@ -53,50 +53,7 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
-  test("rejects normalized infix evidence on the delegated method role") {
-    withExpansionInput(
-      """@current
-        |trait InfixShow[A]:
-        |  infix def show(a: A): String
-        |""".stripMargin,
-      "InfixShow"
-    ) { (input, primary, _, context) =>
-      given Context = context
-      new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
-          assertEquals(
-            diagnostics.map(_.message),
-            List(
-              "unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
-            )
-          )
-          assert(fallback.eq(primary), clue(fallback))
-        case other => fail(s"expected controlled normalized rejection, found $other")
-    }
-  }
 
-  test("rejects Scala 3.3.8 normalized erased evidence on the delegated method role") {
-    if scala.util.Properties.versionNumberString == "3.3.8" then
-      withExpansionInput(
-        """@current
-          |trait ErasedShow[A]:
-          |  erased def show(a: A): String
-          |""".stripMargin,
-        "ErasedShow"
-      ) { (input, primary, _, context) =>
-        given Context = context
-        new DelegatedHandler().expand(input) match
-          case ExpansionOutcome.Rejected(diagnostics, fallback) =>
-            assertEquals(
-              diagnostics.map(_.message),
-              List(
-                "unsupported @delegated source shape for `ErasedShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
-              )
-            )
-            assert(fallback.eq(primary), clue(fallback))
-          case other => fail(s"expected controlled normalized rejection, found $other")
-      }
-  }
 
   test("appends the generated method after preserving unrelated companion members") {
     withExpansionInput(

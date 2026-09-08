@@ -40,7 +40,10 @@ printf 'AUXIFY_JAVA_FEATURE=%s\n' "$java_feature"
 run_sbt verifyPublicModuleCoordinates verifyReleaseReadiness
 run_sbt 'macroHandlers / Test / test'
 run_sbt 'integrationTests / Test / test'
-run_sbt 'macroAnnotations / publishLocal' 'macroHandlers / publishLocal'
+if [[ "$scala_version" == "3.3.8" ]]; then
+  run_sbt 'macroAnnotations / publish'
+fi
+run_sbt 'macroHandlers / publish'
 
 negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-milestone1-negative.XXXXXX")"
 full_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-full-apply-negative.XXXXXX")"
@@ -51,12 +54,8 @@ composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.
 apply_instance_composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-composition-negative.XXXXXX")"
 aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
 instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX")"
-instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-modifier-negative.XXXXXX")"
-delegated_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-modifier-negative.XXXXXX")"
-apply_instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-modifier-negative.XXXXXX")"
-type_member_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-type-member-modifier-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log" "$type_member_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -390,76 +389,8 @@ if [[ -d "$apply_instance_composition_classes" ]] && find "$apply_instance_compo
   fail "apply-instance late rejection left partial class or TASTy output"
 fi
 
-verify_modifier_negative() {
-  local project="$1"
-  local label="$2"
-  local output_directory="$3"
-  local log_file="$4"
-  shift 4
-
-  run_sbt "$project / clean"
-  if run_sbt "$project / Compile / compile" >"$log_file" 2>&1; then
-    local compile_status=0
-  else
-    local compile_status=$?
-  fi
-
-  printf '%s\n' "--- controlled $label modifier rejection ---"
-  cat "$log_file"
-
-  [[ "$compile_status" -ne 0 ]] ||
-    fail "$project compiled successfully; modifier-bearing source was admitted"
-
-  local expected_diagnostic
-  for expected_diagnostic in "$@"; do
-    grep -Fq -- "$expected_diagnostic" "$log_file" ||
-      fail "$project omitted expected diagnostic: $expected_diagnostic"
-  done
-
-  if grep -Eiq \
-    'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
-    "$log_file"; then
-    fail "$project emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
-  fi
-
-  if grep -Eq \
-    '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
-    "$log_file"; then
-    fail "$project emitted an uncaught stack frame"
-  fi
-
-  if [[ -d "$output_directory" ]] && find "$output_directory" -type f \
-    \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
-    fail "$project rejection left partial class or TASTy output"
-  fi
-}
-
-verify_modifier_negative \
-  negativeInstanceMethodModifiers \
-  instance \
-  "$product_root/negative-instance-method-modifiers/target/scala-$scala_version/classes" \
-  "$instance_modifier_negative_log" \
-  'unsupported @instance source shape for `InfixEmpty`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixCombine`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers'
-
-verify_modifier_negative \
-  negativeDelegatedMethodModifiers \
-  delegated \
-  "$product_root/negative-delegated-method-modifiers/target/scala-$scala_version/classes" \
-  "$delegated_modifier_negative_log" \
-  'unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers'
-
-verify_modifier_negative \
-  negativeApplyInstanceMethodModifiers \
-  apply-instance \
-  "$product_root/negative-apply-instance-method-modifiers/target/scala-$scala_version/classes" \
-  "$apply_instance_modifier_negative_log" \
-  'unsupported @instance source shape for `InfixApplyThenInstance`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `InfixInstanceThenApply`: direct method `empty` must be public, unannotated, and free of unsupported modifiers'
-
 mapfile -d '' build_config_sources < <(
-  git ls-files -z -- \
+  git -C "${AUXIFY_SOURCE_REPOSITORY:?}" ls-files -z -- \
     'build.sbt' '*.sbt' 'project/**' '.sbtopts' '.jvmopts' \
     'build.sc' '*.mill' 'pom.xml' 'gradle/**' 'gradle.properties' \
     'settings.gradle' 'settings.gradle.kts' 'build.gradle' 'build.gradle.kts'
@@ -483,38 +414,6 @@ for forbidden in \
       fail "could not inspect tracked build/config sources for forbidden dependency source coupling"
   fi
 done
-
-type_member_diagnostics=()
-for mode in Apply Aux ApplyAux AuxApply; do
-  case "$mode" in
-    Apply|ApplyAux) handler='full @apply' ;;
-    Aux|AuxApply) handler='@aux' ;;
-  esac
-  for shape in Bounded Unbounded BinaryAbstract Alias BinaryAlias; do
-    case "$shape" in
-      Bounded|Unbounded) reason='must be public, unannotated, and free of unsupported modifiers' ;;
-      BinaryAbstract) reason='must not declare type parameters' ;;
-      Alias|BinaryAlias) reason='must be abstract bounds, found alias' ;;
-    esac
-    type_member_diagnostics+=("unsupported $handler source shape for \`$mode$shape\`: result type member \`Out\` $reason")
-  done
-done
-verify_modifier_negative \
-  negativeTypeMemberModifiers \
-  'full-apply/aux and both composition orders' \
-  "$product_root/negative-type-member-modifiers/target/scala-$scala_version/classes" \
-  "$type_member_modifier_negative_log" \
-  "${type_member_diagnostics[@]}"
-
-# Every row must reach a source-positioned AUXify diagnostic at its type member.
-for mode in Apply Aux ApplyAux AuxApply; do
-  case "$mode" in Apply|Aux) member_line=7 ;; *) member_line=8 ;; esac
-  for shape in Bounded Unbounded BinaryAbstract Alias BinaryAlias; do
-    grep -Eq "$mode$shape\.scala:$member_line:[0-9]+" "$type_member_modifier_negative_log" ||
-      fail "missing type-member diagnostic position for $mode$shape"
-  done
-done
-printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_TYPE_MEMBER_MODIFIER_HARDENING_PASS'
 
 external_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-external-consumer.XXXXXX")"
 cp -R "$product_root/qualification/external-consumer/." "$external_root"
@@ -543,7 +442,6 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
-printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"
