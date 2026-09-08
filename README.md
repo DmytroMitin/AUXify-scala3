@@ -435,17 +435,20 @@ into a disposable temporary directory, verifies its commit identity, and
 locally publishes the accepted Macro-Paradise 0.2.0-SNAPSHOT compiler/API.
 Quasiquotes 0.3.0 is not cloned or locally published by the default workflow.
 
-The generic sbt plugin selects Macro-Paradise compiler/API version
-`0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate experiments can
-still select another compiler/API version with `-Dmacroparadise.version=...`;
+The preferred development build explicitly selects Macro-Paradise compiler/API
+version `0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate
+experiments can still select another compiler/API version with
+`-Dmacroparadise.version=...`;
 any corresponding non-public artifacts must be prepared explicitly by that
 experiment. Release-shaped AUXify 0.1.0 verification continues to require the
 public Macro-Paradise 0.1.1 compiler/API dependency as a compatibility rehearsal
 only. That release lacks normalized type-member `infix` and method-level
 `infix`/`erased` evidence, so it cannot prove the hardened admission contract.
 A future AUXify release retaining that contract requires a **public
-Macro-Paradise compiler/API release containing inputs 093/094**. Quasiquotes
-0.3.0 already satisfies the public Quasiquotes dependency. No future
+Macro-Paradise compiler/API release that exposes normalized unsupported-modifier
+evidence for direct type-member `infix` and direct-method `infix`, plus
+method-level `erased` on compiler lines where that syntax is accepted**.
+Quasiquotes 0.3.0 already satisfies the public Quasiquotes dependency. No future
 Macro-Paradise version is selected here; the public generic sbt plugin 0.1.1
 remains a separate build adapter.
 
@@ -457,9 +460,10 @@ The two sbt tasks then publish AUXify's own modules locally:
   dependency metadata that lets sbt resolve its transitive classpath. It is
   published separately for each of the three exact compiler lines.
 
-These operations publish Macro-Paradise, AUXify, and Quasiquotes development
-artifacts locally. They do not publish to Maven Central or another remote
-repository.
+These operations publish Macro-Paradise and AUXify development artifacts
+locally. Quasiquotes 0.3.0 resolves from Maven Central and is not cloned or
+published locally by the normal workflow. The operations do not publish to
+Maven Central or another remote repository.
 
 Pin sbt in the external project's `project/build.properties`:
 
@@ -481,6 +485,7 @@ The preferred external `build.sbt` is:
 enablePlugins(macroparadise.sbt.MacroParadisePrecompiledPlugin)
 
 scalaVersion := "3.8.4"
+macroParadiseCompilerProductVersion := "0.2.0-SNAPSHOT"
 val auxifyVersion = "0.2.0-SNAPSHOT"
 
 macroParadiseMarkerModules := Seq(
