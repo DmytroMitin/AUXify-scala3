@@ -8,31 +8,20 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  ExpansionHandler,
   ExpansionInput,
-  ExpansionOutcome,
-  ExpansionTargetProfile,
-  StructuredExpansionOutput
+  ExpansionOutcome
 }
 
 import quasiquotes.definitions.dotty.InstanceFactoryPeerBridge
 
 class InstanceHandlerSuite extends munit.FunSuite:
-  test("claims the public instance annotation and restricted generic trait envelope") {
-    val handler = new InstanceHandler
+  test("implements the current protocol with the public instance annotation") {
+    val handler: ExpansionHandler = new InstanceHandler
     assertEquals(
       handler.annotationName,
       "com.github.dmytromitin.auxify.macros.instance"
     )
-    assertEquals(
-      handler.targetProfile,
-      ExpansionTargetProfile.RestrictedGenericTraitApply
-    )
-    assertEquals(
-      handler.compositionPolicy,
-      ExpansionCompositionPolicy.SourceOrdered
-    )
-    assert(handler.consumesExistingCompanion, clue(handler))
   }
 
   test("derives and places the canonical instance factory") {
@@ -46,7 +35,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
         case other => fail(s"expected structured instance expansion, found $other")
 
       assertEquals(method.name.toString, "instance")
@@ -70,7 +61,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
         case other => fail(s"expected structured instance expansion, found $other")
 
       assertEquals(method.name.toString, "instance")
@@ -104,7 +97,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
         case other => fail(s"expected structured instance expansion, found $other")
 
       assertEquals(
@@ -138,14 +133,13 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, primary, _, context) =>
       given Context = context
       new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
               "unsupported @instance source shape for `InfixItem`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
             )
           )
-          assert(fallback.eq(primary), clue(fallback))
         case other => fail(s"expected controlled normalized rejection, found $other")
     }
   }
@@ -197,14 +191,13 @@ class InstanceHandlerSuite extends munit.FunSuite:
       ) { (input, primary, _, context) =>
         given Context = context
         new InstanceHandler().expand(input) match
-          case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+          case ExpansionOutcome.Rejected(diagnostics) =>
             assertEquals(
               diagnostics.map(_.message),
               List(
                 s"unsupported @instance source shape for `$traitName`: $role must be public, unannotated, and free of unsupported modifiers"
               )
             )
-            assert(fallback.eq(primary), clue(fallback))
           case other => fail(s"expected controlled normalized rejection, found $other")
       }
   }
@@ -254,14 +247,13 @@ class InstanceHandlerSuite extends munit.FunSuite:
         withExpansionInput(source, traitName) { (input, primary, _, context) =>
           given Context = context
           new InstanceHandler().expand(input) match
-            case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+            case ExpansionOutcome.Rejected(diagnostics) =>
               assertEquals(
                 diagnostics.map(_.message),
                 List(
                   s"unsupported @instance source shape for `$traitName`: $role must be public, unannotated, and free of unsupported modifiers"
                 )
               )
-              assert(fallback.eq(primary), clue(fallback))
             case other => fail(s"expected controlled normalized rejection, found $other")
         }
   }
@@ -277,7 +269,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
         case other => fail(s"expected structured instance expansion, found $other")
 
       assertEquals(method.leadingTypeParams.map(_.name.toString), List("Element"))
@@ -302,7 +296,9 @@ class InstanceHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedInstance(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
         case other => fail(s"expected structured instance expansion, found $other")
 
       assertEquals(
@@ -331,7 +327,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
         case member: MemberDef => member.name.toString
       })
       new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val merged = output.companion.getOrElse(fail("missing merged companion"))
           val names = merged.impl.body.collect {
             case member: MemberDef => member.name.toString
@@ -358,7 +355,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
       val original = companion.getOrElse(fail("missing fixture companion"))
       val originalBody = original.impl.body
       new InstanceHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val preserved = output.companion.getOrElse(fail("missing preserved companion"))
           assert(preserved.eq(original), clue(preserved))
           assert(preserved.impl.body.eq(originalBody), clue(preserved.impl.body))
@@ -397,12 +395,11 @@ class InstanceHandlerSuite extends munit.FunSuite:
           )
         )
       match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List("EXACT_RAW_LOWERING_FAILED: controlled bridge failure")
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(existing.impl.body.eq(originalCompanionBody), clue(existing.impl.body))
         case other => fail(s"expected controlled bridge rejection, found $other")
@@ -424,7 +421,7 @@ class InstanceHandlerSuite extends munit.FunSuite:
     val companion = stats.collectFirst { case value: ModuleDef => value }
     val currentAnnotation = Trees.mods(primary).annotations.head
     run(
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "com.github.dmytromitin.auxify.macros.instance",
         primary,
         companion,

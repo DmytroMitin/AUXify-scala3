@@ -3,12 +3,12 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.util.SrcPos
 
 import paradise3.api.{
-  AnnotatedClassBodyView,
-  AnnotatedClassTypeStructureView,
-  AnnotatedClassView,
+  ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
+  ExpansionTargetView,
   ExpansionDiagnostic
 }
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMember,
   DirectMemberKind,
   DirectMethod,
@@ -17,7 +17,7 @@ import paradise3.api.AnnotatedClassBodyView.{
   DirectTypeShape,
   DirectVisibility
 }
-import paradise3.api.AnnotatedClassTypeStructureView.{
+import paradise3.api.ExpansionTargetTypeStructureView.{
   Bound,
   DirectTypeMember,
   DirectTypeMemberKind
@@ -36,9 +36,9 @@ private[internal] object InstanceSourceShapeDecoder:
   )
 
   def decode(
-      classView: AnnotatedClassView,
-      bodyView: AnnotatedClassBodyView,
-      typeStructureView: Option[AnnotatedClassTypeStructureView] = None
+      classView: ExpansionTargetView,
+      bodyView: ExpansionTargetBodyView,
+      typeStructureView: Option[ExpansionTargetTypeStructureView] = None
   ): Either[ExpansionDiagnostic, SourceShape] =
     val traitName = classView.className
     if !normalizedNameAvailable(traitName) then
@@ -51,7 +51,7 @@ private[internal] object InstanceSourceShapeDecoder:
       classView.typeParameters match
         case List(typeParameter)
             if normalizedNameAvailable(typeParameter.name) &&
-              typeParameter.variance == AnnotatedClassView.Variance.Invariant &&
+              typeParameter.variance == ExpansionTargetView.Variance.Invariant &&
               typeParameter.isOrdinaryUnbounded &&
               !typeParameter.hasContextBounds &&
               !typeParameter.isOrdinaryUpperBounded =>
@@ -172,7 +172,7 @@ private[internal] object InstanceSourceShapeDecoder:
 
   private def thirdPositionConcreteAlias(
       traitName: String,
-      typeStructureView: AnnotatedClassTypeStructureView,
+      typeStructureView: ExpansionTargetTypeStructureView,
       fallbackPos: SrcPos
   ): Either[ExpansionDiagnostic, DirectTypeMember] =
     typeStructureView.directTypeMembers match

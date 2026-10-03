@@ -6,8 +6,8 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 import scala.meta.*
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMemberKind,
   DirectMethodStatus,
   DirectTypeShape,
@@ -129,17 +129,17 @@ class InstanceConcreteMethodInheritanceCharacterizationSuite extends munit.FunSu
   private def decodeViews(
       source: String,
       traitName: String
-  ): (AnnotatedClassView, AnnotatedClassBodyView) =
+  ): (ExpansionTargetView, ExpansionTargetBodyView) =
     val unit = CompilationUnit(s"${traitName}ConcreteMethodFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = new Parsers.Parser(unit.source).parse() match
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (classView, bodyView)

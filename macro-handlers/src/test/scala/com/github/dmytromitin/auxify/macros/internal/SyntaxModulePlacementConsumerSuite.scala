@@ -6,8 +6,18 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.core.Names.*
 import dotty.tools.dotc.parsing.Parsers
-import paradise3.api.{ExpansionInput, ExpansionOutcome, StructuredExpansionOutput}
-import paradise3.api.helpers.{CompanionModuleConflictPolicy, ExpansionHelpers}
+import paradise3.api.{
+  DefinitionPlacement,
+  ExpansionEdit,
+  ExpansionInput,
+  ExpansionOutcome,
+  ExpansionTargetKind
+}
+import paradise3.api.helpers.{
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
+}
 
 /** Test-only consumption of Macro-Paradise input 044.
   *
@@ -20,11 +30,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val fixture = parsedFixture()
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(None),
+    val input = fixture.input(None)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val companion = output.companion.getOrElse(fail("missing generated companion"))
@@ -41,11 +52,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val existingBody = existingTemplate.body
     val existingMods = Trees.mods(existing)
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val merged = output.companion.getOrElse(fail("missing merged companion"))
@@ -78,11 +90,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
       given Context = fixture.context
       val existing = fixture.companion.getOrElse(fail("missing existing companion"))
 
-      val output = structured:
-        ExpansionHelpers.addModuleToCompanion(
-          fixture.input(Some(existing)),
+      val input = fixture.input(Some(existing))
+      val output = structured(input):
+        place(
+          input,
           fixture.generatedModule,
-          CompanionModuleConflictPolicy.PreserveExisting
+          MemberConflictPolicy.PreserveExisting
         )
 
       assert(output.companion.getOrElse(fail("missing companion")).eq(existing), clue(conflictingDefinition))
@@ -90,15 +103,16 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     }
   }
 
-  test("a direct type syntax does not conflict and the exact module is added") {
+  test("the generic member policy preserves term and type namespace separation") {
     val fixture = parsedFixture("type syntax = String")
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(fixture.companion),
+    val input = fixture.input(fixture.companion)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val merged = output.companion.getOrElse(fail("missing merged companion"))
@@ -116,11 +130,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val fixture = parsedFixture("object Nested:\n  object syntax:\n    val existing: Int = 1")
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(fixture.companion),
+    val input = fixture.input(fixture.companion)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val merged = output.companion.getOrElse(fail("missing merged companion"))
@@ -133,11 +148,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val existing = fixture.companion.getOrElse(fail("missing existing companion"))
     val originalBody = existing.impl.body
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val preserved = output.companion.getOrElse(fail("missing companion"))
@@ -156,17 +172,17 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val existing = fixture.companion.getOrElse(fail("missing existing companion"))
     val originalBody = existing.impl.body
 
-    ExpansionHelpers.addModuleToCompanion(
-      fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    place(
+      input,
       fixture.generatedModule,
-      CompanionModuleConflictPolicy.Reject
+      MemberConflictPolicy.Reject
     ) match
-      case ExpansionOutcome.Rejected(diagnostics, fallback) =>
-        assert(fallback.eq(fixture.primary), clue(fallback))
+      case ExpansionOutcome.Rejected(diagnostics) =>
         assertEquals(diagnostics.size, 1)
         assertEquals(
           diagnostics.head.message,
-          "generated companion module `syntax` conflicts with existing direct companion term member `syntax` for `Show`"
+          "generated member `syntax` conflicts with a direct member of `Show`"
         )
         assertEquals(diagnostics.head.pos, fixture.currentAnnotation.sourcePos)
       case other => fail(s"expected Rejected, found $other")
@@ -186,11 +202,12 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
     val generatedTemplate = fixture.generatedModule.impl
     val generatedBody = generatedTemplate.body
 
-    val output = structured:
-      ExpansionHelpers.addModuleToCompanion(
-        fixture.input(fixture.companion),
+    val input = fixture.input(fixture.companion)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedModule,
-        CompanionModuleConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val inserted = directTermMembersNamed(
@@ -216,13 +233,13 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
       context: Context
   ):
     def input(existingCompanion: Option[ModuleDef]): ExpansionInput =
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "current",
         primary,
         existingCompanion,
         Set("Show", "GeneratedModuleOwner"),
         Some(currentAnnotation)
-      )
+      )(using context)
 
   private def parsedFixture(existingBody: String = ""): Fixture =
     val companion =
@@ -279,7 +296,27 @@ class SyntaxModulePlacementConsumerSuite extends munit.FunSuite:
   private def indent(value: String): String =
     value.linesIterator.map(line => s"  $line").mkString("\n")
 
-  private def structured(outcome: ExpansionOutcome): StructuredExpansionOutput =
+  private def place(
+      input: ExpansionInput,
+      member: Tree,
+      policy: MemberConflictPolicy
+  )(using Context): ExpansionOutcome =
+    ExpansionEdit.finish:
+      ExpansionEdit.start(input).flatMap(
+        ExpansionTransforms.placeMemberInCompanion(
+          member,
+          MissingCompanionPolicy.Create(
+            ExpansionTargetKind.Object,
+            DefinitionPlacement.AfterPrimary
+          ),
+          policy
+        )
+      )
+
+  private def structured(
+      input: ExpansionInput
+  )(outcome: ExpansionOutcome)(using Context): StructuredExpansionOutput =
     outcome match
-      case ExpansionOutcome.Structured(output) => output
+      case ExpansionOutcome.Structured(changes) =>
+        StructuredOutcomeTestSupport.materialize(input, changes)
       case other => fail(s"expected Structured, found $other")

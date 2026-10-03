@@ -1,10 +1,10 @@
 package com.github.dmytromitin.auxify.macros.internal
 
 import dotty.tools.dotc.util.{NoSourcePosition, SrcPos}
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.*
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.*
 
-class AnnotatedClassBodyViewConsumerSuite extends munit.FunSuite:
+class ExpansionTargetBodyViewConsumerSuite extends munit.FunSuite:
   private val pos: SrcPos = NoSourcePosition
 
   test("input 042 is sufficient for the exact first instance inspection slice") {
@@ -100,20 +100,20 @@ class AnnotatedClassBodyViewConsumerSuite extends munit.FunSuite:
 
   private val enclosingA = DirectTypeShape.EnclosingTypeParameter("A", pos)
 
-  private def canonicalTrait(name: String): AnnotatedClassView =
-    AnnotatedClassView(
+  private def canonicalTrait(name: String): ExpansionTargetView =
+    ExpansionTargetView(
       className = name,
       typeParameters = List(
-        AnnotatedClassView.TypeParameter(
+        ExpansionTargetView.TypeParameter(
           name = "A",
           pos = pos,
-          variance = AnnotatedClassView.Variance.Invariant,
+          variance = ExpansionTargetView.Variance.Invariant,
           isOrdinaryUnbounded = true,
           hasContextBounds = false
         )
       ),
       constructorClauses = Nil,
-      modifiers = AnnotatedClassView.Modifiers(
+      modifiers = ExpansionTargetView.Modifiers(
         isCase = false,
         isAbstract = false,
         isFinal = false,
@@ -122,11 +122,11 @@ class AnnotatedClassBodyViewConsumerSuite extends munit.FunSuite:
       ),
       classPos = pos,
       constructorPos = pos,
-      definitionKind = AnnotatedClassView.DefinitionKind.Trait
+      definitionKind = ExpansionTargetView.DefinitionKind.Trait
     )
 
-  private def body(members: DirectMember*): AnnotatedClassBodyView =
-    AnnotatedClassBodyView(members.toList, pos)
+  private def body(members: DirectMember*): ExpansionTargetBodyView =
+    ExpansionTargetBodyView(members.toList, pos)
 
   private def method(
       name: String,
@@ -177,7 +177,7 @@ private object InspectionPolicy:
     case NamedResultUnsupported(kind: String)
     case ShapeRejected
 
-  def instance(classView: AnnotatedClassView, bodyView: AnnotatedClassBodyView): Boolean =
+  def instance(classView: ExpansionTargetView, bodyView: ExpansionTargetBodyView): Boolean =
     canonicalTypeParameter(classView).exists: enclosingName =>
       bodyView.members match
         case emptyMember :: combineMember :: Nil =>
@@ -195,7 +195,7 @@ private object InspectionPolicy:
                 enclosing(combine.resultType).contains(enclosingName)
         case _ => false
 
-  def syntax(classView: AnnotatedClassView, bodyView: AnnotatedClassBodyView): Option[SyntaxSelection] =
+  def syntax(classView: ExpansionTargetView, bodyView: ExpansionTargetBodyView): Option[SyntaxSelection] =
     for
       enclosingName <- canonicalTypeParameter(classView)
       direct <- bodyView.members match
@@ -208,7 +208,7 @@ private object InspectionPolicy:
       if enclosing(direct.resultType).contains(enclosingName)
     yield SyntaxSelection(direct.name, parameters.head.name, parameters(1).name, enclosingName)
 
-  def delegated(classView: AnnotatedClassView, bodyView: AnnotatedClassBodyView): DelegatedResult =
+  def delegated(classView: ExpansionTargetView, bodyView: ExpansionTargetBodyView): DelegatedResult =
     val structural = for
       enclosingName <- canonicalTypeParameter(classView)
       direct <- bodyView.members match
@@ -228,12 +228,12 @@ private object InspectionPolicy:
           case _ => DelegatedResult.ShapeRejected
       case None => DelegatedResult.ShapeRejected
 
-  private def canonicalTypeParameter(classView: AnnotatedClassView): Option[String] =
-    if classView.definitionKind != AnnotatedClassView.DefinitionKind.Trait || classView.constructorClauses.nonEmpty then None
+  private def canonicalTypeParameter(classView: ExpansionTargetView): Option[String] =
+    if classView.definitionKind != ExpansionTargetView.DefinitionKind.Trait || classView.constructorClauses.nonEmpty then None
     else
       classView.typeParameters match
         case parameter :: Nil
-            if parameter.variance == AnnotatedClassView.Variance.Invariant &&
+            if parameter.variance == ExpansionTargetView.Variance.Invariant &&
               parameter.isOrdinaryUnbounded &&
               !parameter.hasContextBounds => Some(parameter.name)
         case _ => None

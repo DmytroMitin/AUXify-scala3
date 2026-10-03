@@ -7,22 +7,17 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  ExpansionHandler,
   ExpansionInput,
-  ExpansionOutcome,
-  ExpansionTargetProfile,
-  StructuredExpansionOutput
+  ExpansionOutcome
 }
 
 class ApplyHandlerSuite extends munit.FunSuite:
-  test("the public handler requests admission for both supported apply envelopes") {
+  test("the public handler implements the current protocol with the apply identity") {
+    val handler: ExpansionHandler = new ApplyHandler
     assertEquals(
-      new ApplyHandler().targetProfile,
-      ExpansionTargetProfile.RestrictedOrTwoUpperBoundedGenericTrait
-    )
-    assertEquals(
-      new ApplyHandler().compositionPolicy,
-      ExpansionCompositionPolicy.SourceOrdered
+      handler.annotationName,
+      "com.github.dmytromitin.auxify.macros.apply"
     )
   }
 
@@ -36,7 +31,8 @@ class ApplyHandlerSuite extends munit.FunSuite:
     withExpansionInput(source, "Add") { (input, primary, context) =>
       given Context = context
       new ApplyHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val generated = generatedApply(output)
           assertEquals(generated.leadingTypeParams.map(_.name.toString), List("N", "M"))
           generated.tpt match
@@ -49,8 +45,8 @@ class ApplyHandlerSuite extends munit.FunSuite:
               assertEquals(second.toString, "M")
               assertEquals(result.name.toString, "Out")
             case other => fail(s"expected refined Add[N, M] result, found $other")
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
-          fail(s"full Add.Out shape was rejected: ${diagnostics.map(_.message)}; fallback=$fallback")
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          fail(s"full Add.Out shape was rejected: ${diagnostics.map(_.message)}")
         case other => fail(s"expected structured expansion, found $other")
 
       assert(primary.rhs ne null)
@@ -70,18 +66,17 @@ class ApplyHandlerSuite extends munit.FunSuite:
     withExpansionInput(source, "AliasResult") { (input, primary, context) =>
       given Context = context
       val originalTemplate = primary.rhs
-      val companion = input.existingCompanion.getOrElse(fail("missing fixture companion"))
+      val companion = input.companion.map { case paradise3.api.ExpansionTarget.Object(tree) => tree; case other => throw new IllegalStateException(s"unexpected companion $other") }.getOrElse(fail("missing fixture companion"))
       val originalCompanionBody = companion.impl.body
 
       new ApplyHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
               "unsupported full @apply source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias"
             )
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(companion.impl.body.eq(originalCompanionBody), clue(companion.impl.body))
         case other => fail(s"expected controlled rejection, found $other")
@@ -104,7 +99,7 @@ class ApplyHandlerSuite extends munit.FunSuite:
     val companion = stats.collectFirst { case value: ModuleDef => value }
     val currentAnnotation = Trees.mods(primary).annotations.head
     run(
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "com.github.dmytromitin.auxify.macros.apply",
         primary,
         companion,

@@ -7,31 +7,20 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  ExpansionHandler,
   ExpansionInput,
-  ExpansionOutcome,
-  ExpansionTargetProfile,
-  StructuredExpansionOutput
+  ExpansionOutcome
 }
 
 import quasiquotes.definitions.dotty.DelegatedForwardingMethodPeerBridge
 
 class DelegatedHandlerSuite extends munit.FunSuite:
-  test("claims the public delegated annotation and restricted generic trait envelope") {
-    val handler = new DelegatedHandler
+  test("implements the current protocol with the public delegated annotation") {
+    val handler: ExpansionHandler = new DelegatedHandler
     assertEquals(
       handler.annotationName,
       "com.github.dmytromitin.auxify.macros.delegated"
     )
-    assertEquals(
-      handler.targetProfile,
-      ExpansionTargetProfile.RestrictedGenericTraitApply
-    )
-    assertEquals(
-      handler.compositionPolicy,
-      ExpansionCompositionPolicy.SourceOrdered
-    )
-    assert(handler.consumesExistingCompanion)
   }
 
   test("derives and places the canonical forwarding method") {
@@ -44,7 +33,9 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val method = new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedMethod(output, "show")
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedMethod(output, "show")
         case other => fail(s"expected structured delegated expansion, found $other")
 
       assertEquals(method.name.toString, "show")
@@ -63,14 +54,13 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     ) { (input, primary, _, context) =>
       given Context = context
       new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
               "unsupported @delegated source shape for `InfixShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
             )
           )
-          assert(fallback.eq(primary), clue(fallback))
         case other => fail(s"expected controlled normalized rejection, found $other")
     }
   }
@@ -86,14 +76,13 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       ) { (input, primary, _, context) =>
         given Context = context
         new DelegatedHandler().expand(input) match
-          case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+          case ExpansionOutcome.Rejected(diagnostics) =>
             assertEquals(
               diagnostics.map(_.message),
               List(
                 "unsupported @delegated source shape for `ErasedShow`: direct method `show` must be public, unannotated, and free of unsupported modifiers"
               )
             )
-            assert(fallback.eq(primary), clue(fallback))
           case other => fail(s"expected controlled normalized rejection, found $other")
       }
   }
@@ -116,7 +105,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
         case member: MemberDef => member.name.toString
       })
       new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val merged = output.companion.getOrElse(fail("missing merged companion"))
           val names = merged.impl.body.collect {
             case member: MemberDef => member.name.toString
@@ -142,7 +132,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       val original = companion.getOrElse(fail("missing fixture companion"))
       val originalBody = original.impl.body
       new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val preserved = output.companion.getOrElse(fail("missing preserved companion"))
           assert(preserved.eq(original), clue(preserved))
           assert(preserved.impl.body.eq(originalBody), clue(preserved.impl.body))
@@ -171,14 +162,13 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       val originalTemplate = primary.rhs
       val originalCompanionBody = companion.getOrElse(fail("missing companion")).impl.body
       new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
               "unsupported @delegated source shape for `Concrete`: direct method `show` must be abstract"
             )
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(
             companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody)
@@ -210,12 +200,11 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           )
         )
       match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List("EXACT_FORWARDING_LOWERING_FAILED: controlled bridge failure")
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(
             companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody)
@@ -239,7 +228,7 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     val companion = stats.collectFirst { case value: ModuleDef => value }
     val currentAnnotation = Trees.mods(primary).annotations.head
     run(
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "com.github.dmytromitin.auxify.macros.delegated",
         primary,
         companion,

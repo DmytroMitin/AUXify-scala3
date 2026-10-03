@@ -5,9 +5,9 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassTypeStructureView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{DirectTypeShape, DirectVisibility}
-import paradise3.api.AnnotatedClassTypeStructureView.{
+import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{DirectTypeShape, DirectVisibility}
+import paradise3.api.ExpansionTargetTypeStructureView.{
   Bound,
   DirectTypeMember,
   DirectTypeMemberKind
@@ -30,7 +30,7 @@ class AuxTwoTypeMembersMacroProbeSuite extends munit.FunSuite:
 
       assertEquals(view.typeParameters.map(_.name), List(firstName, secondName))
       view.typeParameters.foreach: parameter =>
-        assertEquals(parameter.variance, AnnotatedClassView.Variance.Invariant)
+        assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
         assertEquals(parameter.lowerBound, Bound.Absent)
         assertNamedBound(parameter.upperBound, boundName)
         assert(!parameter.hasContextBounds)
@@ -116,13 +116,13 @@ class AuxTwoTypeMembersMacroProbeSuite extends munit.FunSuite:
   private def decode(
       source: String,
       traitName: String
-  ): AnnotatedClassTypeStructureView =
+  ): ExpansionTargetTypeStructureView =
     val unit = CompilationUnit(s"${traitName}TwoMemberAuxProbe.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = new Parsers.Parser(unit.source).parse() match
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    AnnotatedClassTypeStructureView
+    ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)

@@ -7,12 +7,12 @@ import dotty.tools.dotc.parsing.Parsers
 import scala.meta.*
 
 import paradise3.api.{
-  AnnotatedClassBodyView,
-  AnnotatedClassTypeStructureView,
-  AnnotatedClassView
+  ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
+  ExpansionTargetView
 }
-import paradise3.api.AnnotatedClassBodyView.DirectTypeShape
-import paradise3.api.AnnotatedClassTypeStructureView.{
+import paradise3.api.ExpansionTargetBodyView.DirectTypeShape
+import paradise3.api.ExpansionTargetTypeStructureView.{
   Bound,
   DirectTypeMemberKind
 }
@@ -984,20 +984,20 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       source: String,
       traitName: String
   ): (
-      AnnotatedClassView,
-      AnnotatedClassBodyView,
-      AnnotatedClassTypeStructureView
+      ExpansionTargetView,
+      ExpansionTargetBodyView,
+      ExpansionTargetTypeStructureView
   ) =
     val unit = CompilationUnit(s"${traitName}InstanceDecoderFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = parsePrimary(unit, traitName)
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val typeStructureView = AnnotatedClassTypeStructureView
+    val typeStructureView = ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (classView, bodyView, typeStructureView)
@@ -1005,14 +1005,14 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
   private def decodeViews(
       source: String,
       traitName: String
-  ): (AnnotatedClassView, AnnotatedClassBodyView) =
+  ): (ExpansionTargetView, ExpansionTargetBodyView) =
     val unit = CompilationUnit(s"${traitName}InstanceDecoderFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = parsePrimary(unit, traitName)
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (classView, bodyView)

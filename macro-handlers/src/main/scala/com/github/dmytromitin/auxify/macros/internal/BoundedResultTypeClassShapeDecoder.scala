@@ -2,9 +2,9 @@ package com.github.dmytromitin.auxify.macros.internal
 
 import dotty.tools.dotc.util.SrcPos
 
-import paradise3.api.{AnnotatedClassTypeStructureView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{DirectTypeShape, DirectVisibility}
-import paradise3.api.AnnotatedClassTypeStructureView.{
+import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{DirectTypeShape, DirectVisibility}
+import paradise3.api.ExpansionTargetTypeStructureView.{
   Bound,
   DirectTypeMember,
   DirectTypeMemberKind
@@ -23,7 +23,7 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
 
   def decode(
       typeClassName: String,
-      view: AnnotatedClassTypeStructureView
+      view: ExpansionTargetTypeStructureView
   ): Either[Rejection, BoundedResultTypeClassShape] =
     view.typeParameters match
       case List(first, second) =>
@@ -60,9 +60,9 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
         )
 
   private def enclosingBound(
-      parameter: AnnotatedClassTypeStructureView.EnclosingTypeParameter
+      parameter: ExpansionTargetTypeStructureView.EnclosingTypeParameter
   ): Either[Rejection, String] =
-    if parameter.variance != AnnotatedClassView.Variance.Invariant then
+    if parameter.variance != ExpansionTargetView.Variance.Invariant then
       reject(
         s"enclosing type parameter `${parameter.name}` must be invariant",
         parameter.pos
@@ -87,7 +87,7 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
           )
 
   private def singleResultMember(
-      view: AnnotatedClassTypeStructureView
+      view: ExpansionTargetTypeStructureView
   ): Either[Rejection, DirectTypeMember] =
     view.directTypeMembers match
       case List(result) => Right(result)

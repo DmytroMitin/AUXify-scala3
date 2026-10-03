@@ -3,30 +3,25 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  DefinitionPlacement,
+  ExpansionDiagnostic,
+  ExpansionEdit,
+  ExpansionHandler,
   ExpansionInput,
   ExpansionOutcome,
-  ExpansionTargetProfile,
-  ParadiseAnnotationExpander
+  ExpansionTargetKind
 }
 import paradise3.api.helpers.{
-  CompanionTypeConflictPolicy,
-  ExpansionHelpers
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
 }
 
 import quasiquotes.definitions.dotty.AuxTypeAliasPeerBridge
 
-final class AuxHandler extends ParadiseAnnotationExpander:
+final class AuxHandler extends ExpansionHandler:
   override val annotationName: String =
     "com.github.dmytromitin.auxify.macros.aux"
-
-  override val targetProfile: ExpansionTargetProfile =
-    ExpansionTargetProfile.TwoUpperBoundedGenericTrait
-
-  override val compositionPolicy: ExpansionCompositionPolicy =
-    ExpansionCompositionPolicy.SourceOrdered
-
-  override val consumesExistingCompanion: Boolean = true
 
   override def expand(input: ExpansionInput)(using Context): ExpansionOutcome =
     AuxHandler.expandWithLowering(input): (shape, context) =>
@@ -46,23 +41,25 @@ private[internal] object AuxHandler:
   )(
       lower: Lowering
   )(using Context): ExpansionOutcome =
-    input.annotatedClassTypeStructureView match
-      case Left(diagnostic) =>
-        ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-      case Right(structure) =>
-        AuxSourceShapeDecoder.decode(input.className, structure) match
-          case Left(diagnostic) =>
-            ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-          case Right(shape) =>
-            lower(shape, summon[Context]) match
-              case Left(failure) =>
-                ExpansionHelpers.rejected(
-                  s"${failure.code}: ${failure.detail}",
-                  input.annotatedClass
-                )
-              case Right(lowered) =>
-                ExpansionHelpers.addTypeToCompanion(
-                  input,
-                  lowered.tree,
-                  CompanionTypeConflictPolicy.PreserveExisting
-                )
+    ExpansionEdit.finish:
+      for
+        view <- input.targetView
+        _ <- AuxifyTargetAdmission.auxTarget(view)
+        structure <- input.targetTypeStructureView
+        shape <- AuxSourceShapeDecoder.decode(input.primary.name, structure)
+        lowered <- lower(shape, summon[Context]).left.map(failure =>
+          ExpansionDiagnostic(
+            s"${failure.code}: ${failure.detail}",
+            input.currentAnnotation.sourcePos
+          )
+        )
+        edit <- ExpansionEdit.start(input)
+        placed <- ExpansionTransforms.placeMemberInCompanion(
+          lowered.tree,
+          MissingCompanionPolicy.Create(
+            ExpansionTargetKind.Object,
+            DefinitionPlacement.AfterPrimary
+          ),
+          MemberConflictPolicy.PreserveExisting
+        )(edit)
+      yield placed

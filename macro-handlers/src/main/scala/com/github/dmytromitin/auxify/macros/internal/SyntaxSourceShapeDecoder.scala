@@ -3,11 +3,11 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.util.SrcPos
 
 import paradise3.api.{
-  AnnotatedClassBodyView,
-  AnnotatedClassView,
+  ExpansionTargetBodyView,
+  ExpansionTargetView,
   ExpansionDiagnostic
 }
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMemberKind,
   DirectMethod,
   DirectMethodParameter,
@@ -15,7 +15,7 @@ import paradise3.api.AnnotatedClassBodyView.{
   DirectTypeShape,
   DirectVisibility
 }
-import paradise3.api.AnnotatedClassView.DefinitionKind
+import paradise3.api.ExpansionTargetView.DefinitionKind
 
 private[internal] object SyntaxSourceShapeDecoder:
   final case class SourceShape(
@@ -29,8 +29,8 @@ private[internal] object SyntaxSourceShapeDecoder:
   )
 
   def decode(
-      classView: AnnotatedClassView,
-      bodyView: AnnotatedClassBodyView
+      classView: ExpansionTargetView,
+      bodyView: ExpansionTargetBodyView
   ): Either[ExpansionDiagnostic, SourceShape] =
     val traitName = classView.className
     if !normalizedNameAvailable(traitName) then
@@ -55,7 +55,7 @@ private[internal] object SyntaxSourceShapeDecoder:
       classView.typeParameters match
         case List(typeParameter)
             if normalizedNameAvailable(typeParameter.name) &&
-              typeParameter.variance == AnnotatedClassView.Variance.Invariant &&
+              typeParameter.variance == ExpansionTargetView.Variance.Invariant &&
               typeParameter.isOrdinaryUnbounded &&
               !typeParameter.hasContextBounds &&
               !typeParameter.isOrdinaryUpperBounded =>
@@ -108,7 +108,7 @@ private[internal] object SyntaxSourceShapeDecoder:
             classView.classPos
           )
 
-  private def restrictedTraitEnvelope(classView: AnnotatedClassView): Boolean =
+  private def restrictedTraitEnvelope(classView: ExpansionTargetView): Boolean =
     classView.definitionKind == DefinitionKind.Trait &&
       !classView.modifiers.isCase &&
       !classView.modifiers.isSealed &&
@@ -116,7 +116,7 @@ private[internal] object SyntaxSourceShapeDecoder:
 
   private def directMethod(
       traitName: String,
-      member: AnnotatedClassBodyView.DirectMember
+      member: ExpansionTargetBodyView.DirectMember
   ): Either[ExpansionDiagnostic, DirectMethod] =
     if member.kind != DirectMemberKind.Method then
       unsupported(

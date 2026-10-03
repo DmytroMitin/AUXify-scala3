@@ -3,11 +3,11 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.util.SrcPos
 
 import paradise3.api.{
-  AnnotatedClassBodyView,
-  AnnotatedClassView,
+  ExpansionTargetBodyView,
+  ExpansionTargetView,
   ExpansionDiagnostic
 }
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMethod,
   DirectMethodStatus,
   DirectTypeShape,
@@ -25,12 +25,12 @@ private[internal] object DelegatedSourceShapeDecoder:
 
   def decode(
       traitName: String,
-      classView: AnnotatedClassView,
-      bodyView: AnnotatedClassBodyView
+      classView: ExpansionTargetView,
+      bodyView: ExpansionTargetBodyView
   ): Either[ExpansionDiagnostic, SourceShape] =
     classView.typeParameters match
       case List(typeParameter)
-          if typeParameter.variance == AnnotatedClassView.Variance.Invariant &&
+          if typeParameter.variance == ExpansionTargetView.Variance.Invariant &&
             typeParameter.isOrdinaryUnbounded &&
             !typeParameter.hasContextBounds &&
             !typeParameter.isOrdinaryUpperBounded =>

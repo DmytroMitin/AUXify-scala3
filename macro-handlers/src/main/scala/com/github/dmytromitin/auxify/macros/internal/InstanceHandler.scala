@@ -3,31 +3,26 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
-  AnnotatedClassBodyView,
-  ExpansionCompositionPolicy,
+  DefinitionPlacement,
+  ExpansionDiagnostic,
+  ExpansionEdit,
+  ExpansionHandler,
   ExpansionInput,
   ExpansionOutcome,
-  ExpansionTargetProfile,
-  ParadiseAnnotationExpander
+  ExpansionTargetBodyView,
+  ExpansionTargetKind
 }
 import paradise3.api.helpers.{
-  CompanionMethodConflictPolicy,
-  ExpansionHelpers
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
 }
 
 import quasiquotes.definitions.dotty.InstanceFactoryPeerBridge
 
-final class InstanceHandler extends ParadiseAnnotationExpander:
+final class InstanceHandler extends ExpansionHandler:
   override val annotationName: String =
     "com.github.dmytromitin.auxify.macros.instance"
-
-  override val targetProfile: ExpansionTargetProfile =
-    ExpansionTargetProfile.RestrictedGenericTraitApply
-
-  override val compositionPolicy: ExpansionCompositionPolicy =
-    ExpansionCompositionPolicy.SourceOrdered
-
-  override val consumesExistingCompanion: Boolean = true
 
   override def expand(input: ExpansionInput)(using Context): ExpansionOutcome =
     InstanceHandler.expandWithLowering(input): (shape, context) =>
@@ -47,38 +42,38 @@ private[internal] object InstanceHandler:
   )(
       lower: Lowering
   )(using Context): ExpansionOutcome =
-    input.annotatedClassView match
-      case Left(diagnostic) =>
-        ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-      case Right(classView) =>
-        input.annotatedClassBodyView match
-          case Left(diagnostic) =>
-            ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-          case Right(bodyView) =>
-            val typeStructureView = bodyView.members match
-              case List(_, _, member)
-                  if member.kind == AnnotatedClassBodyView.DirectMemberKind.Type =>
-                input.annotatedClassTypeStructureView.map(Some(_))
-              case _ => Right(None)
-            typeStructureView.flatMap(typeStructure =>
-              InstanceSourceShapeDecoder.decode(
-                classView,
-                bodyView,
-                typeStructure
-              )
-            ) match
-              case Left(diagnostic) =>
-                ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-              case Right(shape) =>
-                lower(shape, summon[Context]) match
-                  case Left(failure) =>
-                    ExpansionHelpers.rejected(
-                      s"${failure.code}: ${failure.detail}",
-                      input.annotatedClass
-                    )
-                  case Right(lowered) =>
-                    ExpansionHelpers.addMethodToCompanion(
-                      input,
-                      lowered.tree,
-                      CompanionMethodConflictPolicy.PreserveExisting
-                    )
+    ExpansionEdit.finish:
+      for
+        classView <- input.targetView
+        _ <- AuxifyTargetAdmission.instanceOrDelegatedTarget(
+          classView,
+          "@instance"
+        )
+        bodyView <- input.targetBodyView
+        typeStructure <-
+          bodyView.members match
+            case List(_, _, member)
+                if member.kind == ExpansionTargetBodyView.DirectMemberKind.Type =>
+              input.targetTypeStructureView.map(Some(_))
+            case _ => Right(None)
+        shape <- InstanceSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          typeStructure
+        )
+        lowered <- lower(shape, summon[Context]).left.map(failure =>
+          ExpansionDiagnostic(
+            s"${failure.code}: ${failure.detail}",
+            input.currentAnnotation.sourcePos
+          )
+        )
+        edit <- ExpansionEdit.start(input)
+        placed <- ExpansionTransforms.placeMemberInCompanion(
+          lowered.tree,
+          MissingCompanionPolicy.Create(
+            ExpansionTargetKind.Object,
+            DefinitionPlacement.AfterPrimary
+          ),
+          MemberConflictPolicy.PreserveExisting
+        )(edit)
+      yield placed

@@ -7,31 +7,20 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  ExpansionHandler,
   ExpansionInput,
-  ExpansionOutcome,
-  ExpansionTargetProfile,
-  StructuredExpansionOutput
+  ExpansionOutcome
 }
 
 import quasiquotes.definitions.dotty.AuxTypeAliasPeerBridge
 
 class AuxHandlerSuite extends munit.FunSuite:
-  test("claims only the public aux marker and exact bounded composition envelope") {
-    val handler = new AuxHandler
+  test("implements the current protocol with the public aux marker") {
+    val handler: ExpansionHandler = new AuxHandler
     assertEquals(
       handler.annotationName,
       "com.github.dmytromitin.auxify.macros.aux"
     )
-    assertEquals(
-      handler.targetProfile,
-      ExpansionTargetProfile.TwoUpperBoundedGenericTrait
-    )
-    assertEquals(
-      handler.compositionPolicy,
-      ExpansionCompositionPolicy.SourceOrdered
-    )
-    assert(handler.consumesExistingCompanion)
   }
 
   test("decodes lowers and places the canonical Aux alias") {
@@ -45,7 +34,9 @@ class AuxHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       val alias = new AuxHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) => generatedAux(output)
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedAux(output)
         case other => fail(s"expected structured aux expansion, found $other")
 
       assertEquals(alias.name.toString, "Aux")
@@ -74,7 +65,8 @@ class AuxHandlerSuite extends munit.FunSuite:
       val original = companion.getOrElse(fail("missing fixture companion"))
       val originalBody = original.impl.body
       new AuxHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val merged = output.companion.getOrElse(fail("missing merged companion"))
           assert(
             merged.impl.body.take(originalBody.size).zip(originalBody).forall(_ eq _),
@@ -101,7 +93,8 @@ class AuxHandlerSuite extends munit.FunSuite:
       val original = companion.getOrElse(fail("missing fixture companion"))
       val originalBody = original.impl.body
       new AuxHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val preserved = output.companion.getOrElse(fail("missing companion"))
           assert(preserved.eq(original), clue(preserved))
           assert(preserved.impl.body.eq(originalBody), clue(preserved.impl.body))
@@ -123,7 +116,8 @@ class AuxHandlerSuite extends munit.FunSuite:
     ) { (input, _, _, context) =>
       given Context = context
       new AuxHandler().expand(input) match
-        case ExpansionOutcome.Structured(output) =>
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
           val merged = output.companion.getOrElse(fail("missing companion"))
           assertEquals(directTypesNamed(merged, "Aux").size, 1)
           assert(
@@ -153,14 +147,13 @@ class AuxHandlerSuite extends munit.FunSuite:
       val existing = companion.getOrElse(fail("missing companion"))
       val originalCompanionBody = existing.impl.body
       new AuxHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
               "unsupported @aux source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias"
             )
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(existing.impl.body.eq(originalCompanionBody), clue(existing.impl.body))
         case other => fail(s"expected controlled decoder rejection, found $other")
@@ -191,12 +184,11 @@ class AuxHandlerSuite extends munit.FunSuite:
           )
         )
       match
-        case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+        case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List("EXACT_RAW_LOWERING_FAILED: controlled bridge failure")
           )
-          assert(fallback.eq(primary), clue(fallback))
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
           assert(existing.impl.body.eq(originalCompanionBody), clue(existing.impl.body))
         case other => fail(s"expected controlled bridge rejection, found $other")
@@ -218,7 +210,7 @@ class AuxHandlerSuite extends munit.FunSuite:
     val companion = stats.collectFirst { case value: ModuleDef => value }
     val currentAnnotation = Trees.mods(primary).annotations.head
     run(
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "com.github.dmytromitin.auxify.macros.aux",
         primary,
         companion,

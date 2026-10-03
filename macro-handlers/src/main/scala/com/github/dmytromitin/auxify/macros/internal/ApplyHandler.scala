@@ -3,54 +3,47 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  DefinitionPlacement,
+  ExpansionDiagnostic,
+  ExpansionEdit,
+  ExpansionHandler,
   ExpansionInput,
   ExpansionOutcome,
-  ExpansionTargetProfile,
-  ParadiseAnnotationExpander
+  ExpansionTargetKind
 }
 import paradise3.api.helpers.{
-  CompanionMethodConflictPolicy,
-  ExpansionHelpers
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
 }
 
 import quasiquotes.definitions.dotty.ContextualMethodPeerBridge
 
-final class ApplyHandler extends ParadiseAnnotationExpander:
+final class ApplyHandler extends ExpansionHandler:
   override val annotationName: String =
     "com.github.dmytromitin.auxify.macros.apply"
 
-  override val targetProfile: ExpansionTargetProfile =
-    ExpansionTargetProfile.RestrictedOrTwoUpperBoundedGenericTrait
-
-  override val compositionPolicy: ExpansionCompositionPolicy =
-    ExpansionCompositionPolicy.SourceOrdered
-
-  override val consumesExistingCompanion: Boolean = true
-
   override def expand(input: ExpansionInput)(using Context): ExpansionOutcome =
-    ExpansionHelpers.withAnnotatedClassView(input): view =>
-      view.typeParameters match
-        case List(typeParameter) =>
-          lowerAndPlace(
-            input,
-            ApplyDefinitionBuilder.lower(input.className, typeParameter.name)
-          )
-        case List(_, _) =>
-          input.annotatedClassTypeStructureView match
-            case Left(diagnostic) =>
-              ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-            case Right(structure) =>
-              ApplyFullShapeDecoder.decode(input.className, structure) match
-                case Left(diagnostic) =>
-                  ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-                case Right(shape) =>
+    ExpansionEdit.finish:
+      input.targetView.flatMap: view =>
+        AuxifyTargetAdmission.applyTarget(view).flatMap: _ =>
+          view.typeParameters match
+            case List(typeParameter) =>
+              lowerAndPlace(
+                input,
+                ApplyDefinitionBuilder.lower(input.primary.name, typeParameter.name)
+              )
+            case List(_, _) =>
+              input.targetTypeStructureView.flatMap: structure =>
+                ApplyFullShapeDecoder.decode(input.primary.name, structure).flatMap: shape =>
                   lowerAndPlace(input, ApplyDefinitionBuilder.lowerFull(shape))
-        case _ =>
-          ExpansionHelpers.rejected(
-            s"unsupported @apply source shape for `${input.className}`",
-            input.annotatedClass
-          )
+            case _ =>
+              Left(
+                ExpansionDiagnostic(
+                  s"unsupported @apply source shape for `${input.primary.name}`",
+                  input.currentAnnotation.sourcePos
+                )
+              )
 
   private def lowerAndPlace(
       input: ExpansionInput,
@@ -58,16 +51,22 @@ final class ApplyHandler extends ParadiseAnnotationExpander:
         ContextualMethodPeerBridge.Failure,
         ContextualMethodPeerBridge.Lowered
       ]
-  )(using Context): ExpansionOutcome =
-    lowered match
-      case Left(failure) =>
-        ExpansionHelpers.rejected(
+  )(using Context): Either[ExpansionDiagnostic, ExpansionEdit] =
+    lowered
+      .left.map(failure =>
+        ExpansionDiagnostic(
           s"${failure.code}: ${failure.detail}",
-          input.annotatedClass
+          input.currentAnnotation.sourcePos
         )
-      case Right(value) =>
-        ExpansionHelpers.addMethodToCompanion(
-          input,
-          value.tree,
-          CompanionMethodConflictPolicy.PreserveExisting
+      )
+      .flatMap: value =>
+        ExpansionEdit.start(input).flatMap(
+          ExpansionTransforms.placeMemberInCompanion(
+            value.tree,
+            MissingCompanionPolicy.Create(
+              ExpansionTargetKind.Object,
+              DefinitionPlacement.AfterPrimary
+            ),
+            MemberConflictPolicy.PreserveExisting
+          )
         )

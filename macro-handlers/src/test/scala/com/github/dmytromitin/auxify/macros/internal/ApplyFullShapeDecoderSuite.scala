@@ -5,7 +5,7 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.AnnotatedClassTypeStructureView
+import paradise3.api.ExpansionTargetTypeStructureView
 
 class ApplyFullShapeDecoderSuite extends munit.FunSuite:
   test("decodes independently renamed full apply semantic names") {
@@ -183,7 +183,7 @@ class ApplyFullShapeDecoderSuite extends munit.FunSuite:
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val structure = AnnotatedClassTypeStructureView
+    val structure = ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     ApplyFullShapeDecoder.decode(typeClassName, structure)

@@ -5,7 +5,7 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassTypeStructureView, ExpansionDiagnostic}
+import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionDiagnostic}
 
 class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
   private final case class CommonFacts(
@@ -255,7 +255,7 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
 
   private def decodeStructure(
       source: String
-  ): (String, AnnotatedClassTypeStructureView) =
+  ): (String, ExpansionTargetTypeStructureView) =
     val unit = CompilationUnit("ApplyAuxShapeEquivalenceFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val parsed = new Parsers.Parser(unit.source).parse()
@@ -263,7 +263,7 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val structure = AnnotatedClassTypeStructureView
+    val structure = ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (primary.name.show, structure)

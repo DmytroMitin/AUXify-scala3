@@ -1,0 +1,8 @@
+package com.github.dmytromitin.auxify.negative.instance
+
+import com.github.dmytromitin.auxify.macros.instance
+
+@instance
+trait ContextualClause[A]:
+  def empty: A
+  def combine(using a: A, a1: A): A

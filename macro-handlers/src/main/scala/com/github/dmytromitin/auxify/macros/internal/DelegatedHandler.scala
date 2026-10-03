@@ -3,30 +3,25 @@ package com.github.dmytromitin.auxify.macros.internal
 import dotty.tools.dotc.core.Contexts.Context
 
 import paradise3.api.{
-  ExpansionCompositionPolicy,
+  DefinitionPlacement,
+  ExpansionDiagnostic,
+  ExpansionEdit,
+  ExpansionHandler,
   ExpansionInput,
   ExpansionOutcome,
-  ExpansionTargetProfile,
-  ParadiseAnnotationExpander
+  ExpansionTargetKind
 }
 import paradise3.api.helpers.{
-  CompanionMethodConflictPolicy,
-  ExpansionHelpers
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
 }
 
 import quasiquotes.definitions.dotty.DelegatedForwardingMethodPeerBridge
 
-final class DelegatedHandler extends ParadiseAnnotationExpander:
+final class DelegatedHandler extends ExpansionHandler:
   override val annotationName: String =
     "com.github.dmytromitin.auxify.macros.delegated"
-
-  override val targetProfile: ExpansionTargetProfile =
-    ExpansionTargetProfile.RestrictedGenericTraitApply
-
-  override val compositionPolicy: ExpansionCompositionPolicy =
-    ExpansionCompositionPolicy.SourceOrdered
-
-  override val consumesExistingCompanion: Boolean = true
 
   override def expand(input: ExpansionInput)(using Context): ExpansionOutcome =
     DelegatedHandler.expandWithLowering(input): (shape, context) =>
@@ -46,27 +41,28 @@ private[internal] object DelegatedHandler:
   )(
       lower: Lowering
   )(using Context): ExpansionOutcome =
-    ExpansionHelpers.withAnnotatedClassView(input): classView =>
-      input.annotatedClassBodyView match
-        case Left(diagnostic) =>
-          ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-        case Right(bodyView) =>
-          DelegatedSourceShapeDecoder.decode(input.className, classView, bodyView) match
-            case Left(diagnostic) =>
-              ExpansionHelpers.rejected(diagnostic, input.annotatedClass)
-            case Right(shape) =>
-              lower(shape, summon[Context]) match
-                case Left(failure) =>
-                  ExpansionHelpers.rejected(
-                    s"${failure.code}: ${failure.detail}",
-                    input.annotatedClass
-                  )
-                case Right(lowered) =>
-                  // This first slice treats any direct raw companion member with
-                  // the generated method name as a bounded syntactic conflict.
-                  // PreserveExisting keeps that companion exact and adds nothing.
-                  ExpansionHelpers.addMethodToCompanion(
-                    input,
-                    lowered.tree,
-                    CompanionMethodConflictPolicy.PreserveExisting
-                  )
+    ExpansionEdit.finish:
+      for
+        classView <- input.targetView
+        _ <- AuxifyTargetAdmission.instanceOrDelegatedTarget(
+          classView,
+          "@delegated"
+        )
+        bodyView <- input.targetBodyView
+        shape <- DelegatedSourceShapeDecoder.decode(input.primary.name, classView, bodyView)
+        lowered <- lower(shape, summon[Context]).left.map(failure =>
+          ExpansionDiagnostic(
+            s"${failure.code}: ${failure.detail}",
+            input.currentAnnotation.sourcePos
+          )
+        )
+        edit <- ExpansionEdit.start(input)
+        placed <- ExpansionTransforms.placeMemberInCompanion(
+          lowered.tree,
+          MissingCompanionPolicy.Create(
+            ExpansionTargetKind.Object,
+            DefinitionPlacement.AfterPrimary
+          ),
+          MemberConflictPolicy.PreserveExisting
+        )(edit)
+      yield placed

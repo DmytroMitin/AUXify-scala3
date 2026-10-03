@@ -6,8 +6,8 @@ import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 import scala.compiletime.testing.typeChecks
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{DirectMethod, DirectMethodStatus, DirectVisibility}
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{DirectMethod, DirectMethodStatus, DirectVisibility}
 
 class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.FunSuite:
   test("records compiletime-testing screening for method-modifier candidates") {
@@ -117,10 +117,10 @@ class CurrentPublicMethodModifierAdmissionCharacterizationSuite extends munit.Fu
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    AnnotatedClassView
+    ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    AnnotatedClassBodyView
+    ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
       .members

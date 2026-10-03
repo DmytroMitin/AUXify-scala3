@@ -245,12 +245,19 @@ if grep -Eq \
   fail "aux negative compile emitted an uncaught stack frame"
 fi
 
-run_sbt 'negativeInstanceUnsupported / clean'
-if run_sbt 'negativeInstanceUnsupported / Compile / compile' >"$instance_negative_log" 2>&1; then
-  instance_negative_status=0
-else
-  instance_negative_status=$?
-fi
+: >"$instance_negative_log"
+instance_negative_status=1
+for source_pattern in '[A-S].*[.]scala' '[T-Z].*[.]scala'; do
+  run_sbt 'negativeInstanceUnsupported / clean'
+  if run_sbt "set negativeInstanceUnsupported / Compile / sources := (negativeInstanceUnsupported / Compile / sources).value.filter(file => file.getName.matches(\"$source_pattern\") || file.getName == \"Other.scala\")" 'negativeInstanceUnsupported / Compile / compile' >>"$instance_negative_log" 2>&1; then
+    batch_status=0
+  else
+    batch_status=$?
+  fi
+
+  [[ "$batch_status" -ne 0 ]] ||
+    fail "negativeInstanceUnsupported batch $source_pattern compiled successfully; unsupported instance shapes were admitted"
+done
 
 printf '%s\n' '--- controlled instance source-shape diagnostics ---'
 cat "$instance_negative_log"

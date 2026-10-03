@@ -69,6 +69,12 @@ verifyExternalPolicy := {
     ) == 1,
     "external compile must carry one exact-line AUXify handler classpath"
   )
+  require(
+    compileOptions.count(_.matches(
+      "-P:macroparadise:externalArtifactIdentity=sha256:[0-9a-f]{64}"
+    )) == 1,
+    "external compile must carry one SHA-256 marker/handler artifact identity"
+  )
 
   if (releaseConsumerMode) {
     require(auxifyVersion == "0.1.0", s"release consumer requires AUXify 0.1.0, found $auxifyVersion")

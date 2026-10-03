@@ -1,3 +1,9 @@
+import macroparadise.sbt.{
+  MacroParadiseIntegration,
+  MacroParadisePrecompiledPlugin
+}
+import MacroParadisePrecompiledPlugin.autoImport.*
+
 val supportedScalaVersions = Set("3.3.8", "3.8.4", "3.9.0")
 val selectedScalaVersion =
   sys.props.getOrElse("auxify.scalaVersion", "3.8.4")
@@ -71,10 +77,6 @@ val macroParadiseApi =
 
 lazy val MarkerBuild = config("marker-build").hide
 
-val macroParadisePlugin =
-  ("com.github.dmytromitin" % "macroparadise-scala3-plugin" % macroParadiseVersion)
-    .cross(CrossVersion.full)
-
 val quasiquotesDottyInternal =
   ("com.github.dmytromitin" % "quasiquotes-scala3-dotty-internal" % quasiquotesVersion)
     .cross(CrossVersion.full)
@@ -112,23 +114,16 @@ lazy val macroHandlers = project
   )
 
 lazy val consumerSettings = Seq(
-  libraryDependencies += compilerPlugin(macroParadisePlugin),
-  Compile / scalacOptions ++= {
-    val handlerJar = (macroHandlers / Compile / packageBin).value
-    val handlerDependencies =
-      (macroHandlers / Compile / dependencyClasspath).value.files
-    val handlerClasspath =
-      (handlerJar +: handlerDependencies).distinct
-    Seq(
-      "-Xplugin-require:macroparadise",
-      s"-P:macroparadise:handlerClasspath=${handlerClasspath.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator)}"
-    )
-  }
+  macroParadiseCompilerProductVersion := macroParadiseVersion
+) ++ MacroParadiseIntegration.precompiledProjects(
+  macroAnnotations,
+  macroHandlers
 )
 
 lazy val integrationTests = project
   .in(file("integration-tests"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
   .settings(
     libraryDependencies += "org.scalameta" %% "munit" % munitVersion % Test
@@ -137,66 +132,79 @@ lazy val integrationTests = project
 lazy val negativeUnsupported = project
   .in(file("negative-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeFullUnsupported = project
   .in(file("negative-full-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeSelfConflict = project
   .in(file("negative-self-conflict"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeSelfUnsupported = project
   .in(file("negative-self-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeDelegatedUnsupported = project
   .in(file("negative-delegated-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeCompositionLateRejection = project
   .in(file("negative-composition-late-rejection"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeApplyInstanceComposition = project
   .in(file("negative-apply-instance-composition"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeInstanceMethodModifiers = project
   .in(file("negative-instance-method-modifiers"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeDelegatedMethodModifiers = project
   .in(file("negative-delegated-method-modifiers"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeApplyInstanceMethodModifiers = project
   .in(file("negative-apply-instance-method-modifiers"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeTypeMemberModifiers = project
   .in(file("negative-type-member-modifiers"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeAuxUnsupported = project
   .in(file("negative-aux-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val negativeInstanceUnsupported = project
   .in(file("negative-instance-unsupported"))
   .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
 lazy val root = project

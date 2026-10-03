@@ -1,7 +1,7 @@
 package com.github.dmytromitin.auxify.macros.internal
 
 import paradise3.api.{
-  AnnotatedClassTypeStructureView,
+  ExpansionTargetTypeStructureView,
   ExpansionDiagnostic
 }
 
@@ -19,7 +19,7 @@ private[internal] object AuxSourceShapeDecoder:
 
   def decode(
       typeClassName: String,
-      view: AnnotatedClassTypeStructureView
+      view: ExpansionTargetTypeStructureView
   ): Either[ExpansionDiagnostic, Shape] =
     BoundedResultTypeClassShapeDecoder
       .decode(typeClassName, view)

@@ -669,12 +669,12 @@ invalidation: when locally republished SNAPSHOT bytes change without changing
 their artifact version or stable path, the compiler option changes and Zinc
 recompiles affected consumers.
 
-For a first clean compile, the required Macro-Paradise options are
-`-Xplugin-require:macroparadise` and `handlerClasspath`.
-`externalArtifactIdentity` is recommended for incremental development against
-repeatedly republished marker/handler SNAPSHOTs, but is not required merely for
-that first clean build. A clean-build-only setup can omit the helper, the
-`markerJar`/`handlerJar` lookups, and the identity option together.
+Current `0.2.0-SNAPSHOT` development requires all three Macro-Paradise options:
+`-Xplugin-require:macroparadise`, `handlerClasspath`, and
+`externalArtifactIdentity`. The identity option is required even when the
+first invocation is a clean compile, because the same build must remain sound
+when marker or handler SNAPSHOT bytes are republished without changing their
+artifact version or path.
 
 After compilation, the generated result is ordinary Scala code. On all three
 qualified compiler lines, the verified external consumer runs without the

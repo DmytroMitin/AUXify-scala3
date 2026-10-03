@@ -5,7 +5,7 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
 
 class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
   test("decodes the canonical one-method delegated source facts") {
@@ -210,10 +210,10 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     DelegatedSourceShapeDecoder.decode(traitName, classView, bodyView)

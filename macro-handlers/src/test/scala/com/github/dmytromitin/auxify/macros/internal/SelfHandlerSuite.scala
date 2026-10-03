@@ -25,7 +25,7 @@ class SelfHandlerSuite extends munit.FunSuite:
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
     val currentAnnotation = Trees.mods(primary).annotations.head
-    val input = ExpansionInput(
+    val input = paradise3.api.ExpansionInputTestFactory(
       "com.github.dmytromitin.auxify.macros.self",
       primary,
       None,
@@ -42,11 +42,10 @@ class SelfHandlerSuite extends munit.FunSuite:
         )
       )
     match
-      case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+      case ExpansionOutcome.Rejected(diagnostics) =>
         assertEquals(diagnostics.map(_.message), List(
           "EXACT_RAW_LOWERING_FAILED: controlled bridge failure"
         ))
-        assert(fallback.eq(primary), clue(fallback))
         assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
       case other => fail(s"expected controlled Rejected outcome, found $other")
   }

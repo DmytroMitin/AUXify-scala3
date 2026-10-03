@@ -11,9 +11,9 @@ import java.io.File
 import java.nio.file.Files
 import scala.jdk.CollectionConverters.*
 
-import paradise3.api.{AnnotatedClassTypeStructureView, AnnotatedClassView, ExpansionInput, ExpansionOutcome}
-import paradise3.api.AnnotatedClassBodyView.{DirectTypeShape, DirectVisibility}
-import paradise3.api.AnnotatedClassTypeStructureView.{Bound, DirectTypeMemberKind}
+import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionTargetView, ExpansionInput, ExpansionOutcome}
+import paradise3.api.ExpansionTargetBodyView.{DirectTypeShape, DirectVisibility}
+import paradise3.api.ExpansionTargetTypeStructureView.{Bound, DirectTypeMemberKind}
 
 class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
   private case class Row(label: String, declaration: String, kind: DirectTypeMemberKind,
@@ -79,11 +79,11 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
       assert(!summon[Context].reporter.hasErrors)
       val primary = stats.collectFirst { case value: TypeDef => value }.get
       val companion = stats.collectFirst { case value: ModuleDef => value }.get
-      val view = AnnotatedClassTypeStructureView.decode(primary)
+      val view = ExpansionTargetTypeStructureView.decode(primary)
         .fold(diagnostic => fail(diagnostic.message), identity)
       assertEquals(view.typeParameters.map(_.name), List("N", "M"))
       view.typeParameters.foreach: parameter =>
-        assertEquals(parameter.variance, AnnotatedClassView.Variance.Invariant)
+        assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
         assertEquals(parameter.lowerBound, Bound.Absent)
         assertNamedBound(parameter.upperBound)
         assert(!parameter.hasContextBounds)
@@ -121,7 +121,7 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
       val companionBody = companion.impl.body
       val current = Trees.mods(primary).annotations.head
       for annotation <- List("apply", "aux") do
-        val input = ExpansionInput(s"com.github.dmytromitin.auxify.macros.$annotation",
+        val input = paradise3.api.ExpansionInputTestFactory(s"com.github.dmytromitin.auxify.macros.$annotation",
           primary, Some(companion), Set(name), Some(current))
         val diagnosticPrefix = if annotation == "apply" then "full @apply" else "@aux"
         reason match
@@ -134,10 +134,9 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
             val outcome = if annotation == "apply" then new ApplyHandler().expand(input)
               else AuxHandler.expandWithLowering(input)((_, _) => fail("lowering reached after rejection"))
             outcome match
-              case ExpansionOutcome.Rejected(diagnostics, fallback) =>
+              case ExpansionOutcome.Rejected(diagnostics) =>
                 assertEquals(diagnostics.map(_.message), List(expected))
                 assertEquals(diagnostics.map(_.pos), List(member.pos))
-                assert(fallback.eq(primary))
               case other => fail(s"expected controlled rejection, found $other")
           case None =>
             assert(applyResult.isRight)

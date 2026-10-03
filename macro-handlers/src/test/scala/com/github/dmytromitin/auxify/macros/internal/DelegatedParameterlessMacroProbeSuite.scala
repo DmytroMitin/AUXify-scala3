@@ -5,8 +5,8 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMethod,
   DirectMethodStatus,
   DirectTypeShape,
@@ -25,7 +25,7 @@ class DelegatedParameterlessMacroProbeSuite extends munit.FunSuite:
     classView.typeParameters match
       case parameter :: Nil =>
         assertEquals(parameter.name, "A")
-        assertEquals(parameter.variance, AnnotatedClassView.Variance.Invariant)
+        assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
         assert(parameter.isOrdinaryUnbounded)
         assert(!parameter.hasContextBounds)
         assert(!parameter.isOrdinaryUpperBounded)
@@ -75,7 +75,7 @@ class DelegatedParameterlessMacroProbeSuite extends munit.FunSuite:
     val (_, bodyView) = decode(s"trait Empty[A]:\n  $sourceMethod\n", "Empty")
     onlyMethod(bodyView)
 
-  private def onlyMethod(bodyView: AnnotatedClassBodyView): DirectMethod =
+  private def onlyMethod(bodyView: ExpansionTargetBodyView): DirectMethod =
     bodyView.members match
       case member :: Nil =>
         member.method.getOrElse(fail(s"expected direct method, found $member"))
@@ -84,17 +84,17 @@ class DelegatedParameterlessMacroProbeSuite extends munit.FunSuite:
   private def decode(
       source: String,
       traitName: String
-  ): (AnnotatedClassView, AnnotatedClassBodyView) =
+  ): (ExpansionTargetView, ExpansionTargetBodyView) =
     val unit = CompilationUnit(s"${traitName}ParameterlessDelegatedProbe.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = new Parsers.Parser(unit.source).parse() match
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     classView -> bodyView

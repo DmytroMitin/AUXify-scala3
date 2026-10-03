@@ -5,8 +5,8 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMethod,
   DirectMethodParameter,
   DirectMethodStatus,
@@ -26,13 +26,13 @@ class DelegatedBinaryMacroProbeSuite extends munit.FunSuite:
       )
 
       assertEquals(classView.className, traitName)
-      assertEquals(classView.definitionKind, AnnotatedClassView.DefinitionKind.Trait)
+      assertEquals(classView.definitionKind, ExpansionTargetView.DefinitionKind.Trait)
       assertEquals(classView.constructorClauses, Nil)
       assert(!classView.modifiers.isSealed)
       classView.typeParameters match
         case List(parameter) =>
           assertEquals(parameter.name, typeName)
-          assertEquals(parameter.variance, AnnotatedClassView.Variance.Invariant)
+          assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
           assert(parameter.isOrdinaryUnbounded)
           assert(!parameter.isOrdinaryUpperBounded)
           assert(!parameter.hasContextBounds)
@@ -187,7 +187,7 @@ class DelegatedBinaryMacroProbeSuite extends munit.FunSuite:
     val (_, bodyView) = decode(s"trait Eq[A]:\n  $sourceMethod\n", "Eq")
     onlyMethod(bodyView)
 
-  private def onlyMethod(bodyView: AnnotatedClassBodyView): DirectMethod =
+  private def onlyMethod(bodyView: ExpansionTargetBodyView): DirectMethod =
     bodyView.members match
       case List(member) =>
         member.method.getOrElse(fail(s"expected direct method, found $member"))
@@ -196,7 +196,7 @@ class DelegatedBinaryMacroProbeSuite extends munit.FunSuite:
   private def decode(
       source: String,
       traitName: String
-  ): (AnnotatedClassView, AnnotatedClassBodyView) =
+  ): (ExpansionTargetView, ExpansionTargetBodyView) =
     val unit = CompilationUnit(s"${traitName}BinaryDelegatedProbe.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = new Parsers.Parser(unit.source).parse() match
@@ -206,10 +206,10 @@ class DelegatedBinaryMacroProbeSuite extends munit.FunSuite:
         }.getOrElse(fail(s"missing primary TypeDef $traitName in $stats"))
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     classView -> bodyView

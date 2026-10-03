@@ -5,8 +5,19 @@ import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
-import paradise3.api.{AnnotatedClassView, ExpansionInput, ExpansionOutcome, ExpansionTargetProfile, StructuredExpansionOutput}
-import paradise3.api.helpers.{CompanionTypeConflictPolicy, ExpansionHelpers}
+import paradise3.api.{
+  DefinitionPlacement,
+  ExpansionEdit,
+  ExpansionInput,
+  ExpansionOutcome,
+  ExpansionTargetKind,
+  ExpansionTargetView
+}
+import paradise3.api.helpers.{
+  ExpansionTransforms,
+  MemberConflictPolicy,
+  MissingCompanionPolicy
+}
 
 /** Test-only consumption of Macro-Paradise input 040.
   *
@@ -15,21 +26,16 @@ import paradise3.api.helpers.{CompanionTypeConflictPolicy, ExpansionHelpers}
   * validation and lowering.
   */
 class AuxPlacementConsumerSuite extends munit.FunSuite:
-  test("input 040 exposes the profile and normalized canonical two-upper-bounded trait shape") {
-    assertEquals(
-      ExpansionTargetProfile.TwoUpperBoundedGenericTrait.toString,
-      "TwoUpperBoundedGenericTrait"
-    )
-
+  test("the current target view exposes the normalized canonical two-upper-bounded trait shape") {
     val canonical = shape(
       """trait Add[N <: Nat, M <: Nat]:
         |  type Out <: Nat
         |""".stripMargin
     )
 
-    assertEquals(canonical.definitionKind, AnnotatedClassView.DefinitionKind.Trait)
+    assertEquals(canonical.definitionKind, ExpansionTargetView.DefinitionKind.Trait)
     assertEquals(canonical.typeParameters.map(_.name), List("N", "M"))
-    assert(canonical.typeParameters.forall(_.variance == AnnotatedClassView.Variance.Invariant))
+    assert(canonical.typeParameters.forall(_.variance == ExpansionTargetView.Variance.Invariant))
     assert(canonical.typeParameters.forall(_.isOrdinaryUpperBounded))
     assert(canonical.typeParameters.forall(!_.isOrdinaryUnbounded))
     assert(canonical.typeParameters.forall(!_.hasContextBounds))
@@ -52,11 +58,12 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     val fixture = parsedFixture()
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addTypeToCompanion(
-        fixture.input(None),
+    val input = fixture.input(None)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedType,
-        CompanionTypeConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val companion = output.companion.getOrElse(fail("missing generated companion"))
@@ -71,11 +78,12 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     val existing = fixture.companion.getOrElse(fail("missing existing companion"))
     val originalBody = existing.impl.body
 
-    val output = structured:
-      ExpansionHelpers.addTypeToCompanion(
-        fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedType,
-        CompanionTypeConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val merged = output.companion.getOrElse(fail("missing merged companion"))
@@ -91,11 +99,12 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     given Context = fixture.context
     val existing = fixture.companion.getOrElse(fail("missing existing companion"))
 
-    val output = structured:
-      ExpansionHelpers.addTypeToCompanion(
-        fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedType,
-        CompanionTypeConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     assert(output.companion.getOrElse(fail("missing companion")).eq(existing), clue(output.companion))
@@ -108,16 +117,16 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     val existing = fixture.companion.getOrElse(fail("missing existing companion"))
     val originalBody = existing.impl.body
 
-    ExpansionHelpers.addTypeToCompanion(
-      fixture.input(Some(existing)),
+    val input = fixture.input(Some(existing))
+    place(
+      input,
       fixture.generatedType,
-      CompanionTypeConflictPolicy.Reject
+      MemberConflictPolicy.Reject
     ) match
-      case ExpansionOutcome.Rejected(diagnostics, fallback) =>
-        assert(fallback.eq(fixture.primary), clue(fallback))
+      case ExpansionOutcome.Rejected(diagnostics) =>
         assertEquals(diagnostics.size, 1)
         assert(
-          diagnostics.head.message.contains("generated companion type `Aux` conflicts"),
+          diagnostics.head.message.contains("generated member `Aux` conflicts"),
           clue(diagnostics.head.message)
         )
       case other => fail(s"expected Rejected, found $other")
@@ -126,15 +135,16 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     assertEquals(directTypesNamed(existing, "Aux").size, 1)
   }
 
-  test("same-spelling direct term does not occupy the type namespace") {
+  test("the generic member policy preserves term and type namespace separation") {
     val fixture = parsedFixture("val Aux: Int = 1")
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addTypeToCompanion(
-        fixture.input(fixture.companion),
+    val input = fixture.input(fixture.companion)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedType,
-        CompanionTypeConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val merged = output.companion.getOrElse(fail("missing merged companion"))
@@ -152,11 +162,12 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     val fixture = parsedFixture("val preserved: Int = 1")
     given Context = fixture.context
 
-    val output = structured:
-      ExpansionHelpers.addTypeToCompanion(
-        fixture.input(fixture.companion),
+    val input = fixture.input(fixture.companion)
+    val output = structured(input):
+      place(
+        input,
         fixture.generatedType,
-        CompanionTypeConflictPolicy.PreserveExisting
+        MemberConflictPolicy.PreserveExisting
       )
 
     val inserted = directTypesNamed(
@@ -175,15 +186,15 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
       context: Context
   ):
     def input(existingCompanion: Option[ModuleDef]): ExpansionInput =
-      ExpansionInput(
+      paradise3.api.ExpansionInputTestFactory(
         "current",
         primary,
         existingCompanion,
         Set("Add", "GeneratedTypeOwner"),
         Some(currentAnnotation)
-      )
+      )(using context)
 
-  private def shape(code: String): AnnotatedClassView =
+  private def shape(code: String): ExpansionTargetView =
     val (stats, context) = parsedStats(code, "AuxPlacementShape.scala")
     given Context = context
     val primary = typeDefNamed(stats, stats.collectFirst {
@@ -191,7 +202,7 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
     }.getOrElse(fail(s"missing class definition in $stats")))
     primary match
       case value: TypeDef =>
-        AnnotatedClassView.decode(value) match
+        ExpansionTargetView.decode(value) match
           case Right(view) => view
           case Left(diagnostic) => fail(diagnostic.message)
 
@@ -249,7 +260,27 @@ class AuxPlacementConsumerSuite extends munit.FunSuite:
   private def indent(value: String): String =
     value.linesIterator.map(line => s"  $line").mkString("\n")
 
-  private def structured(outcome: ExpansionOutcome): StructuredExpansionOutput =
+  private def place(
+      input: ExpansionInput,
+      member: Tree,
+      policy: MemberConflictPolicy
+  )(using Context): ExpansionOutcome =
+    ExpansionEdit.finish:
+      ExpansionEdit.start(input).flatMap(
+        ExpansionTransforms.placeMemberInCompanion(
+          member,
+          MissingCompanionPolicy.Create(
+            ExpansionTargetKind.Object,
+            DefinitionPlacement.AfterPrimary
+          ),
+          policy
+        )
+      )
+
+  private def structured(
+      input: ExpansionInput
+  )(outcome: ExpansionOutcome)(using Context): StructuredExpansionOutput =
     outcome match
-      case ExpansionOutcome.Structured(output) => output
+      case ExpansionOutcome.Structured(changes) =>
+        StructuredOutcomeTestSupport.materialize(input, changes)
       case other => fail(s"expected Structured, found $other")

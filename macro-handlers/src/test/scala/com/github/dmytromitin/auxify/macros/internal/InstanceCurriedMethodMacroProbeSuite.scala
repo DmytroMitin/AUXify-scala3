@@ -5,8 +5,8 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{AnnotatedClassBodyView, AnnotatedClassView}
-import paradise3.api.AnnotatedClassBodyView.{
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.ExpansionTargetBodyView.{
   DirectMethod,
   DirectMethodStatus,
   DirectTypeShape,
@@ -25,13 +25,13 @@ class InstanceCurriedMethodMacroProbeSuite extends munit.FunSuite:
       )
 
       assertEquals(classView.className, traitName)
-      assertEquals(classView.definitionKind, AnnotatedClassView.DefinitionKind.Trait)
+      assertEquals(classView.definitionKind, ExpansionTargetView.DefinitionKind.Trait)
       assertEquals(classView.constructorClauses, Nil)
       assert(!classView.modifiers.isSealed)
       classView.typeParameters match
         case parameter :: Nil =>
           assertEquals(parameter.name, typeName)
-          assertEquals(parameter.variance, AnnotatedClassView.Variance.Invariant)
+          assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
           assert(parameter.isOrdinaryUnbounded)
           assert(!parameter.hasContextBounds)
           assert(!parameter.isOrdinaryUpperBounded)
@@ -89,7 +89,7 @@ class InstanceCurriedMethodMacroProbeSuite extends munit.FunSuite:
   }
 
   private def assertOrdinaryClause(
-      clause: AnnotatedClassBodyView.DirectMethodParameterClause,
+      clause: ExpansionTargetBodyView.DirectMethodParameterClause,
       expectedName: String,
       expectedTypeName: String
   ): Unit =
@@ -122,7 +122,7 @@ class InstanceCurriedMethodMacroProbeSuite extends munit.FunSuite:
     val (_, bodyView) = decode(s"trait Curried[A]:\n  $sourceMethod\n", "Curried")
     onlyMethod(bodyView)
 
-  private def onlyMethod(bodyView: AnnotatedClassBodyView): DirectMethod =
+  private def onlyMethod(bodyView: ExpansionTargetBodyView): DirectMethod =
     bodyView.members match
       case member :: Nil =>
         member.method.getOrElse(fail(s"expected direct method, found $member"))
@@ -131,17 +131,17 @@ class InstanceCurriedMethodMacroProbeSuite extends munit.FunSuite:
   private def decode(
       source: String,
       traitName: String
-  ): (AnnotatedClassView, AnnotatedClassBodyView) =
+  ): (ExpansionTargetView, ExpansionTargetBodyView) =
     val unit = CompilationUnit(s"${traitName}CurriedInstanceProbe.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val primary = new Parsers.Parser(unit.source).parse() match
       case PackageDef(_, List(value: TypeDef)) => value
       case value: TypeDef => value
       case other => fail(s"missing primary TypeDef in $other")
-    val classView = AnnotatedClassView
+    val classView = ExpansionTargetView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    val bodyView = AnnotatedClassBodyView
+    val bodyView = ExpansionTargetBodyView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     classView -> bodyView

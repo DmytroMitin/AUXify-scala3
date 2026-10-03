@@ -1,14 +1,14 @@
 package com.github.dmytromitin.auxify.macros.internal
 
 import paradise3.api.{
-  AnnotatedClassTypeStructureView,
+  ExpansionTargetTypeStructureView,
   ExpansionDiagnostic
 }
 
 private[internal] object ApplyFullShapeDecoder:
   def decode(
       typeClassName: String,
-      view: AnnotatedClassTypeStructureView
+      view: ExpansionTargetTypeStructureView
   ): Either[ExpansionDiagnostic, ApplyDefinitionBuilder.FullShape] =
     BoundedResultTypeClassShapeDecoder
       .decode(typeClassName, view)
