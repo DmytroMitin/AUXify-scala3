@@ -59,6 +59,13 @@ verifyExternalPolicy := {
     s"AUXify handler leaked onto the external runtime classpath: $handlerFilePrefix"
   )
   require(
+    !runtimeFiles.exists(file =>
+      file.getName.startsWith("quasiquotes-scala3-") &&
+        file.getName.endsWith(".jar")
+    ),
+    "Quasiquotes implementation/tooling leaked onto the external runtime classpath"
+  )
+  require(
     compileOptions.count(_ == "-Xplugin-require:macroparadise") == 1,
     "external compile must require Macro-Paradise exactly once"
   )
@@ -101,6 +108,6 @@ verifyExternalPolicy := {
   }
 
   streams.value.log.info(
-    s"AUXIFY_SCALA3_EXTERNAL_POLICY_PASS scala=${scalaVersion.value} release=$releaseConsumerMode runtime_handler=false"
+    s"AUXIFY_SCALA3_EXTERNAL_POLICY_PASS scala=${scalaVersion.value} release=$releaseConsumerMode runtime_handler=false runtime_quasiquotes=false"
   )
 }

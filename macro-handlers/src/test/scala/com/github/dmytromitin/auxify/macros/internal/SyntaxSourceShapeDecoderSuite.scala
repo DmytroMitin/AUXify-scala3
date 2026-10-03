@@ -74,11 +74,7 @@ class SyntaxSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.extensionTypeParameterName, "Collision1")
     assertEquals(
       SyntaxDefinitionBuilder.module(decoded).syntax,
-      """object syntax {
-        |  extension [Collision1](left: Collision1) {
-        |    def merge(right: Collision1)(using inst: Collision[Collision1]): Collision1 = inst.merge(left, right)
-        |  }
-        |}""".stripMargin
+      "object syntax { extension [Collision1](left: Collision1) def merge(right: Collision1)(using inst: Collision[Collision1]): Collision1 = inst.merge(left, right) }"
     )
   }
 

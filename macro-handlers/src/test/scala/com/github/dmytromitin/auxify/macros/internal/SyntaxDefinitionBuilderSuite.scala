@@ -12,11 +12,7 @@ class SyntaxDefinitionBuilderSuite extends munit.FunSuite:
 
     assertEquals(
       module.syntax,
-      """object syntax {
-        |  extension [A](a: A) {
-        |    def combine(a1: A)(using inst: Monoid[A]): A = inst.combine(a, a1)
-        |  }
-        |}""".stripMargin
+      "object syntax { extension [A](a: A) def combine(a1: A)(using inst: Monoid[A]): A = inst.combine(a, a1) }"
     )
     assertTypedTopology(module, "Monoid", "A", "combine", "a", "a1", "inst")
   }
@@ -28,11 +24,7 @@ class SyntaxDefinitionBuilderSuite extends munit.FunSuite:
 
     assertEquals(
       module.syntax,
-      """object syntax {
-        |  extension [Value](left: Value) {
-        |    def merge(right: Value)(using evidence: Merge[Value]): Value = evidence.merge(left, right)
-        |  }
-        |}""".stripMargin
+      "object syntax { extension [Value](left: Value) def merge(right: Value)(using evidence: Merge[Value]): Value = evidence.merge(left, right) }"
     )
     assertTypedTopology(
       module,
@@ -52,11 +44,7 @@ class SyntaxDefinitionBuilderSuite extends munit.FunSuite:
 
     assertEquals(
       module.syntax,
-      """object syntax {
-        |  extension [Element](inst: Element) {
-        |    def merge(inst1: Element)(using inst2: Collision[Element]): Element = inst2.merge(inst, inst1)
-        |  }
-        |}""".stripMargin
+      "object syntax { extension [Element](inst: Element) def merge(inst1: Element)(using inst2: Collision[Element]): Element = inst2.merge(inst, inst1) }"
     )
     assertTypedTopology(
       module,
@@ -114,8 +102,8 @@ class SyntaxDefinitionBuilderSuite extends munit.FunSuite:
           case other => fail(s"expected one extension receiver, found $other")
 
         val method = extension.body match
-          case Term.Block(List(value: Defn.Def)) => value
-          case other => fail(s"expected one forwarding method block, found $other")
+          case value: Defn.Def => value
+          case other => fail(s"expected one direct forwarding method, found $other")
 
         assertEquals(method.name.value, expectedMethodName)
         assertEquals(method.decltpe.map(_.syntax), Some(expectedTypeParameterName))

@@ -1,4 +1,4 @@
-import com.github.dmytromitin.auxify.macros.{apply, aux, delegated, instance, self}
+import com.github.dmytromitin.auxify.macros.{apply, aux, delegated, instance, self, syntax}
 
 @apply
 trait Show[A]:
@@ -156,6 +156,10 @@ object ApplyThenDelegated:
 trait DelegatedThenApply[A]:
   def show(a: A): String
 
+@syntax
+trait ExternalSyntaxMonoid[A]:
+  def combine(left: A, right: A): A
+
 object DelegatedThenApply:
   val preserved = 84
   given DelegatedThenApply[String] with
@@ -163,6 +167,12 @@ object DelegatedThenApply:
 
 object ExternalApp:
   def main(args: Array[String]): Unit =
+    import ExternalSyntaxMonoid.syntax.*
+    given ExternalSyntaxMonoid[Int] with
+      def combine(left: Int, right: Int): Int = left + right
+
+    assert(20.combine(22) == 42)
+
     assert(Show[String].show("external") == "external")
 
     val selected: Add.Aux[Zero, One, One] = summon[Add[Zero, One]]

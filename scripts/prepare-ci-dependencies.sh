@@ -8,7 +8,10 @@ product_root="$(cd "$script_dir/.." && pwd -P)"
 macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
 macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
 macro_paradise_version="0.2.0-SNAPSHOT"
-quasiquotes_version="0.3.0"
+quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
+quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
+quasiquotes_version="0.4.0-SNAPSHOT"
+quasiquotes_binary_scala_version="3.3.8"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 
 fail() {
@@ -27,15 +30,27 @@ esac
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
 printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$macro_paradise_commit"
 printf 'MACRO_PARADISE_DEVELOPMENT_VERSION=%s\n' "$macro_paradise_version"
-printf 'QUASIQUOTES_PUBLIC_VERSION=%s\n' "$quasiquotes_version"
+printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$quasiquotes_commit"
+printf 'QUASIQUOTES_DEVELOPMENT_VERSION=%s\n' "$quasiquotes_version"
+printf 'QUASIQUOTES_BINARY_ARTIFACT_SCALA_VERSION=%s\n' "$quasiquotes_binary_scala_version"
 
-for command in git sbt java; do
+for command in git sbt java sha256sum; do
   command -v "$command" >/dev/null 2>&1 ||
     fail "required command is unavailable: $command"
 done
 
 dependency_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-ci-dependencies.XXXXXX")"
 trap 'rm -rf -- "$dependency_root"' EXIT
+
+dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
+ivy_home="$dependency_state_root/ivy"
+coursier_cache="$dependency_state_root/coursier-cache"
+mkdir -p "$ivy_home" "$coursier_cache"
+export COURSIER_CACHE="$coursier_cache"
+
+printf 'AUXIFY_DEPENDENCY_STATE_ROOT=%s\n' "$dependency_state_root"
+printf 'AUXIFY_IVY_HOME=%s\n' "$ivy_home"
+printf 'AUXIFY_COURSIER_CACHE=%s\n' "$coursier_cache"
 
 clone_at_commit() {
   local repository="$1"
@@ -55,6 +70,7 @@ clone_at_commit() {
 }
 
 macro_paradise_checkout="$dependency_root/macroparadise-scala3"
+quasiquotes_checkout="$dependency_root/quasiquotes-scala3"
 
 clone_at_commit \
   "$macro_paradise_repository" \
@@ -65,13 +81,59 @@ clone_at_commit \
 (
   cd "$macro_paradise_checkout"
   sbt -batch \
+    -Dsbt.ivy.home="$ivy_home" \
     -Dmacroparadise.exactScalaVersion="$scala_version" \
     "++$scala_version!" \
     "pluginApi/publishLocal" \
     "plugin/publishLocal"
 )
 
+clone_at_commit \
+  "$quasiquotes_repository" \
+  "$quasiquotes_commit" \
+  "$quasiquotes_checkout" \
+  QUASIQUOTES
+
+(
+  cd "$quasiquotes_checkout"
+  sbt -batch \
+    -Dsbt.ivy.home="$ivy_home" \
+    "++$quasiquotes_binary_scala_version!" \
+    "core/publishLocal" \
+    "neutralScalameta/publishLocal" \
+    "++$scala_version!" \
+    "dottyInternal/publishLocal"
+)
+
+hash_single_artifact() {
+  local module="$1"
+  local artifact_glob="$2"
+  local -a artifacts=()
+
+  mapfile -t artifacts < <(find "$ivy_home/local/com.github.dmytromitin/$module" -type f -path "$artifact_glob" -print | sort)
+  [[ "${#artifacts[@]}" -eq 1 ]] ||
+    fail "expected one published $module artifact, found ${#artifacts[@]}"
+
+  local digest
+  digest="$(sha256sum "${artifacts[0]}" | awk '{ print $1 }')"
+  printf 'QUASIQUOTES_ARTIFACT_SHA256 module=%s scala=%s sha256=%s file=%s\n' \
+    "$module" \
+    "$scala_version" \
+    "$digest" \
+    "${artifacts[0]}"
+}
+
+hash_single_artifact \
+  "quasiquotes-scala3-core_3" \
+  "*/$quasiquotes_version/jars/*.jar"
+hash_single_artifact \
+  "quasiquotes-scala3-neutral-scalameta_3" \
+  "*/$quasiquotes_version/jars/*.jar"
+hash_single_artifact \
+  "quasiquotes-scala3-dotty-internal_$scala_version" \
+  "*/$quasiquotes_version/jars/*.jar"
+
 printf 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED scala=%s macro_paradise=%s quasiquotes=%s\n' \
   "$scala_version" \
   "$macro_paradise_version" \
-  "${quasiquotes_version}-public"
+  "$quasiquotes_version"

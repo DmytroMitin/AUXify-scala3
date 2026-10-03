@@ -1,0 +1,7 @@
+package com.github.dmytromitin.auxify.negative.syntax.rows
+
+import com.github.dmytromitin.auxify.macros.{syntax as auxSyntax}
+
+@com.github.dmytromitin.auxify.macros.syntax
+trait SyntaxProtectedMethod[A]:
+  protected def combine(a: A, a1: A): A

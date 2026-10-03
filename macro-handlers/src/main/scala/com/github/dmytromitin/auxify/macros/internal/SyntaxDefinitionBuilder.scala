@@ -26,8 +26,10 @@ private[internal] object SyntaxDefinitionBuilder:
       q"$evidenceName.$methodName($receiverName, $remainingParameterName)"
     val forwardingMethod: Defn.Def =
       q"def $methodName($remainingParameter)(using $evidenceName: $target): $typeParameterName = $invocation"
-    val extensionGroup: Defn.ExtensionGroup =
+    val extensionGroupWithBlock: Defn.ExtensionGroup =
       q"extension [..$typeParameters]($receiverParameter) { $forwardingMethod }"
+    val extensionGroup: Defn.ExtensionGroup =
+      extensionGroupWithBlock.copy(body = forwardingMethod)
     val syntaxStats: List[Stat] = extensionGroup :: Nil
 
     q"object syntax { ..$syntaxStats }"

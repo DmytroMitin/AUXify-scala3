@@ -5,6 +5,13 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
+macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
+quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
+dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
+ivy_home="$dependency_state_root/ivy"
+coursier_cache="$dependency_state_root/coursier-cache"
+
+export COURSIER_CACHE="$coursier_cache"
 
 fail() {
   printf 'milestone verification failed: %s\n' "$1" >&2
@@ -19,8 +26,14 @@ case "$scala_version" in
   *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8, 3.8.4, or 3.9.0" ;;
 esac
 
+[[ -d "$ivy_home/local/com.github.dmytromitin" && -d "$coursier_cache" ]] ||
+  fail "exact source-built dependencies are absent; run scripts/prepare-ci-dependencies.sh first"
+
 run_sbt() {
-  sbt -Dauxify.scalaVersion="$scala_version" -batch "$@"
+  sbt \
+    -Dsbt.ivy.home="$ivy_home" \
+    -Dauxify.scalaVersion="$scala_version" \
+    -batch "$@"
 }
 
 if ! java_properties="$(java -XshowSettings:properties -version 2>&1)"; then
@@ -36,6 +49,9 @@ java_feature="$({
 
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
 printf 'AUXIFY_JAVA_FEATURE=%s\n' "$java_feature"
+printf 'MACRO_PARADISE_SOURCE=%s\n' "$macro_paradise_commit"
+printf 'QUASIQUOTES_SOURCE=%s\n' "$quasiquotes_commit"
+printf 'AUXIFY_DEPENDENCY_STATE_ROOT=%s\n' "$dependency_state_root"
 
 run_sbt verifyPublicModuleCoordinates verifyReleaseReadiness
 run_sbt 'macroHandlers / Test / test'
@@ -51,12 +67,13 @@ composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-composition-negative.
 apply_instance_composition_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-composition-negative.XXXXXX")"
 aux_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-aux-negative.XXXXXX")"
 instance_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-negative.XXXXXX")"
+syntax_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-syntax-negative.XXXXXX")"
 instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-instance-modifier-negative.XXXXXX")"
 delegated_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-delegated-modifier-negative.XXXXXX")"
 apply_instance_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-apply-instance-modifier-negative.XXXXXX")"
 type_member_modifier_negative_log="$(mktemp "${TMPDIR:-/tmp}/auxify-type-member-modifier-negative.XXXXXX")"
 external_root=""
-trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log" "$type_member_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
+trap 'rm -f "$negative_log" "$full_negative_log" "$self_conflict_log" "$self_unsupported_log" "$delegated_negative_log" "$composition_negative_log" "$apply_instance_composition_negative_log" "$aux_negative_log" "$instance_negative_log" "$syntax_negative_log" "$instance_modifier_negative_log" "$delegated_modifier_negative_log" "$apply_instance_modifier_negative_log" "$type_member_modifier_negative_log"; [[ -z "$external_root" ]] || rm -rf -- "$external_root"' EXIT
 
 if run_sbt 'negativeUnsupported / Compile / compile' >"$negative_log" 2>&1; then
   negative_status=0
@@ -351,6 +368,62 @@ if [[ -d "$instance_classes" ]] && find "$instance_classes" -type f \
   fail "instance rejection left partial class or TASTy output"
 fi
 
+run_sbt 'negativeSyntaxUnsupported / clean'
+if run_sbt 'negativeSyntaxUnsupported / Compile / compile' >"$syntax_negative_log" 2>&1; then
+  syntax_negative_status=0
+else
+  syntax_negative_status=$?
+fi
+
+printf '%s\n' '--- controlled syntax source-shape diagnostics ---'
+cat "$syntax_negative_log"
+
+[[ "$syntax_negative_status" -ne 0 ]] ||
+  fail "negativeSyntaxUnsupported compiled successfully; unsupported syntax shapes were admitted"
+
+for expected_diagnostic in \
+  'unsupported @syntax source shape for `SyntaxClassTarget`: requires the restricted top-level ordinary trait profile' \
+  'unsupported @syntax source shape for `SyntaxSealedTarget`: requires the restricted top-level ordinary trait profile' \
+  'unsupported @syntax source shape for `SyntaxNoOwnerParameter`: requires exactly one invariant unbounded enclosing type parameter' \
+  'unsupported @syntax source shape for `SyntaxTwoOwnerParameters`: requires exactly one invariant unbounded enclosing type parameter' \
+  'unsupported @syntax source shape for `SyntaxVariantOwner`: requires exactly one invariant unbounded enclosing type parameter' \
+  'unsupported @syntax source shape for `SyntaxBoundedOwner`: requires exactly one invariant unbounded enclosing type parameter' \
+  'unsupported @syntax source shape for `SyntaxNoBodyMember`: requires exactly one direct body member; found 0' \
+  'unsupported @syntax source shape for `SyntaxMultipleBodyMembers`: requires exactly one direct body member; found 2' \
+  'unsupported @syntax source shape for `SyntaxNonMethodMember`: the direct body member must be a method' \
+  'unsupported @syntax source shape for `SyntaxConcreteMethod`: direct method `combine` must be abstract' \
+  'unsupported @syntax source shape for `SyntaxAnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxProtectedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxUnsupportedModifierMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxMethodTypeParameter`: direct method `combine` must not declare method type parameters in this first slice; historical Scala 2 @syntax support was broader' \
+  'unsupported @syntax source shape for `SyntaxWrongClauseCount`: direct method `combine` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @syntax source shape for `SyntaxContextualClause`: direct method `combine` parameter clause must be ordinary and non-contextual' \
+  'unsupported @syntax source shape for `SyntaxWrongParameterCount`: direct method `combine` requires exactly two ordinary parameters; found 1' \
+  'unsupported @syntax source shape for `SyntaxWrongParameterType`: direct method `combine` parameter `a1` must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxWrongResultType`: direct method `combine` result type must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `syntax`: trait name `syntax` conflicts with the fixed generated nested object name `syntax`'; do
+  grep -Fq -- "$expected_diagnostic" "$syntax_negative_log" ||
+    fail "syntax negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+if grep -Eiq \
+  'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
+  "$syntax_negative_log"; then
+  fail "syntax negative compile emitted an uncaught stack trace, linkage/class-loading failure, assertion, or crash marker"
+fi
+
+if grep -Eq \
+  '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
+  "$syntax_negative_log"; then
+  fail "syntax negative compile emitted an uncaught stack frame"
+fi
+
+syntax_classes="$product_root/negative-syntax-unsupported/target/scala-$scala_version/classes"
+if [[ -d "$syntax_classes" ]] && find "$syntax_classes" -type f \
+  \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+  fail "syntax rejection left partial class or TASTy output"
+fi
+
 run_sbt 'negativeCompositionLateRejection / clean'
 if run_sbt 'negativeCompositionLateRejection / Compile / compile' >"$composition_negative_log" 2>&1; then
   composition_negative_status=0
@@ -559,7 +632,8 @@ cp -R "$product_root/qualification/external-consumer/." "$external_root"
 
 (
   cd "$external_root"
-  sbt -Dauxify.scalaVersion="$scala_version" -batch \
+  sbt -Dsbt.ivy.home="$ivy_home" \
+    -Dauxify.scalaVersion="$scala_version" -batch \
     clean \
     verifyExternalPolicy \
     run
@@ -575,6 +649,7 @@ printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'

@@ -48,7 +48,7 @@ ThisBuild / pomIncludeRepository := (_ => false)
 val macroParadiseVersion =
   sys.props.getOrElse("macroparadise.version", "0.2.0-SNAPSHOT")
 val quasiquotesVersion =
-  sys.props.getOrElse("quasiquotes.version", "0.3.0")
+  sys.props.getOrElse("quasiquotes.version", "0.4.0-SNAPSHOT")
 val scalaMetaVersion = "4.17.3"
 val munitVersion = "1.0.4"
 
@@ -207,6 +207,12 @@ lazy val negativeInstanceUnsupported = project
   .enablePlugins(MacroParadisePrecompiledPlugin)
   .settings(consumerSettings)
 
+lazy val negativeSyntaxUnsupported = project
+  .in(file("negative-syntax-unsupported"))
+  .dependsOn(macroAnnotations)
+  .enablePlugins(MacroParadisePrecompiledPlugin)
+  .settings(consumerSettings)
+
 lazy val root = project
   .in(file("."))
   .aggregate(macroAnnotations, macroHandlers, integrationTests)
@@ -282,7 +288,8 @@ lazy val root = project
         "negativeApplyInstanceMethodModifiers" -> (negativeApplyInstanceMethodModifiers / publish / skip).value,
         "negativeTypeMemberModifiers" -> (negativeTypeMemberModifiers / publish / skip).value,
         "negativeAuxUnsupported" -> (negativeAuxUnsupported / publish / skip).value,
-        "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value
+        "negativeInstanceUnsupported" -> (negativeInstanceUnsupported / publish / skip).value,
+        "negativeSyntaxUnsupported" -> (negativeSyntaxUnsupported / publish / skip).value
       )
       val publicProjects = Vector(
         "macroAnnotations" -> (macroAnnotations / publish / skip).value,
@@ -401,8 +408,8 @@ lazy val root = project
       }
       if (!sys.props.contains("quasiquotes.version")) {
         require(
-          quasiquotesVersion == "0.3.0",
-          s"default development build requires public Quasiquotes 0.3.0, found $quasiquotesVersion"
+          quasiquotesVersion == "0.4.0-SNAPSHOT",
+          s"default development build requires accepted source-built Quasiquotes 0.4.0-SNAPSHOT, found $quasiquotesVersion"
         )
       }
       val munitDependencies = (handlerPomXml \\ "dependency").filter(node =>

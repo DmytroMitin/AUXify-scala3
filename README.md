@@ -1,7 +1,7 @@
 # AUXify-scala3
 
 AUXify-scala3 currently provides experimental first Scala 3 `@apply`, `@aux`,
-`@instance`, `@self`, and `@delegated` development milestones. The current product is qualified on
+`@instance`, `@self`, `@delegated`, and `@syntax` development milestones. The current product is qualified on
 exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25. Scala 3.8.4
 remains the default developer line.
 
@@ -54,7 +54,7 @@ current project READMEs for the latest development APIs.
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including its optional final inherited concrete unary method, concrete parameterless method, or concrete alias to the enclosing type parameter |
-| `@syntax` | Characterized / not yet implemented | The selected Scala 3 design uses native extension methods while preserving the `import TypeClass.syntax.*` and receiver-call style |
+| `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly; generates native Scala 3 extension syntax and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
 
@@ -75,9 +75,10 @@ build it.
 The documented AUXify 0.1.0 compatibility slices are publicly released. Current
 `main` is the 0.2.0-SNAPSHOT development line and additionally contains the
 post-0.1.0 inherited concrete type-alias and parameterless-method `@instance`
-widenings plus normalized modifier-admission hardening. Ordinary development
-uses a coherently source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT graph
-at the pinned accepted commit and public Quasiquotes 0.3.0 from Maven Central.
+widenings, normalized modifier-admission hardening, and the bounded native
+extension-method `@syntax` slice. Ordinary development uses coherently
+source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
+0.4.0-SNAPSHOT graphs at their pinned accepted commits.
 
 ### Development module coordinates
 
@@ -100,8 +101,9 @@ handlers are `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:
 
 That release does not include the concrete type-alias or concrete
 parameterless-method `@instance` inheritances documented below, nor the later
-normalized modifier-admission hardening. Those changes remain on the distinct
-post-release `main` line and do not widen, rebase, or rewrite the 0.1.0 release.
+normalized modifier-admission hardening or `@syntax` slice. Those changes
+remain on the distinct post-release `main` line and do not widen, rebase, or
+rewrite the 0.1.0 release or the public Giter8 starter.
 
 For a supported generic trait such as:
 
@@ -389,6 +391,59 @@ rollback contract, independently exercised by the real `@apply` +
 `@delegated` late-rejection regression. This is not a claim about arbitrary
 annotation composition, target profiles, failures, or semantic bound equality.
 
+The first supported `@syntax` slice is current `0.2.0-SNAPSHOT` development
+behavior:
+
+```scala
+import com.github.dmytromitin.auxify.macros.syntax
+
+@syntax
+trait Monoid[A]:
+  def combine(a: A, a1: A): A
+```
+
+It adds a nested companion module containing a native Scala 3 extension method,
+conceptually:
+
+```scala
+object Monoid:
+  object syntax:
+    extension [A](a: A)
+      def combine(a1: A)(using inst: Monoid[A]): A =
+        inst.combine(a, a1)
+```
+
+Consumer code keeps the historical import and receiver-call style:
+
+```scala
+import Monoid.syntax.*
+
+given Monoid[Int] with
+  def combine(a: Int, a1: Int): Int = a + a1
+
+assert(20.combine(22) == 42)
+```
+
+This bounded slice requires a top-level ordinary non-case, non-sealed trait
+with exactly one invariant unbounded type parameter, no constructor parameters,
+and exactly one direct public abstract method. The method must be unannotated,
+have no unsupported modifiers or method type parameters, and have exactly one
+ordinary non-contextual clause with two parameters; both parameter types and
+the result type must be that enclosing type parameter directly. Names are
+source-derived and generated receiver, remaining-argument, and evidence names
+are freshened deterministically.
+
+A missing companion is created. Existing unrelated companion members retain
+their order. A direct term member named `syntax` (object, def, or val) is
+preserved and suppresses generation without creating a duplicate; a direct type
+member or a nested same-name definition is not a direct term conflict.
+
+Classes, objects, variance or bounds, other owner/member cardinalities,
+concrete or modified methods, extra or contextual clauses, broader result
+families, overloads, and arbitrary annotation composition remain later parity
+work. This slice is not part of released AUXify 0.1.0 or the public Giter8
+starter, which continue to use only released 0.1.0 behavior.
+
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
 ```scala
@@ -421,15 +476,15 @@ The current external-consumer proof covers exact Scala 3.3.8, Scala 3.8.4, and
 Scala 3.9.0 LTS on JDK 25. The public Macro-Paradise sbt plugin remains 0.1.1;
 the selected compiler/API product is the accepted 0.2.0-SNAPSHOT development
 graph built from the pinned peer commit. AUXify 0.2.0-SNAPSHOT remains a local
-development artifact, while its default Quasiquotes 0.3.0 dependency resolves
-publicly from Maven Central.
+development artifact, and its Quasiquotes 0.4.0-SNAPSHOT dependency is built
+from exact accepted source rather than resolved as a public release.
 
 ### Preferred development setup with the Macro-Paradise sbt plugin
 
-From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API, then
-publish the AUXify marker and handler to the local Ivy repository. Quasiquotes
-0.3.0 and the generic Macro-Paradise sbt plugin resolve from their public
-releases:
+From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API and
+Quasiquotes chain, then publish the AUXify marker and handler to the same
+task-owned local Ivy repository. The generic Macro-Paradise sbt plugin remains
+the public 0.1.1 adapter:
 
 ```sh
 AUXIFY_SCALA_VERSION=3.8.4 ./scripts/prepare-ci-dependencies.sh
@@ -442,10 +497,14 @@ qualified line. Omitting both selectors retains the default Scala 3.8.4 behavior
 Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the
 checked-in, reproducible helper for this local-development setup. It accepts
 exactly `AUXIFY_SCALA_VERSION=3.3.8`, `AUXIFY_SCALA_VERSION=3.8.4`, or
-`AUXIFY_SCALA_VERSION=3.9.0`, clones the exact pinned Macro-Paradise revision
-into a disposable temporary directory, verifies its commit identity, and
-locally publishes the accepted Macro-Paradise 0.2.0-SNAPSHOT compiler/API.
-Quasiquotes 0.3.0 is not cloned or locally published by the default workflow.
+`AUXIFY_SCALA_VERSION=3.9.0`. It clones and verifies the exact accepted
+Macro-Paradise provider and Quasiquotes product
+`4104a7cc7058069ba7692370ec0da6b4d85096be` in disposable checkouts. It then
+publishes Macro-Paradise 0.2.0-SNAPSHOT plus Quasiquotes 0.4.0-SNAPSHOT
+`core`/`neutral-scalameta` at their 3.3.8 binary-artifact baseline and
+`dotty-internal` at the selected exact compiler line. The task-owned Ivy and
+Coursier roots exclude same-coordinate stale snapshots; the helper reports the
+source identities, versions, and required Quasiquotes artifact hashes.
 
 The preferred development build explicitly selects Macro-Paradise compiler/API
 version `0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate
@@ -460,9 +519,10 @@ A future AUXify release retaining that contract requires a **public
 Macro-Paradise compiler/API release that exposes normalized unsupported-modifier
 evidence for direct type-member `infix` and direct-method `infix`, plus
 method-level `erased` on compiler lines where that syntax is accepted**.
-Quasiquotes 0.3.0 already satisfies the public Quasiquotes dependency. No future
-Macro-Paradise version is selected here; the public generic sbt plugin 0.1.1
-remains a separate build adapter.
+The `@syntax` development slice likewise requires a future public Quasiquotes
+release containing the required extension-module bridge before an all-public
+dependency graph can be claimed. No future peer release version is selected
+here; the public generic sbt plugin 0.1.1 remains a separate build adapter.
 
 The two sbt tasks then publish AUXify's own modules locally:
 
@@ -472,10 +532,11 @@ The two sbt tasks then publish AUXify's own modules locally:
   dependency metadata that lets sbt resolve its transitive classpath. It is
   published separately for each of the three exact compiler lines.
 
-These operations publish Macro-Paradise and AUXify development artifacts
-locally. Quasiquotes 0.3.0 resolves from Maven Central and is not cloned or
-published locally by the normal workflow. The operations do not publish to
-Maven Central or another remote repository.
+These operations publish Macro-Paradise, the required Quasiquotes chain, and
+AUXify development artifacts locally inside the task-owned repository. They do
+not publish to Maven Central or another remote repository. The fixed AUXify
+0.1.0 compatibility rehearsal remains separate and continues to resolve public
+Quasiquotes 0.3.0.
 
 Pin sbt in the external project's `project/build.properties`:
 
@@ -744,10 +805,11 @@ companion and adds the materializer when it has no direct member named
 `apply`. An existing direct `apply` is preserved and is not duplicated.
 
 The development implementation depends on the source-built Scala 3
-Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and public Quasiquotes 0.3.0.
-Preparing Macro-Paradise and AUXify through local publication remains a
-development-only step; this README does not present either 0.2.0-SNAPSHOT
-coordinate as remotely available.
+Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and exact source-built
+Quasiquotes 0.4.0-SNAPSHOT graph from the exact pinned commit. Preparing those peers and AUXify through
+the task-owned local repository remains a development-only step; this README
+does not present either snapshot coordinate as remotely available. Ordinary
+runtime excludes both the AUXify handler and Quasiquotes implementation/tooling.
 
 The verified `@apply` target remains deliberately narrow: a top-level,
 non-sealed ordinary trait with no constructor or value parameters, using
