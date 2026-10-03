@@ -20,6 +20,18 @@ exact Scala 3.9.0 and also supports exact Scala 3.3.8 and 3.8.4. It demonstrates
 the five released annotation families—`@apply`, `@aux`, `@instance`,
 `@delegated`, and `@self`—plus their released bounded composition examples.
 
+## Talk
+
+**Can Scala 3 Have Macro Annotations Again? Rebuilding Macro Paradise** was
+delivered at London Scala User Group on 9 September 2026.
+
+Resources: [talk repository](https://github.com/DmytroMitin/macroparadise-talk-09-2026),
+[final Markdown text](https://github.com/DmytroMitin/macroparadise-talk-09-2026/blob/main/draft/draft_v8.md),
+and [final PDF slides](https://github.com/DmytroMitin/macroparadise-talk-09-2026/blob/main/macroparadise-talk-09-2026-literal-v8.pdf).
+
+The talk reflects the project state presented on 9 September 2026; use the
+current project READMEs for the latest development APIs.
+
 ## Related projects
 
 - [quasiquotes-scala3](https://github.com/DmytroMitin/quasiquotes-scala3) —
