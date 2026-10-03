@@ -114,6 +114,38 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("admits one third-position concrete binary method without changing the factory shape") {
+    val decoded = decode(
+      """trait BinaryDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def combineAgain(a: A, a1: A): A = combine(a, a1)
+        |""".stripMargin,
+      "BinaryDerivedMonoid"
+    )
+
+    assertEquals(
+      decoded,
+      InstanceSourceShapeDecoder.SourceShape(
+        traitName = "BinaryDerivedMonoid",
+        enclosingTypeParameterName = "A",
+        parameterlessMethodName = "empty",
+        binaryMethodName = "combine",
+        binaryFirstParameterName = "a",
+        binarySecondParameterName = "a1",
+        parameterlessCarrierName = "emptyValue",
+        binaryCarrierName = "combineFunction"
+      )
+    )
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): BinaryDerivedMonoid[A] = new BinaryDerivedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
   test("admits one third-position concrete parameterless method without changing the factory shape") {
     val decoded = decode(
       """trait ZeroMonoid[A]:
@@ -157,6 +189,23 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     )
 
     assertEquals(decoded.parameterlessCarrierName, "emptyValue1")
+    assertEquals(decoded.binaryCarrierName, "combineFunction1")
+    assertEquals(decoded.parameterlessMethodName, "fallback")
+    assertEquals(decoded.binaryMethodName, "select")
+  }
+
+  test("derives renamed binary concrete-method evidence and freshens past both parameters") {
+    val decoded = decode(
+      """trait BinaryDerivedChoice[Element]:
+        |  def fallback: Element
+        |  def select(left: Element, right: Element): Element
+        |  def combineFunction(emptyValue: Element, emptyValue1: Element): Element =
+        |    select(emptyValue, emptyValue1)
+        |""".stripMargin,
+      "BinaryDerivedChoice"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue2")
     assertEquals(decoded.binaryCarrierName, "combineFunction1")
     assertEquals(decoded.parameterlessMethodName, "fallback")
     assertEquals(decoded.binaryMethodName, "select")
@@ -460,31 +509,41 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
     ),
     (
-      "wrong concrete parameter count",
+      "three concrete parameters",
       """trait ConcreteArity[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A, a1: A): A = combine(a, a1)
+        |  def twice(a: A, a1: A, a2: A): A = combine(combine(a, a1), a2)
         |""".stripMargin,
       "ConcreteArity",
-      "inherited concrete method `twice` requires exactly one ordinary parameter; found 2"
+      "inherited concrete method `twice` requires one or two ordinary parameters in its single clause; found 3"
     ),
     (
-      "wrong concrete parameter type",
+      "curried concrete parameters",
+      """trait ConcreteCurried[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A)(a1: A): A = combine(a, a1)
+        |""".stripMargin,
+      "ConcreteCurried",
+      "inherited concrete method `twice` requires exactly one ordinary parameter clause; found 2"
+    ),
+    (
+      "wrong second concrete parameter type",
       """trait ConcreteParameter[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: Other): A = empty
+        |  def twice(a: A, a1: Other): A = a
         |""".stripMargin,
       "ConcreteParameter",
-      "inherited concrete method `twice` parameter `a` must use enclosing type parameter `A`"
+      "inherited concrete method `twice` parameter `a1` must use enclosing type parameter `A`"
     ),
     (
       "wrong concrete result type",
       """trait ConcreteResult[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A): Other = ???
+        |  def twice(a: A, a1: A): Other = ???
         |""".stripMargin,
       "ConcreteResult",
       "inherited concrete method `twice` result type must use enclosing type parameter `A`"
@@ -494,17 +553,17 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       """trait ConcreteDefault[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A = empty): A = combine(a, a)
+        |  def twice(a: A, a1: A = empty): A = combine(a, a1)
         |""".stripMargin,
       "ConcreteDefault",
-      "inherited concrete method `twice` parameter `a` must be ordinary, non-defaulted, and unmodified"
+      "inherited concrete method `twice` parameter `a1` must be ordinary, non-defaulted, and unmodified"
     ),
     (
       "contextual concrete clause",
       """trait ConcreteContextual[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(using a: A): A = combine(a, a)
+        |  def twice(using a: A, a1: A): A = combine(a, a1)
         |""".stripMargin,
       "ConcreteContextual",
       "inherited concrete method `twice` parameter clause must be ordinary and non-contextual"
@@ -801,6 +860,69 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         InstanceSourceShapeDecoder.decode(classView, malformedBody),
         "Monoid",
         "binary method `combine` parameter `a` must be ordinary, non-defaulted, and unmodified"
+      )
+  }
+
+  test("rejects modified second parameters on an inherited concrete binary method") {
+    val (classView, bodyView) = decodeViews(
+      """trait BinaryDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def combineAgain(left: A, right: A): A = combine(left, right)
+        |""".stripMargin,
+      "BinaryDerivedMonoid"
+    )
+    val inheritedMember = bodyView.members(2)
+    val inheritedMethod =
+      inheritedMember.method.getOrElse(fail("missing inherited method"))
+    val clause = inheritedMethod.parameterClauses.head
+    val second = clause.parameters(1)
+
+    List(
+      clause.copy(isImplicit = true),
+      clause.copy(isGiven = true)
+    ).foreach: malformedClause =>
+      val malformedBody = bodyView.copy(
+        members = bodyView.members.updated(
+          2,
+          inheritedMember.copy(
+            method = Some(
+              inheritedMethod.copy(parameterClauses = malformedClause :: Nil)
+            )
+          )
+        )
+      )
+      assertRejected(
+        InstanceSourceShapeDecoder.decode(classView, malformedBody),
+        "BinaryDerivedMonoid",
+        "inherited concrete method `combineAgain` parameter clause must be ordinary and non-contextual"
+      )
+
+    List(
+      second.copy(hasDefault = true),
+      second.copy(isContextual = true),
+      second.copy(isImplicit = true),
+      second.copy(isGiven = true),
+      second.copy(isVal = true),
+      second.copy(isVar = true)
+    ).foreach: malformedParameter =>
+      val malformedClause = clause.copy(
+        parameters = clause.parameters.updated(1, malformedParameter)
+      )
+      val malformedBody = bodyView.copy(
+        members = bodyView.members.updated(
+          2,
+          inheritedMember.copy(
+            method = Some(
+              inheritedMethod.copy(parameterClauses = malformedClause :: Nil)
+            )
+          )
+        )
+      )
+      assertRejected(
+        InstanceSourceShapeDecoder.decode(classView, malformedBody),
+        "BinaryDerivedMonoid",
+        "inherited concrete method `combineAgain` parameter `right` must be ordinary, non-defaulted, and unmodified"
       )
   }
 

@@ -6,4 +6,4 @@ import com.github.dmytromitin.auxify.macros.instance
 trait ContextualConcrete[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(using a: A): A = combine(a, a)
+  def twice(using a: A, a1: A): A = combine(a, a1)

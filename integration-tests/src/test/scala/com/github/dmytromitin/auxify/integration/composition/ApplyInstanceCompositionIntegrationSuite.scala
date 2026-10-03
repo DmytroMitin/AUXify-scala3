@@ -88,6 +88,27 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(DerivedInstanceThenApply.preserved, 184)
   }
 
+  test("apply then instance supports the inherited concrete binary method") {
+    val constructed = BinaryApplyThenInstance.instance(0, _ + _)
+    given BinaryApplyThenInstance[Int] = constructed
+
+    assert(BinaryApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.combineAgain(20, 22), 42)
+    assertEquals(BinaryApplyThenInstance.preserved, 191)
+  }
+
+  test("instance then apply supports a renamed inherited concrete binary method") {
+    val constructed = BinaryInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given BinaryInstanceThenApply[String] = constructed
+
+    assert(BinaryInstanceThenApply[String].eq(constructed))
+    assertEquals(constructed.selectAgain("left", "right"), "left/right")
+    assertEquals(BinaryInstanceThenApply.preserved, 193)
+  }
+
   test("apply then instance inherits the concrete parameterless method with by-name dispatch") {
     var evaluations = 0
     val constructed = ZeroApplyThenInstance.instance[Int](

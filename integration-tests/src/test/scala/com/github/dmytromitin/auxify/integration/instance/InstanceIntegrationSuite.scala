@@ -56,6 +56,36 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(DerivedMonoid.preserved, 84)
   }
 
+  test("inherits the concrete binary method and dispatches through combine") {
+    var combineCalls = 0
+    val derived = BinaryDerivedMonoid.instance[Int](
+      0,
+      (left, right) =>
+        combineCalls += 1
+        left + right
+    )
+
+    assertEquals(derived.combineAgain(20, 22), 42)
+    assertEquals(combineCalls, 1)
+    assertEquals(BinaryDerivedMonoid.preserved, 91)
+  }
+
+  test("inherits a coherently renamed concrete binary method") {
+    val choice = BinaryDerivedChoice.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+
+    assertEquals(choice.selectAgain("left", "right"), "left/right")
+  }
+
+  test("preserves a direct existing instance for the concrete binary family") {
+    val derived = ExistingBinaryDerived.instance[Int](0, _ + _)
+
+    assertEquals(derived.combineAgain(20, 22), 42)
+    assertEquals(ExistingBinaryDerived.instanceCalls, 1)
+  }
+
   test("inherits the concrete parameterless method and dispatches through the by-name empty override") {
     var evaluations = 0
     val zero = ZeroMonoid.instance[Int](

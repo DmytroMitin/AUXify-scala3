@@ -76,49 +76,33 @@ private[internal] object InstanceSourceShapeDecoder:
                       inheritedMember
                     )
                     _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-                    shape <- inheritedMethod.parameterClauses match
-                      case Nil =>
-                        for
-                          _ <- enclosingResult(
-                            traitName,
-                            "inherited concrete",
-                            inheritedMethod,
-                            typeParameter.name
-                          )
-                          decoded <- decodeAbstractRoles(
-                            traitName,
-                            typeParameter.name,
-                            parameterlessMember,
-                            binaryMember,
-                            Set(inheritedMethod.name)
-                          )
-                        yield decoded
-                      case _ =>
-                        for
-                          inheritedParameter <- inheritedTopology(
-                            traitName,
-                            inheritedMethod
-                          )
-                          _ <- inheritedParameterType(
-                            traitName,
-                            inheritedMethod,
-                            inheritedParameter,
-                            typeParameter.name
-                          )
-                          _ <- enclosingResult(
-                            traitName,
-                            "inherited concrete",
-                            inheritedMethod,
-                            typeParameter.name
-                          )
-                          decoded <- decodeAbstractRoles(
-                            traitName,
-                            typeParameter.name,
-                            parameterlessMember,
-                            binaryMember,
-                            Set(inheritedMethod.name, inheritedParameter.name)
-                          )
-                        yield decoded
+                    inheritedParameters <- inheritedTopology(
+                      traitName,
+                      inheritedMethod
+                    )
+                    _ <- inheritedParameters.foldLeft[
+                      Either[ExpansionDiagnostic, Unit]
+                    ](Right(())): (validated, parameter) =>
+                      validated.flatMap: _ =>
+                        inheritedParameterType(
+                          traitName,
+                          inheritedMethod,
+                          parameter,
+                          typeParameter.name
+                        )
+                    _ <- enclosingResult(
+                      traitName,
+                      "inherited concrete",
+                      inheritedMethod,
+                      typeParameter.name
+                    )
+                    shape <- decodeAbstractRoles(
+                      traitName,
+                      typeParameter.name,
+                      parameterlessMember,
+                      binaryMember,
+                      Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
+                    )
                   yield shape
                 case DirectMemberKind.Type =>
                   for
@@ -393,8 +377,9 @@ private[internal] object InstanceSourceShapeDecoder:
   private def inheritedTopology(
       traitName: String,
       method: DirectMethod
-  ): Either[ExpansionDiagnostic, DirectMethodParameter] =
+  ): Either[ExpansionDiagnostic, List[DirectMethodParameter]] =
     method.parameterClauses match
+      case Nil => Right(Nil)
       case List(clause) =>
         if clause.isContextual || clause.isImplicit || clause.isGiven then
           unsupported(
@@ -402,13 +387,13 @@ private[internal] object InstanceSourceShapeDecoder:
             s"inherited concrete method `${method.name}` parameter clause must be ordinary and non-contextual",
             clause.pos
           )
-        else if clause.parameters.size != 1 then
+        else if clause.parameters.size < 1 || clause.parameters.size > 2 then
           unsupported(
             traitName,
-            s"inherited concrete method `${method.name}` requires exactly one ordinary parameter; found ${clause.parameters.size}",
+            s"inherited concrete method `${method.name}` requires one or two ordinary parameters in its single clause; found ${clause.parameters.size}",
             clause.pos
           )
-        else Right(clause.parameters.head)
+        else Right(clause.parameters)
       case clauses =>
         unsupported(
           traitName,

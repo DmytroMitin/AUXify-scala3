@@ -6,5 +6,5 @@ import com.github.dmytromitin.auxify.macros.instance
 trait ConcretePlusUnsupported[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A): A = combine(a, a)
+  def twice(a: A, a1: A): A = combine(a, a1)
   trait Nested

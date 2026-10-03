@@ -6,4 +6,4 @@ import com.github.dmytromitin.auxify.macros.instance
 trait WrongConcreteArity[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A, a1: A): A = combine(a, a1)
+  def twice(a: A, a1: A, a2: A): A = combine(combine(a, a1), a2)

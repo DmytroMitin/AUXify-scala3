@@ -6,4 +6,4 @@ import com.github.dmytromitin.auxify.macros.instance
 trait WrongConcreteResult[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A): Other = ???
+  def twice(a: A, a1: A): Other = ???

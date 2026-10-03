@@ -94,6 +94,26 @@ object DerivedInstanceThenApply:
 
 @apply
 @instance
+trait BinaryApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+
+object BinaryApplyThenInstance:
+  val preserved = 191
+
+@instance
+@apply
+trait BinaryInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def selectAgain(first: Element, second: Element): Element = select(first, second)
+
+object BinaryInstanceThenApply:
+  val preserved = 193
+
+@apply
+@instance
 trait ZeroApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A

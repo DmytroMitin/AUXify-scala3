@@ -70,6 +70,12 @@ trait DerivedMonoid[A]:
   def twice(a: A): A = combine(a, a)
 
 @instance
+trait BinaryDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+
+@instance
 trait ZeroMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -112,6 +118,20 @@ trait DerivedInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   def duplicate(value: Element): Element = select(value, value)
+
+@apply
+@instance
+trait BinaryApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+
+@instance
+@apply
+trait BinaryInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def selectAgain(first: Element, second: Element): Element = select(first, second)
 
 @apply
 @instance
@@ -214,6 +234,10 @@ object ExternalApp:
     val derived: DerivedMonoid[Int] = DerivedMonoid.instance(0, _ + _)
     assert(derived.twice(21) == 42)
 
+    val binaryDerived: BinaryDerivedMonoid[Int] =
+      BinaryDerivedMonoid.instance(0, _ + _)
+    assert(binaryDerived.combineAgain(20, 22) == 42)
+
     var zeroEvaluations = 0
     val zero: ZeroMonoid[Int] = ZeroMonoid.instance(
       {
@@ -261,6 +285,19 @@ object ExternalApp:
     given DerivedInstanceThenApply[String] = derivedReverse
     assert(DerivedInstanceThenApply[String].eq(derivedReverse))
     assert(derivedReverse.duplicate("same") == "same/same")
+
+    val binaryComposed = BinaryApplyThenInstance.instance[Int](0, _ + _)
+    given BinaryApplyThenInstance[Int] = binaryComposed
+    assert(BinaryApplyThenInstance[Int].eq(binaryComposed))
+    assert(binaryComposed.combineAgain(20, 22) == 42)
+
+    val binaryReverse = BinaryInstanceThenApply.instance[String](
+      "external",
+      (left, right) => s"$left/$right"
+    )
+    given BinaryInstanceThenApply[String] = binaryReverse
+    assert(BinaryInstanceThenApply[String].eq(binaryReverse))
+    assert(binaryReverse.selectAgain("left", "right") == "left/right")
 
     val zeroComposed = ZeroApplyThenInstance.instance[Int](0, _ + _)
     given ZeroApplyThenInstance[Int] = zeroComposed

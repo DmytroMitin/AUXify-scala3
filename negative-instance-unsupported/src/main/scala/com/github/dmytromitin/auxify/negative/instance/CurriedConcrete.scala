@@ -3,7 +3,7 @@ package com.github.dmytromitin.auxify.negative.instance
 import com.github.dmytromitin.auxify.macros.instance
 
 @instance
-trait DefaultedConcrete[A]:
+trait CurriedConcrete[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A, a1: A = empty): A = combine(a, a1)
+  def combineAgain(a: A)(a1: A): A = combine(a, a1)

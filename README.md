@@ -216,7 +216,8 @@ parameterless carrier is by-name, so constructing an instance does not evaluate 
 An existing direct companion member named `instance` is preserved under the current
 bounded syntactic conflict policy; unrelated companion members are preserved too.
 
-The same factory also supports one bounded inherited-method extension:
+The same factory also supports one bounded inherited-method extension of arity
+zero, one, or two:
 
 ```scala
 @instance
@@ -226,13 +227,25 @@ trait DerivedMonoid[A]:
   def twice(a: A): A = combine(a, a)
 ```
 
+For example, the binary form is:
+
+```scala
+@instance
+trait BinaryDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+```
+
 The concrete method must be the third and final direct member. It must be public,
-unannotated, non-polymorphic, free of unsupported modifiers, and have exactly one
-ordinary non-defaulted `A` parameter and result `A`. The factory remains the same
-two-override factory shown above: `twice` is inherited from the trait, so its body
-is not inspected, copied, re-authored, or lowered. Calling
+unannotated, non-polymorphic, free of unsupported modifiers, return `A`, and
+either declare no parameter clauses or one ordinary clause with exactly one or
+two non-defaulted, unmodified `A` parameters. The factory remains the same
+two-override factory shown above: the concrete method is inherited from the
+trait, so its body is not inspected, copied, re-authored, or lowered. Calling
 `DerivedMonoid.instance(0, _ + _).twice(21)` therefore dispatches through the
-generated `combine` override and returns `42`.
+generated `combine` override and returns `42`; likewise,
+`BinaryDerivedMonoid.instance(0, _ + _).combineAgain(20, 22)` returns `42`.
 
 Post-0.1.0 `main` also supports the parameterless counterpart:
 
@@ -274,13 +287,17 @@ exactly two or three direct body members in source order: one public, unannotate
 non-polymorphic abstract parameterless method returning that type parameter, then
 one public, unannotated, non-polymorphic abstract method with one ordinary clause of
 exactly two non-defaulted, unmodified parameters and the same parameter/result type,
-optionally followed by the bounded concrete unary method, concrete parameterless
-method, or concrete alias above. Classes/objects,
+optionally followed by one bounded concrete method of arity zero, one, or two,
+or by the separate concrete alias form above. Classes/objects,
 variance or bounds, abstract vals/vars/types, concrete vals/vars/lazy vals, multiple
 concrete members, concrete members in other source positions or with other
 signatures, reordered abstract methods, extra members, multiple or
 contextual/default clauses, method type parameters, modifiers/annotations, and
 broader Scala-2 `@instance` behavior remain outside this slice.
+
+The parameterless, binary, and concrete-alias extensions are post-0.1.0
+`0.2.0-SNAPSHOT` development behavior. They do not change AUXify v0.1.0 and
+are not included in the public Giter8 starter.
 
 Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
 Scala-3.3.8 parser's experimental method-level `erased`) through its normalized

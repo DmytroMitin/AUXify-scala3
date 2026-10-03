@@ -30,6 +30,35 @@ object DerivedMonoid:
   val preserved = 84
 
 @instance
+trait BinaryDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+
+object BinaryDerivedMonoid:
+  val preserved = 91
+
+@instance
+trait BinaryDerivedChoice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def selectAgain(first: Element, second: Element): Element = select(first, second)
+
+@instance
+trait ExistingBinaryDerived[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def combineAgain(a: A, a1: A): A = combine(a, a1)
+
+object ExistingBinaryDerived:
+  var instanceCalls = 0
+  def instance[A](value: A, combineFunction: (A, A) => A): ExistingBinaryDerived[A] =
+    instanceCalls += 1
+    new ExistingBinaryDerived[A]:
+      def empty: A = value
+      def combine(a: A, a1: A): A = combineFunction(a, a1)
+
+@instance
 trait ZeroMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
