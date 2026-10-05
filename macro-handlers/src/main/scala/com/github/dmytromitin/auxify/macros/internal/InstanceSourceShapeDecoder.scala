@@ -387,10 +387,10 @@ private[internal] object InstanceSourceShapeDecoder:
             s"inherited concrete method `${method.name}` parameter clause must be ordinary and non-contextual",
             clause.pos
           )
-        else if clause.parameters.size < 1 || clause.parameters.size > 2 then
+        else if clause.parameters.isEmpty then
           unsupported(
             traitName,
-            s"inherited concrete method `${method.name}` requires one or two ordinary parameters in its single clause; found ${clause.parameters.size}",
+            s"inherited concrete method `${method.name}` requires one or more ordinary parameters in its single clause; found 0",
             clause.pos
           )
         else Right(clause.parameters)

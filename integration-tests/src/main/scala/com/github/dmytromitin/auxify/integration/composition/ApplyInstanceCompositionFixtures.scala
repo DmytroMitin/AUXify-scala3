@@ -114,6 +114,27 @@ object BinaryInstanceThenApply:
 
 @apply
 @instance
+trait TernaryApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object TernaryApplyThenInstance:
+  val preserved = 195
+
+@instance
+@apply
+trait LargerInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def fold5(a: Element, b: Element, c: Element, d: Element, e: Element): Element =
+    select(select(select(select(a, b), c), d), e)
+
+object LargerInstanceThenApply:
+  val preserved = 197
+
+@apply
+@instance
 trait ZeroApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A

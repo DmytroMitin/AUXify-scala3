@@ -6,4 +6,4 @@ import com.github.dmytromitin.auxify.macros.instance
 trait DefaultedConcrete[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def twice(a: A, a1: A = empty): A = combine(a, a1)
+  def fold5(a: A, b: A, c: A, d: A = empty, e: A): A = a

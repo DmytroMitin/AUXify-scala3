@@ -76,6 +76,19 @@ trait BinaryDerivedMonoid[A]:
   def combineAgain(a: A, a1: A): A = combine(a, a1)
 
 @instance
+trait TernaryDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
+trait LargerDerivedChoice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def fold5(a: Element, b: Element, c: Element, d: Element, e: Element): Element =
+    select(select(select(select(a, b), c), d), e)
+
+@instance
 trait ZeroMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -132,6 +145,21 @@ trait BinaryInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   def selectAgain(first: Element, second: Element): Element = select(first, second)
+
+@apply
+@instance
+trait TernaryApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
+@apply
+trait LargerInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def fold5(a: Element, b: Element, c: Element, d: Element, e: Element): Element =
+    select(select(select(select(a, b), c), d), e)
 
 @apply
 @instance
@@ -238,6 +266,13 @@ object ExternalApp:
       BinaryDerivedMonoid.instance(0, _ + _)
     assert(binaryDerived.combineAgain(20, 22) == 42)
 
+    val ternaryDerived = TernaryDerivedMonoid.instance[Int](0, _ + _)
+    assert(ternaryDerived.fold3(10, 12, 20) == 42)
+
+    val largerDerived =
+      LargerDerivedChoice.instance[String]("fallback", (left, right) => s"$left/$right")
+    assert(largerDerived.fold5("a", "b", "c", "d", "e") == "a/b/c/d/e")
+
     var zeroEvaluations = 0
     val zero: ZeroMonoid[Int] = ZeroMonoid.instance(
       {
@@ -298,6 +333,20 @@ object ExternalApp:
     given BinaryInstanceThenApply[String] = binaryReverse
     assert(BinaryInstanceThenApply[String].eq(binaryReverse))
     assert(binaryReverse.selectAgain("left", "right") == "left/right")
+
+    val ternaryComposed = TernaryApplyThenInstance.instance[Int](0, _ + _)
+    given TernaryApplyThenInstance[Int] = ternaryComposed
+    assert(TernaryApplyThenInstance[Int].eq(ternaryComposed))
+    assert(ternaryComposed.fold3(10, 12, 20) == 42)
+
+    val largerReverse =
+      LargerInstanceThenApply.instance[String](
+        "external",
+        (left, right) => s"$left/$right"
+      )
+    given LargerInstanceThenApply[String] = largerReverse
+    assert(LargerInstanceThenApply[String].eq(largerReverse))
+    assert(largerReverse.fold5("a", "b", "c", "d", "e") == "a/b/c/d/e")
 
     val zeroComposed = ZeroApplyThenInstance.instance[Int](0, _ + _)
     given ZeroApplyThenInstance[Int] = zeroComposed

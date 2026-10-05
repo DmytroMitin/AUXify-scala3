@@ -314,16 +314,16 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `PrivateConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AnnotatedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InlineConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `WrongConcreteArity`: inherited concrete method `twice` requires one or two ordinary parameters in its single clause; found 3' \
   'unsupported @instance source shape for `CurriedConcrete`: inherited concrete method `combineAgain` requires exactly one ordinary parameter clause; found 2' \
   'unsupported @instance source shape for `ImplicitConcrete`: inherited concrete method `combineAgain` parameter clause must be ordinary and non-contextual' \
-  'unsupported @instance source shape for `WrongConcreteParameter`: inherited concrete method `twice` parameter `a` must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `WrongConcreteSecondParameter`: inherited concrete method `combineAgain` parameter `a1` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongConcreteEarlyParameter`: inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongConcreteMiddleParameter`: inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongConcreteFinalParameter`: inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `twice` parameter `a1` must be ordinary, non-defaulted, and unmodified' \
+  'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `fold5` parameter `d` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @instance source shape for `ContextualConcrete`: inherited concrete method `twice` parameter clause must be ordinary and non-contextual' \
   'unsupported @instance source shape for `AbstractZero`: inherited method `zero` must be concrete' \
-  'unsupported @instance source shape for `EmptyClauseZero`: inherited concrete method `zero` requires one or two ordinary parameters in its single clause; found 0' \
+  'unsupported @instance source shape for `EmptyClauseZero`: inherited concrete method `zero` requires one or more ordinary parameters in its single clause; found 0' \
   'unsupported @instance source shape for `WrongZeroResult`: inherited concrete method `zero` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `PolyZero`: inherited concrete method `zero` must not declare method type parameters' \
   'unsupported @instance source shape for `PrivateZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
@@ -651,6 +651,7 @@ printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
@@ -661,6 +662,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \

@@ -109,6 +109,30 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(BinaryInstanceThenApply.preserved, 193)
   }
 
+  test("apply then instance inherits a concrete ternary method") {
+    val constructed = TernaryApplyThenInstance.instance(0, _ + _)
+    given TernaryApplyThenInstance[Int] = constructed
+
+    assert(TernaryApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.fold3(10, 12, 20), 42)
+    assertEquals(TernaryApplyThenInstance.preserved, 195)
+  }
+
+  test("instance then apply inherits a renamed five-parameter concrete method") {
+    val constructed = LargerInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given LargerInstanceThenApply[String] = constructed
+
+    assert(LargerInstanceThenApply[String].eq(constructed))
+    assertEquals(
+      constructed.fold5("a", "b", "c", "d", "e"),
+      "a/b/c/d/e"
+    )
+    assertEquals(LargerInstanceThenApply.preserved, 197)
+  }
+
   test("apply then instance inherits the concrete parameterless method with by-name dispatch") {
     var evaluations = 0
     val constructed = ZeroApplyThenInstance.instance[Int](

@@ -39,6 +39,25 @@ object BinaryDerivedMonoid:
   val preserved = 91
 
 @instance
+trait TernaryDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object TernaryDerivedMonoid:
+  val preserved = 93
+
+@instance
+trait LargerDerivedChoice[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def fold5(a: Element, b: Element, c: Element, d: Element, e: Element): Element =
+    select(select(select(select(a, b), c), d), e)
+
+object LargerDerivedChoice:
+  val preserved = 95
+
+@instance
 trait BinaryDerivedChoice[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element

@@ -70,6 +70,37 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(BinaryDerivedMonoid.preserved, 91)
   }
 
+  test("inherits the concrete ternary method and dispatches through combine") {
+    var combineCalls = 0
+    val derived = TernaryDerivedMonoid.instance[Int](
+      0,
+      (left, right) =>
+        combineCalls += 1
+        left + right
+    )
+
+    assertEquals(derived.fold3(10, 12, 20), 42)
+    assertEquals(combineCalls, 2)
+    assertEquals(TernaryDerivedMonoid.preserved, 93)
+  }
+
+  test("inherits a coherently renamed five-parameter concrete method") {
+    var selectCalls = 0
+    val choice = LargerDerivedChoice.instance[String](
+      "fallback",
+      (left, right) =>
+        selectCalls += 1
+        s"$left/$right"
+    )
+
+    assertEquals(
+      choice.fold5("a", "b", "c", "d", "e"),
+      "a/b/c/d/e"
+    )
+    assertEquals(selectCalls, 4)
+    assertEquals(LargerDerivedChoice.preserved, 95)
+  }
+
   test("inherits a coherently renamed concrete binary method") {
     val choice = BinaryDerivedChoice.instance[String](
       "fallback",

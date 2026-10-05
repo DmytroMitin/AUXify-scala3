@@ -146,6 +146,45 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("admits one third-position concrete ternary method without changing the factory shape") {
+    val decoded = decode(
+      """trait TernaryDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+        |""".stripMargin,
+      "TernaryDerivedMonoid"
+    )
+
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): TernaryDerivedMonoid[A] = new TernaryDerivedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("admits one third-position concrete five-parameter method without changing the factory shape") {
+    val decoded = decode(
+      """trait FiveDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def fold5(a: A, b: A, c: A, d: A, e: A): A =
+        |    combine(combine(combine(combine(a, b), c), d), e)
+        |""".stripMargin,
+      "FiveDerivedMonoid"
+    )
+
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): FiveDerivedMonoid[A] = new FiveDerivedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
   test("admits one third-position concrete parameterless method without changing the factory shape") {
     val decoded = decode(
       """trait ZeroMonoid[A]:
@@ -194,18 +233,23 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryMethodName, "select")
   }
 
-  test("derives renamed binary concrete-method evidence and freshens past both parameters") {
+  test("derives renamed larger-arity concrete-method evidence and freshens past every parameter") {
     val decoded = decode(
-      """trait BinaryDerivedChoice[Element]:
+      """trait LargerDerivedChoice[Element]:
         |  def fallback: Element
         |  def select(left: Element, right: Element): Element
-        |  def combineFunction(emptyValue: Element, emptyValue1: Element): Element =
-        |    select(emptyValue, emptyValue1)
+        |  def combineFunction(
+        |    first: Element,
+        |    emptyValue: Element,
+        |    second: Element,
+        |    emptyValue1: Element,
+        |    emptyValue2: Element
+        |  ): Element = select(first, emptyValue2)
         |""".stripMargin,
-      "BinaryDerivedChoice"
+      "LargerDerivedChoice"
     )
 
-    assertEquals(decoded.parameterlessCarrierName, "emptyValue2")
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue3")
     assertEquals(decoded.binaryCarrierName, "combineFunction1")
     assertEquals(decoded.parameterlessMethodName, "fallback")
     assertEquals(decoded.binaryMethodName, "select")
@@ -509,14 +553,14 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       "inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers"
     ),
     (
-      "three concrete parameters",
-      """trait ConcreteArity[A]:
+      "empty concrete parameter clause",
+      """trait ConcreteEmptyClause[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A, a1: A, a2: A): A = combine(combine(a, a1), a2)
+        |  def zero(): A = empty
         |""".stripMargin,
-      "ConcreteArity",
-      "inherited concrete method `twice` requires one or two ordinary parameters in its single clause; found 3"
+      "ConcreteEmptyClause",
+      "inherited concrete method `zero` requires one or more ordinary parameters in its single clause; found 0"
     ),
     (
       "curried concrete parameters",
@@ -529,14 +573,34 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       "inherited concrete method `twice` requires exactly one ordinary parameter clause; found 2"
     ),
     (
-      "wrong second concrete parameter type",
-      """trait ConcreteParameter[A]:
+      "wrong early concrete parameter type",
+      """trait ConcreteEarlyParameter[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A, a1: Other): A = a
+        |  def fold5(a: Other, b: A, c: A, d: A, e: A): A = b
         |""".stripMargin,
-      "ConcreteParameter",
-      "inherited concrete method `twice` parameter `a1` must use enclosing type parameter `A`"
+      "ConcreteEarlyParameter",
+      "inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`"
+    ),
+    (
+      "wrong middle concrete parameter type",
+      """trait ConcreteMiddleParameter[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def fold5(a: A, b: A, c: Other, d: A, e: A): A = a
+        |""".stripMargin,
+      "ConcreteMiddleParameter",
+      "inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`"
+    ),
+    (
+      "wrong final concrete parameter type",
+      """trait ConcreteFinalParameter[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def fold5(a: A, b: A, c: A, d: A, e: Other): A = a
+        |""".stripMargin,
+      "ConcreteFinalParameter",
+      "inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A`"
     ),
     (
       "wrong concrete result type",
@@ -553,10 +617,10 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       """trait ConcreteDefault[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
-        |  def twice(a: A, a1: A = empty): A = combine(a, a1)
+        |  def fold5(a: A, b: A, c: A, d: A = empty, e: A): A = a
         |""".stripMargin,
       "ConcreteDefault",
-      "inherited concrete method `twice` parameter `a1` must be ordinary, non-defaulted, and unmodified"
+      "inherited concrete method `fold5` parameter `d` must be ordinary, non-defaulted, and unmodified"
     ),
     (
       "contextual concrete clause",
