@@ -6,7 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
-quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
+quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
+stale_quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
 dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
 ivy_home="$dependency_state_root/ivy"
 coursier_cache="$dependency_state_root/coursier-cache"
@@ -52,6 +53,24 @@ printf 'AUXIFY_JAVA_FEATURE=%s\n' "$java_feature"
 printf 'MACRO_PARADISE_SOURCE=%s\n' "$macro_paradise_commit"
 printf 'QUASIQUOTES_SOURCE=%s\n' "$quasiquotes_commit"
 printf 'AUXIFY_DEPENDENCY_STATE_ROOT=%s\n' "$dependency_state_root"
+
+dependency_classpath="$(run_sbt 'show macroHandlers / Compile / dependencyClasspath')"
+printf '%s\n' '--- exact macro-handler dependency classpath ---'
+printf '%s\n' "$dependency_classpath"
+
+grep -Fq -- \
+  "$dependency_state_root/ivy/local/com.github.dmytromitin/quasiquotes-scala3-dotty-internal_$scala_version" <<<"$dependency_classpath" ||
+  fail "macroHandlers did not resolve the exact task-owned C060 Quasiquotes artifact"
+grep -Fq -- \
+  "$dependency_state_root/ivy/local/com.github.dmytromitin/macroparadise-scala3-plugin-api_$scala_version" <<<"$dependency_classpath" ||
+  fail "macroHandlers did not resolve the exact task-owned Macro-Paradise artifact"
+
+if grep -Fq -- "$stale_quasiquotes_commit" <<<"$dependency_classpath"; then
+  fail "macroHandlers reused the stale C054 Quasiquotes dependency snapshot"
+fi
+
+printf '%s\n' \
+  "AUXIFY_SCALA3_EXACT_DEPENDENCY_CLASSPATH_PASS scala=$scala_version macro_paradise=$macro_paradise_commit quasiquotes=$quasiquotes_commit"
 
 run_sbt verifyPublicModuleCoordinates verifyReleaseReadiness
 run_sbt 'macroHandlers / Test / test'
@@ -348,7 +367,27 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `AliasFirst`: inherited method `combine` must be concrete' \
   'unsupported @instance source shape for `AliasPlusUnsupported`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
   'unsupported @instance source shape for `MethodThenAlias`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
-  'unsupported @instance source shape for `TwoAliases`: inherited concrete type alias `Value` must target enclosing type parameter `A`'; do
+  'unsupported @instance source shape for `TwoAliases`: inherited concrete type alias `Value` must target enclosing type parameter `A`' \
+  'found 0 type parameters' \
+  'unsupported @instance source shape for `TypeMemberAbstractVal`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberAbstractVar`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberDirectMethod`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberAlias`: direct type member `Out` must be abstract, not a concrete alias' \
+  'unsupported @instance source shape for `TypeMemberLowerBound`: abstract type member `Out` must be unbounded' \
+  'unsupported @instance source shape for `TypeMemberUpperBound`: abstract type member `Out` must be unbounded' \
+  'unsupported @instance source shape for `TypeMemberTwoSidedBound`: abstract type member `Out` must be unbounded' \
+  'unsupported @instance source shape for `TypeMemberPolymorphic`: abstract type member `Out` must not declare type parameters' \
+  'unsupported @instance source shape for `TypeMemberPrivate`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `TypeMemberProtected`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `TypeMemberAnnotated`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `TypeMemberInfix`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `TypeMemberTwoMembers`: direct body member at index 0 must be a method; found type' \
+  'unsupported @instance source shape for `TypeMemberThenMethod`: direct body member at index 0 must be a method; found type' \
+  'unsupported @instance source shape for `TypeMemberMethodThenType`: direct body member at index 1 must be a method; found type' \
+  'unsupported @instance source shape for `TypeMemberThenAlias`: direct body member at index 0 must be a method; found type' \
+  'unsupported @instance source shape for `TypeMemberNestedTrait`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberNestedClass`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberNestedObject`: requires exactly two direct body members; found 1'; do
   grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
     fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -364,6 +403,19 @@ if grep -Eq \
   "$instance_negative_log"; then
   fail "instance negative compile emitted an uncaught stack frame"
 fi
+
+for source in \
+  TypeMemberNoParameter TypeMemberTwoParameters TypeMemberVariant \
+  TypeMemberBoundedParameter TypeMemberHigherKinded TypeMemberContextBound \
+  TypeMemberAlias TypeMemberLowerBound TypeMemberUpperBound \
+  TypeMemberTwoSidedBound TypeMemberPolymorphic TypeMemberPrivate \
+  TypeMemberProtected TypeMemberAnnotated TypeMemberInfix TypeMemberTwoMembers \
+  TypeMemberThenMethod TypeMemberMethodThenType TypeMemberThenAlias \
+  TypeMemberAbstractVal TypeMemberAbstractVar TypeMemberDirectMethod \
+  TypeMemberNestedTrait TypeMemberNestedClass TypeMemberNestedObject; do
+  grep -Eq "$source[.]scala:[0-9]+:[0-9]+" "$instance_negative_log" ||
+    fail "abstract-type-member negative diagnostic is not source-positioned: $source"
+done
 
 instance_classes="$product_root/negative-instance-unsupported/target/scala-$scala_version/classes"
 if [[ -d "$instance_classes" ]] && find "$instance_classes" -type f \
@@ -650,6 +702,7 @@ printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_ABSTRACT_TYPE_MEMBER_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_PASS'

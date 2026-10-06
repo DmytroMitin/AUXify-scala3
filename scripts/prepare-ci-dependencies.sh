@@ -9,7 +9,7 @@ macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.g
 macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
 macro_paradise_version="0.2.0-SNAPSHOT"
 quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
-quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
+quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
 quasiquotes_version="0.4.0-SNAPSHOT"
 quasiquotes_binary_scala_version="3.3.8"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
@@ -132,6 +132,31 @@ hash_single_artifact \
 hash_single_artifact \
   "quasiquotes-scala3-dotty-internal_$scala_version" \
   "*/$quasiquotes_version/jars/*.jar"
+
+# The dependency state lives below the root target directory, so root/clean would
+# delete the source-built artifacts. Clean every consumer subproject explicitly
+# instead; this invalidates sbt update reports that may still name an older exact
+# source snapshot while preserving the freshly prepared task-owned repository.
+sbt -batch \
+  -Dsbt.ivy.home="$ivy_home" \
+  -Dauxify.scalaVersion="$scala_version" \
+  'macroAnnotations / clean' \
+  'macroHandlers / clean' \
+  'integrationTests / clean' \
+  'negativeUnsupported / clean' \
+  'negativeFullUnsupported / clean' \
+  'negativeSelfConflict / clean' \
+  'negativeSelfUnsupported / clean' \
+  'negativeDelegatedUnsupported / clean' \
+  'negativeCompositionLateRejection / clean' \
+  'negativeApplyInstanceComposition / clean' \
+  'negativeInstanceMethodModifiers / clean' \
+  'negativeDelegatedMethodModifiers / clean' \
+  'negativeApplyInstanceMethodModifiers / clean' \
+  'negativeTypeMemberModifiers / clean' \
+  'negativeAuxUnsupported / clean' \
+  'negativeInstanceUnsupported / clean' \
+  'negativeSyntaxUnsupported / clean'
 
 printf 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED scala=%s macro_paradise=%s quasiquotes=%s\n' \
   "$scala_version" \

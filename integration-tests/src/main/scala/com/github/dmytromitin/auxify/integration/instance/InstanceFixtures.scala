@@ -16,6 +16,28 @@ trait Choice[Element]:
   def select(left: Element, right: Element): Element
 
 @instance
+trait HasOut[A]:
+  type Out
+
+@instance
+trait Container[Element0]:
+  type Element
+
+object Container:
+  val preserved = 142
+
+@instance
+trait ExistingOut[A]:
+  type Out
+
+object ExistingOut:
+  var instanceCalls = 0
+  def instance[A, Out0]: ExistingOut[A] { type Out = Out0 } =
+    instanceCalls += 1
+    new ExistingOut[A]:
+      type Out = Out0
+
+@instance
 trait Collision[Element]:
   def emptyValue: Element
   def merge(combineFunction: Element, right: Element): Element

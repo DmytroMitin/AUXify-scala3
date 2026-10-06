@@ -49,7 +49,7 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; followed by zero or more independently validated inherited concrete members, each either a supported concrete method or a direct concrete alias to `A`; inherited members are never copied; generates an unchanged two-carrier companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Two disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, or (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
@@ -75,7 +75,8 @@ build it.
 The documented AUXify 0.1.0 compatibility slices are publicly released. Current
 `main` is the 0.2.0-SNAPSHOT development line and additionally contains the
 post-0.1.0 inherited concrete type-alias and parameterless-or-arity-neutral
-ordinary-method `@instance` widenings, normalized modifier-admission hardening,
+ordinary-method `@instance` widenings, the disjoint one-abstract-type-member
+`@instance` factory, normalized modifier-admission hardening,
 and the bounded native extension-method `@syntax` slice. Ordinary development uses coherently
 source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
 0.4.0-SNAPSHOT graphs at their pinned accepted commits.
@@ -101,8 +102,9 @@ handlers are `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:
 
 That release does not include the concrete type-alias or concrete
 parameterless-method `@instance` inheritances documented below, nor the later
-normalized modifier-admission hardening or `@syntax` slice. Those changes
-remain on the distinct post-release `main` line and do not widen, rebase, or
+one-abstract-type-member `@instance` family, normalized modifier-admission
+hardening, or `@syntax` slice. Those changes remain on the distinct post-release
+`main` line and do not widen, rebase, or
 rewrite the 0.1.0 release or the public Giter8 starter.
 
 For a supported generic trait such as:
@@ -216,6 +218,32 @@ parameterless carrier is by-name, so constructing an instance does not evaluate 
 An existing direct companion member named `instance` is preserved under the current
 bounded syntactic conflict policy; unrelated companion members are preserved too.
 
+Post-0.1.0 `0.2.0-SNAPSHOT` development also supports a second, disjoint
+abstract-type factory family:
+
+```scala
+@instance
+trait HasOut[A]:
+  type Out
+```
+
+It conceptually adds:
+
+```scala
+def instance[A, Out0]: HasOut[A] { type Out = Out0 } =
+  new HasOut[A]:
+    type Out = Out0
+```
+
+The trait has exactly one invariant, ordinary, unbounded enclosing type
+parameter and exactly one direct public, unannotated, monomorphic, unbounded
+abstract type member. Trait, enclosing-parameter, and member names are
+source-derived. The generated second type-parameter name uses a deterministic
+numeric suffix and skips occupied source names, while the return refinement and
+anonymous concrete alias retain the source member name. Existing direct
+`instance` members and unrelated companion content follow the same preservation
+policy as the method family.
+
 Post-0.1.0 `0.2.0-SNAPSHOT` development supports a heterogeneous inherited tail after the two abstract roles. Every tail member is validated independently and must be either:
 
 - a public, unannotated, non-polymorphic concrete method, free of unsupported modifiers, returning `A`, with either no parameter clauses or one ordinary non-contextual clause of one or more non-defaulted, unmodified direct-`A` parameters; or
@@ -236,9 +264,17 @@ trait RichTypedMonoid[A]:
 
 The factory remains the same two-carrier, two-override factory shown above. All accepted tail members are inherited from the trait; AUXify does not inspect method bodies or copy, re-author, or lower either methods or aliases. Type-alias names remain in the type namespace and do not reserve generated term-carrier names.
 
-This slice still requires exactly one invariant, unbounded enclosing type parameter and the two ordered abstract roles described above. Concrete vals, vars, and lazy vals; abstract type members; aliases with bounds, parameters, modifiers, annotations, visibility restrictions, or non-`A` targets; nested definitions; empty `()` method clauses; curried or contextual clauses; defaults; method type parameters; unsupported method modifiers; and wrong parameter or result types remain rejected. Abstract type-member factories that generate an override or refinement are a distinct unsupported family.
+The method family still requires the two ordered abstract roles described above.
+Concrete vals, vars, and lazy vals; unsupported aliases or methods; nested
+definitions; empty `()` method clauses; curried or contextual clauses; defaults;
+method type parameters; unsupported modifiers; and wrong parameter or result
+types remain rejected. The abstract-type family does not accept bounded or
+multiple type members, abstract vals, methods, aliases, nested definitions, or
+mixed-member bodies. The two families are not freely mixable.
 
-The heterogeneous inherited method/alias tail is post-0.1.0 `0.2.0-SNAPSHOT` development behavior. It does not change AUXify v0.1.0 and is not included in the public Giter8 starter.
+Both the heterogeneous inherited method/alias tail and the abstract-type factory
+are post-0.1.0 `0.2.0-SNAPSHOT` development behavior. They do not change AUXify
+v0.1.0 and are not included in the public Giter8 starter.
 
 Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
 Scala-3.3.8 parser's experimental method-level `erased`) through its normalized
@@ -457,7 +493,7 @@ checked-in, reproducible helper for this local-development setup. It accepts
 exactly `AUXIFY_SCALA_VERSION=3.3.8`, `AUXIFY_SCALA_VERSION=3.8.4`, or
 `AUXIFY_SCALA_VERSION=3.9.0`. It clones and verifies the exact accepted
 Macro-Paradise provider and Quasiquotes product
-`4104a7cc7058069ba7692370ec0da6b4d85096be` in disposable checkouts. It then
+`1fd2bd49445e905947c83025139b2ba1db40696b` in disposable checkouts. It then
 publishes Macro-Paradise 0.2.0-SNAPSHOT plus Quasiquotes 0.4.0-SNAPSHOT
 `core`/`neutral-scalameta` at their 3.3.8 binary-artifact baseline and
 `dotty-internal` at the selected exact compiler line. The task-owned Ivy and

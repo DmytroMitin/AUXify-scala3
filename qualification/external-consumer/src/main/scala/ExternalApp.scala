@@ -64,6 +64,10 @@ trait Choice[Element]:
   def select(left: Element, right: Element): Element
 
 @instance
+trait HasOut[A]:
+  type Out
+
+@instance
 trait DerivedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -269,6 +273,11 @@ object DelegatedThenApply:
 
 object ExternalApp:
   def main(args: Array[String]): Unit =
+    val output: HasOut[Int] { type Out = String } =
+      HasOut.instance[Int, String]
+    val outputWitness: output.Out =:= String = summon[output.Out =:= String]
+    assert(outputWitness("external-type-member") == "external-type-member")
+
     import ExternalSyntaxMonoid.syntax.*
     given ExternalSyntaxMonoid[Int] with
       def combine(left: Int, right: Int): Int = left + right

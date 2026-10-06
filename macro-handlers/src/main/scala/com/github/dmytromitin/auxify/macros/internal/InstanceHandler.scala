@@ -26,11 +26,21 @@ final class InstanceHandler extends ExpansionHandler:
 
   override def expand(input: ExpansionInput)(using Context): ExpansionOutcome =
     InstanceHandler.expandWithLowering(input): (shape, context) =>
-      InstanceDefinitionBuilder.lower(shape)(using context)
+      shape match
+        case InstanceHandler.SourceShape.Methods(value) =>
+          InstanceDefinitionBuilder.lower(value)(using context)
+        case InstanceHandler.SourceShape.AbstractTypeMember(value) =>
+          InstanceAbstractTypeMemberDefinitionBuilder.lower(value)(using context)
 
 private[internal] object InstanceHandler:
+  enum SourceShape:
+    case Methods(value: InstanceSourceShapeDecoder.SourceShape)
+    case AbstractTypeMember(
+        value: InstanceAbstractTypeMemberSourceShapeDecoder.SourceShape
+    )
+
   type Lowering = (
-      InstanceSourceShapeDecoder.SourceShape,
+      SourceShape,
       Context
   ) => Either[
     InstanceFactoryPeerBridge.Failure,
@@ -51,15 +61,29 @@ private[internal] object InstanceHandler:
         )
         bodyView <- input.targetBodyView
         typeStructure <-
-          if bodyView.members.drop(2).exists(
+          if bodyView.members.exists(
               _.kind == ExpansionTargetBodyView.DirectMemberKind.Type
             ) then input.targetTypeStructureView.map(Some(_))
           else Right(None)
-        shape <- InstanceSourceShapeDecoder.decode(
-          classView,
-          bodyView,
-          typeStructure
-        )
+        shape <- bodyView.members match
+          case List(member)
+              if member.kind == ExpansionTargetBodyView.DirectMemberKind.Type =>
+            typeStructure match
+              case Some(view) =>
+                InstanceAbstractTypeMemberSourceShapeDecoder
+                  .decode(classView, bodyView, view)
+                  .map(SourceShape.AbstractTypeMember.apply)
+              case None =>
+                Left(
+                  ExpansionDiagnostic(
+                    s"unsupported @instance source shape for `${classView.className}`: direct body member at index 0 must provide normalized type-member evidence",
+                    member.pos
+                  )
+                )
+          case _ =>
+            InstanceSourceShapeDecoder
+              .decode(classView, bodyView, typeStructure)
+              .map(SourceShape.Methods.apply)
         lowered <- lower(shape, summon[Context]).left.map(failure =>
           ExpansionDiagnostic(
             s"${failure.code}: ${failure.detail}",

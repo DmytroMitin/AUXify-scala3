@@ -34,6 +34,32 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(words.select("left", "right"), "left/right")
   }
 
+  test("constructs the canonical abstract-type factory with a visible refinement") {
+    val value: HasOut[Int] { type Out = String } =
+      HasOut.instance[Int, String]
+    val witness: value.Out =:= String = summon[value.Out =:= String]
+
+    assertEquals(witness("typed"), "typed")
+  }
+
+  test("constructs renamed abstract-type roles with collision-free freshness") {
+    val value: Container[Int] { type Element = String } =
+      Container.instance[Int, String]
+    val witness: value.Element =:= String = summon[value.Element =:= String]
+
+    assertEquals(witness("renamed"), "renamed")
+    assertEquals(Container.preserved, 142)
+  }
+
+  test("preserves a direct existing abstract-type instance factory") {
+    val value: ExistingOut[Int] { type Out = String } =
+      ExistingOut.instance[Int, String]
+    val witness: value.Out =:= String = summon[value.Out =:= String]
+
+    assertEquals(witness("existing"), "existing")
+    assertEquals(ExistingOut.instanceCalls, 1)
+  }
+
   test("keeps collision-safe carriers distinct from source names") {
     val values: Collision[Int] =
       Collision.instance(7, _ max _)

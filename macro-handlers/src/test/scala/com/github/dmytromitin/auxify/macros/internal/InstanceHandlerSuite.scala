@@ -49,6 +49,177 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("derives and places the canonical abstract-type-member instance factory") {
+    withExpansionInput(
+      """@current
+        |trait HasOut[A]:
+        |  type Out
+        |""".stripMargin,
+      "HasOut"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
+        case other => fail(s"expected structured abstract-type factory, found $other")
+
+      assertEquals(method.name.toString, "instance")
+      assertEquals(method.leadingTypeParams.map(_.name.toString), List("A", "Out0"))
+      assertEquals(method.trailingParamss, Nil)
+    }
+  }
+
+  test("derives renamed abstract-type roles and collision-free type parameters") {
+    withExpansionInput(
+      """@current
+        |trait Container[Element0]:
+        |  type Element
+        |""".stripMargin,
+      "Container"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedInstance(StructuredOutcomeTestSupport.materialize(input, changes))
+        case other => fail(s"expected renamed abstract-type factory, found $other")
+
+      assertEquals(
+        method.leadingTypeParams.map(_.name.toString),
+        List("Element0", "Element1")
+      )
+      method.tpt match
+        case refinement: RefinedTypeTree =>
+          assert(refinement.toString.contains("Container"), clue(refinement))
+          assert(refinement.toString.contains("Element"), clue(refinement))
+          assert(refinement.toString.contains("Element1"), clue(refinement))
+        case other => fail(s"expected renamed refined result, found $other")
+    }
+  }
+
+  test("abstract-type family preserves unrelated existing companion members") {
+    withExpansionInput(
+      """@current
+        |trait HasOut[A]:
+        |  type Out
+        |
+        |object HasOut:
+        |  val before = 41
+        |  object Nested
+        |  val after = 43
+        |""".stripMargin,
+      "HasOut"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val originalNames = companion.toList.flatMap(_.impl.body.collect {
+        case member: MemberDef => member.name.toString
+      })
+      new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val merged = output.companion.getOrElse(fail("missing merged companion"))
+          val names = merged.impl.body.collect {
+            case member: MemberDef => member.name.toString
+          }
+          assertEquals(names, originalNames :+ "instance")
+        case other => fail(s"expected structured abstract-type expansion, found $other")
+    }
+  }
+
+  test("abstract-type family PreserveExisting retains a direct instance member") {
+    withExpansionInput(
+      """@current
+        |trait ExistingOut[A]:
+        |  type Out
+        |
+        |object ExistingOut:
+        |  def instance[A, Out0]: ExistingOut[A] { type Out = Out0 } = ???
+        |  val retained = 7
+        |""".stripMargin,
+      "ExistingOut"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val original = companion.getOrElse(fail("missing fixture companion"))
+      val originalBody = original.impl.body
+      new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val preserved = output.companion.getOrElse(fail("missing preserved companion"))
+          assert(preserved.eq(original), clue(preserved))
+          assert(preserved.impl.body.eq(originalBody), clue(preserved.impl.body))
+          assertEquals(
+            preserved.impl.body.collect {
+              case method: DefDef if method.name.toString == "instance" => method
+            }.size,
+            1
+          )
+        case other => fail(s"expected structured abstract-type expansion, found $other")
+    }
+  }
+
+  test("one abstract val remains rejected before C060 lowering") {
+    withExpansionInput(
+      """@current
+        |trait HasValue[A]:
+        |  val value: A
+        |""".stripMargin,
+      "HasValue"
+    ) { (input, _, _, context) =>
+      given Context = context
+      var lowerCalled = false
+      InstanceHandler.expandWithLowering(input): (_, _) =>
+        lowerCalled = true
+        fail("one-abstract-val source must not reach peer lowering")
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @instance source shape for `HasValue`: requires exactly two direct body members; found 1"
+            )
+          )
+          assert(!lowerCalled)
+        case other => fail(s"expected controlled abstract-val rejection, found $other")
+    }
+  }
+
+  test("abstract-type bridge failure rolls back without partial companion mutation") {
+    withExpansionInput(
+      """@current
+        |trait HasOut[A]:
+        |  type Out
+        |
+        |object HasOut:
+        |  val retained = 11
+        |""".stripMargin,
+      "HasOut"
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      val existing = companion.getOrElse(fail("missing fixture companion"))
+      val originalCompanionBody = existing.impl.body
+
+      InstanceHandler.expandWithLowering(input): (_, _) =>
+        Left(
+          InstanceFactoryPeerBridge.Failure(
+            "EXACT_RAW_LOWERING_FAILED",
+            "controlled abstract-type bridge failure"
+          )
+        )
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "EXACT_RAW_LOWERING_FAILED: controlled abstract-type bridge failure"
+            )
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assert(existing.impl.body.eq(originalCompanionBody), clue(existing.impl.body))
+        case other => fail(s"expected controlled bridge rejection, found $other")
+    }
+  }
+
   test("admits a third-position concrete type alias without changing the factory roles") {
     withExpansionInput(
       """@current
