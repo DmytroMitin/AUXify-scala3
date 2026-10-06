@@ -315,6 +315,112 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryMethodName, "select")
   }
 
+  test("admits a method followed by a concrete alias") {
+    val decoded = decode(
+      """trait MethodThenAlias[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |  type Item = A
+        |""".stripMargin,
+      "MethodThenAlias"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  test("admits a concrete alias followed by a method") {
+    val decoded = decode(
+      """trait AliasThenMethod[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "AliasThenMethod"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  test("admits two concrete aliases") {
+    val decoded = decode(
+      """trait TwoAliases[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  type Value = A
+        |""".stripMargin,
+      "TwoAliases"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  test("admits multiple methods and aliases interleaved") {
+    val decoded = decode(
+      """trait RichTypedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a, a)
+        |  type Value = A
+        |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+        |""".stripMargin,
+      "RichTypedMonoid"
+    )
+
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): RichTypedMonoid[A] = new RichTypedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("type-alias names do not occupy the term-carrier namespace") {
+    val decoded = decode(
+      """trait NamespaceMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type emptyValue = A
+        |  type combineFunction = A
+        |  def fold3(emptyValue1: A, combineFunction1: A, c: A): A =
+        |    combine(combine(emptyValue1, combineFunction1), c)
+        |""".stripMargin,
+      "NamespaceMonoid"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  test("admits coherently renamed aliases, methods, and parameters") {
+    val decoded = decode(
+      """trait RenamedRichTyped[Element]:
+        |  def fallback: Element
+        |  def select(left: Element, right: Element): Element
+        |  type Value = Element
+        |  def duplicate(value: Element): Element = select(value, value)
+        |  type Output = Element
+        |  def merge3(first: Element, second: Element, third: Element): Element =
+        |    select(select(first, second), third)
+        |""".stripMargin,
+      "RenamedRichTyped"
+    )
+
+    assertEquals(decoded.parameterlessMethodName, "fallback")
+    assertEquals(decoded.binaryMethodName, "select")
+    assertEquals(decoded.binaryFirstParameterName, "left")
+    assertEquals(decoded.binarySecondParameterName, "right")
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
   test("admits one third-position concrete alias without changing the factory shape") {
     val decoded = decode(
       """trait WrappedMonoid[A]:
@@ -495,6 +601,34 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       )
   }
 
+  test("rejects type-member evidence whose body index does not match the tail member") {
+    val source =
+      """trait MismatchedAliasIndex[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      "MismatchedAliasIndex"
+    )
+    val alias = typeStructureView.directTypeMembers.head
+
+    assertRejected(
+      InstanceSourceShapeDecoder.decode(
+        classView,
+        bodyView,
+        Some(
+          typeStructureView.copy(
+            directTypeMembers = List(alias.copy(bodyIndex = 3))
+          )
+        )
+      ),
+      "MismatchedAliasIndex",
+      "direct body member at index 2 must provide normalized type-member evidence"
+    )
+  }
+
   private val rejectedShapes = List(
     (
       "variant enclosing type parameter",
@@ -583,39 +717,6 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |""".stripMargin,
       "ValidThenVal",
       "direct body member at index 3 must be a method; found val"
-    ),
-    (
-      "concrete alias followed by inherited method",
-      """trait AliasThenMethod[A]:
-        |  def empty: A
-        |  def combine(a: A, a1: A): A
-        |  type Item = A
-        |  def twice(a: A): A = combine(a, a)
-        |""".stripMargin,
-      "AliasThenMethod",
-      "direct body member at index 2 must be a method; found type"
-    ),
-    (
-      "inherited method followed by concrete alias",
-      """trait MethodThenAlias[A]:
-        |  def empty: A
-        |  def combine(a: A, a1: A): A
-        |  def twice(a: A): A = combine(a, a)
-        |  type Item = A
-        |""".stripMargin,
-      "MethodThenAlias",
-      "direct body member at index 3 must be a method; found type"
-    ),
-    (
-      "multiple concrete aliases",
-      """trait MultipleAliases[A]:
-        |  def empty: A
-        |  def combine(a: A, a1: A): A
-        |  type Item = A
-        |  type OtherItem = A
-        |""".stripMargin,
-      "MultipleAliases",
-      "direct body member at index 2 must be a method; found type"
     ),
     (
       "polymorphic concrete method",

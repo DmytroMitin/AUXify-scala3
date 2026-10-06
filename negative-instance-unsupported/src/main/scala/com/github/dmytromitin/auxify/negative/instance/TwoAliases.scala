@@ -7,4 +7,4 @@ trait TwoAliases[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
-  type Value = A
+  type Value = String

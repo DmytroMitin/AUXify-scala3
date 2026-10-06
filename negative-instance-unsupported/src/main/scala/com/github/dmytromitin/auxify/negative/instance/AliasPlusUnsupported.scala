@@ -7,4 +7,4 @@ trait AliasPlusUnsupported[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
-  def twice(a: A): A = combine(a, a)
+  def invalid(): A = empty

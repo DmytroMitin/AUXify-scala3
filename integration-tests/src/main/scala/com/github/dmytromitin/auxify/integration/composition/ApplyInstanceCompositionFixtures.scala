@@ -157,6 +157,33 @@ object RichInstanceThenApply:
 
 @apply
 @instance
+trait HeterogeneousApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  def twice(a: A): A = combine(a, a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object HeterogeneousApplyThenInstance:
+  val preserved = 209
+
+@instance
+@apply
+trait HeterogeneousInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  type Value = Element
+  def duplicate(value: Element): Element = select(value, value)
+  type Output = Element
+  def fold3(first: Element, second: Element, third: Element): Element =
+    select(select(first, second), third)
+
+object HeterogeneousInstanceThenApply:
+  val preserved = 210
+
+@apply
+@instance
 trait ZeroApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A

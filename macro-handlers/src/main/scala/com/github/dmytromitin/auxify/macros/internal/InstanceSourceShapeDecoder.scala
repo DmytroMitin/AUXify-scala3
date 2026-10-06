@@ -57,63 +57,27 @@ private[internal] object InstanceSourceShapeDecoder:
               !typeParameter.isOrdinaryUpperBounded =>
           bodyView.members match
             case parameterlessMember :: binaryMember :: tail =>
-              tail match
-                case Nil =>
-                  decodeAbstractRoles(
-                    traitName,
-                    typeParameter.name,
-                    parameterlessMember,
-                    binaryMember,
-                    Set.empty
-                  )
-                case List(inheritedMember)
-                    if inheritedMember.kind == DirectMemberKind.Type =>
-                  for
-                    typeStructure <- typeStructureView.toRight(
-                      ExpansionDiagnostic(
-                        s"unsupported @instance source shape for `$traitName`: direct body member at index 2 must provide normalized type-member evidence",
-                        inheritedMember.pos
-                      )
-                    )
-                    alias <- thirdPositionConcreteAlias(
+              for
+                additionallyOccupied <- tail.zipWithIndex.foldLeft[
+                  Either[ExpansionDiagnostic, Set[String]]
+                ](Right(Set.empty)): (validated, indexedMember) =>
+                  val (member, offset) = indexedMember
+                  validated.flatMap: occupied =>
+                    inheritedMemberOccupiedNames(
                       traitName,
-                      typeStructure,
-                      inheritedMember.pos
-                    )
-                    _ <- eligibleConcreteAlias(
-                      traitName,
-                      alias,
-                      typeParameter.name
-                    )
-                    shape <- decodeAbstractRoles(
-                      traitName,
+                      index = offset + 2,
+                      member,
                       typeParameter.name,
-                      parameterlessMember,
-                      binaryMember,
-                      Set.empty
-                    )
-                  yield shape
-                case inheritedMembers =>
-                  for
-                    additionallyOccupied <- inheritedMembers.zipWithIndex.foldLeft[
-                      Either[ExpansionDiagnostic, Set[String]]
-                    ](Right(Set.empty)): (validated, indexedMember) =>
-                      val (member, offset) = indexedMember
-                      validated.flatMap: occupied =>
-                        inheritedMethodOccupiedNames(
-                          traitName,
-                          index = offset + 2,
-                          member,
-                          typeParameter.name
-                        ).map(occupied ++ _)
-                    shape <- decodeAbstractRoles(
-                      traitName,
-                      typeParameter.name,
-                      parameterlessMember,
-                      binaryMember,
-                      additionallyOccupied
-                    )
-                  yield shape
+                      typeStructureView
+                    ).map(occupied ++ _)
+                shape <- decodeAbstractRoles(
+                  traitName,
+                  typeParameter.name,
+                  parameterlessMember,
+                  binaryMember,
+                  additionallyOccupied
+                )
+              yield shape
             case members =>
               unsupported(
                 traitName,
@@ -126,6 +90,44 @@ private[internal] object InstanceSourceShapeDecoder:
             "requires exactly one invariant unbounded enclosing type parameter",
             classView.classPos
           )
+
+  private def inheritedMemberOccupiedNames(
+      traitName: String,
+      index: Int,
+      member: DirectMember,
+      enclosingTypeParameterName: String,
+      typeStructureView: Option[ExpansionTargetTypeStructureView]
+  ): Either[ExpansionDiagnostic, Set[String]] =
+    member.kind match
+      case DirectMemberKind.Method =>
+        inheritedMethodOccupiedNames(
+          traitName,
+          index,
+          member,
+          enclosingTypeParameterName
+        )
+      case DirectMemberKind.Type =>
+        for
+          typeStructure <- typeStructureView.toRight(
+            ExpansionDiagnostic(
+              s"unsupported @instance source shape for `$traitName`: direct body member at index $index must provide normalized type-member evidence",
+              member.pos
+            )
+          )
+          alias <- concreteAliasAtIndex(
+            traitName,
+            index,
+            typeStructure,
+            member.pos
+          )
+          _ <- eligibleConcreteAlias(
+            traitName,
+            alias,
+            enclosingTypeParameterName
+          )
+        yield Set.empty
+      case _ =>
+        directMethod(traitName, index, member).map(_ => Set.empty)
 
   private def inheritedMethodOccupiedNames(
       traitName: String,
@@ -155,18 +157,25 @@ private[internal] object InstanceSourceShapeDecoder:
       )
     yield Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
 
-  private def thirdPositionConcreteAlias(
+  private def concreteAliasAtIndex(
       traitName: String,
+      index: Int,
       typeStructureView: ExpansionTargetTypeStructureView,
       fallbackPos: SrcPos
   ): Either[ExpansionDiagnostic, DirectTypeMember] =
-    typeStructureView.directTypeMembers match
-      case List(alias) if alias.bodyIndex == 2 => Right(alias)
-      case members =>
+    typeStructureView.directTypeMembers.filter(_.bodyIndex == index) match
+      case List(alias) => Right(alias)
+      case Nil =>
         unsupported(
           traitName,
-          "direct body member at index 2 must be the only normalized direct type member",
-          members.find(_.bodyIndex == 2).map(_.pos).getOrElse(fallbackPos)
+          s"direct body member at index $index must provide normalized type-member evidence",
+          fallbackPos
+        )
+      case aliases =>
+        unsupported(
+          traitName,
+          s"direct body member at index $index must provide exactly one normalized direct type member; found ${aliases.size}",
+          aliases.headOption.map(_.pos).getOrElse(fallbackPos)
         )
 
   private def eligibleConcreteAlias(

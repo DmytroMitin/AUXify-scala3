@@ -156,6 +156,37 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(RichInstanceThenApply.preserved, 200)
   }
 
+  test("apply then instance inherits heterogeneous aliases and methods") {
+    val constructed = HeterogeneousApplyThenInstance.instance(0, _ + _)
+    given HeterogeneousApplyThenInstance[Int] = constructed
+
+    val item: constructed.Item = 42
+    val value: constructed.Value = 42
+    assert(HeterogeneousApplyThenInstance[Int].eq(constructed))
+    assertEquals(summon[constructed.Item =:= Int](item), 42)
+    assertEquals(summon[constructed.Value =:= Int](value), 42)
+    assertEquals(constructed.twice(21), 42)
+    assertEquals(constructed.fold3(10, 12, 20), 42)
+    assertEquals(HeterogeneousApplyThenInstance.preserved, 209)
+  }
+
+  test("instance then apply inherits renamed heterogeneous aliases and methods") {
+    val constructed = HeterogeneousInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given HeterogeneousInstanceThenApply[String] = constructed
+
+    val value: constructed.Value = "typed"
+    val output: constructed.Output = "output"
+    assert(HeterogeneousInstanceThenApply[String].eq(constructed))
+    assertEquals(summon[constructed.Value =:= String](value), "typed")
+    assertEquals(summon[constructed.Output =:= String](output), "output")
+    assertEquals(constructed.duplicate("same"), "same/same")
+    assertEquals(constructed.fold3("a", "b", "c"), "a/b/c")
+    assertEquals(HeterogeneousInstanceThenApply.preserved, 210)
+  }
+
   test("apply then instance inherits the concrete parameterless method with by-name dispatch") {
     var evaluations = 0
     val constructed = ZeroApplyThenInstance.instance[Int](

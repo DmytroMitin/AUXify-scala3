@@ -51,11 +51,10 @@ private[internal] object InstanceHandler:
         )
         bodyView <- input.targetBodyView
         typeStructure <-
-          bodyView.members match
-            case List(_, _, member)
-                if member.kind == ExpansionTargetBodyView.DirectMemberKind.Type =>
-              input.targetTypeStructureView.map(Some(_))
-            case _ => Right(None)
+          if bodyView.members.drop(2).exists(
+              _.kind == ExpansionTargetBodyView.DirectMemberKind.Type
+            ) then input.targetTypeStructureView.map(Some(_))
+          else Right(None)
         shape <- InstanceSourceShapeDecoder.decode(
           classView,
           bodyView,

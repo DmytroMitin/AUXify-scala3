@@ -69,6 +69,18 @@ object RichDerivedMonoid:
   val preserved = 97
 
 @instance
+trait HeterogeneousDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  def twice(a: A): A = combine(a, a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object HeterogeneousDerivedMonoid:
+  val preserved = 98
+
+@instance
 trait BinaryDerivedChoice[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element

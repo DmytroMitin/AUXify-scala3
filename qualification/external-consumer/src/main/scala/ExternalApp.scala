@@ -97,6 +97,15 @@ trait RichDerivedMonoid[A]:
   def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
 
 @instance
+trait HeterogeneousDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  def twice(a: A): A = combine(a, a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
 trait ZeroMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -184,6 +193,27 @@ trait RichInstanceThenApply[Element]:
   def select(left: Element, right: Element): Element
   def duplicate(value: Element): Element = select(value, value)
   def fold3(a: Element, b: Element, c: Element): Element = select(select(a, b), c)
+
+@apply
+@instance
+trait HeterogeneousApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  def twice(a: A): A = combine(a, a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
+@apply
+trait HeterogeneousInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  type Value = Element
+  def duplicate(value: Element): Element = select(value, value)
+  type Output = Element
+  def fold3(first: Element, second: Element, third: Element): Element =
+    select(select(first, second), third)
 
 @apply
 @instance
@@ -315,6 +345,14 @@ object ExternalApp:
     assert(richEmptyEvaluations == 1)
     assert(richCombineCalls == 3)
 
+    val heterogeneous = HeterogeneousDerivedMonoid.instance[Int](0, _ + _)
+    val heterogeneousItem: heterogeneous.Item = 42
+    val heterogeneousValue: heterogeneous.Value = 42
+    assert(summon[heterogeneous.Item =:= Int](heterogeneousItem) == 42)
+    assert(summon[heterogeneous.Value =:= Int](heterogeneousValue) == 42)
+    assert(heterogeneous.twice(21) == 42)
+    assert(heterogeneous.fold3(10, 12, 20) == 42)
+
     var zeroEvaluations = 0
     val zero: ZeroMonoid[Int] = ZeroMonoid.instance(
       {
@@ -404,6 +442,29 @@ object ExternalApp:
     assert(RichInstanceThenApply[String].eq(richReverse))
     assert(richReverse.duplicate("same") == "same/same")
     assert(richReverse.fold3("a", "b", "c") == "a/b/c")
+
+    val heterogeneousComposed = HeterogeneousApplyThenInstance.instance[Int](0, _ + _)
+    given HeterogeneousApplyThenInstance[Int] = heterogeneousComposed
+    val composedItem: heterogeneousComposed.Item = 42
+    val composedValue: heterogeneousComposed.Value = 42
+    assert(HeterogeneousApplyThenInstance[Int].eq(heterogeneousComposed))
+    assert(summon[heterogeneousComposed.Item =:= Int](composedItem) == 42)
+    assert(summon[heterogeneousComposed.Value =:= Int](composedValue) == 42)
+    assert(heterogeneousComposed.twice(21) == 42)
+    assert(heterogeneousComposed.fold3(10, 12, 20) == 42)
+
+    val heterogeneousReverse = HeterogeneousInstanceThenApply.instance[String](
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given HeterogeneousInstanceThenApply[String] = heterogeneousReverse
+    val reverseValue: heterogeneousReverse.Value = "typed"
+    val reverseOutput: heterogeneousReverse.Output = "output"
+    assert(HeterogeneousInstanceThenApply[String].eq(heterogeneousReverse))
+    assert(summon[heterogeneousReverse.Value =:= String](reverseValue) == "typed")
+    assert(summon[heterogeneousReverse.Output =:= String](reverseOutput) == "output")
+    assert(heterogeneousReverse.duplicate("same") == "same/same")
+    assert(heterogeneousReverse.fold3("a", "b", "c") == "a/b/c")
 
     val zeroComposed = ZeroApplyThenInstance.instance[Int](0, _ + _)
     given ZeroApplyThenInstance[Int] = zeroComposed
