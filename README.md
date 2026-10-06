@@ -49,11 +49,11 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; optionally followed by exactly one public concrete method that is parameterless or has one ordinary non-contextual clause of one or more direct `A` parameters, or one concrete alias `type Item = A`, each inherited rather than copied; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Supported bounded development slice | Exactly one invariant unbounded enclosing type parameter and exactly two ordered public abstract methods: a parameterless `A` result followed by one ordinary binary `(A, A): A` method; followed by zero or more public concrete methods that each are parameterless or have one ordinary non-contextual clause of one or more direct `A` parameters, or by the separate exact single concrete alias `type Item = A`; inherited members are never copied; generates a companion `instance` factory and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
-| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including its optional final inherited concrete parameterless or arity-neutral ordinary method, or concrete alias to the enclosing type parameter |
+| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including zero or more supported inherited concrete methods, or the separate exact single concrete alias to the enclosing type parameter |
 | `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly; generates native Scala 3 extension syntax and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -216,56 +216,21 @@ parameterless carrier is by-name, so constructing an instance does not evaluate 
 An existing direct companion member named `instance` is preserved under the current
 bounded syntactic conflict policy; unrelated companion members are preserved too.
 
-The same factory also supports one bounded inherited-method extension that is
-either parameterless or arity-neutral across one ordinary parameter clause:
+Post-0.1.0 `main` also supports zero or more inherited concrete methods after the two abstract roles. Every method is validated independently under the same boundary: it must be public, unannotated, non-polymorphic, free of unsupported modifiers, return `A`, and either declare no parameter clauses or one ordinary non-contextual clause with one or more non-defaulted, unmodified parameters typed directly as `A`.
+
+For example, several supported arities can coexist on one trait:
 
 ```scala
 @instance
-trait DerivedMonoid[A]:
+trait RichDerivedMonoid[A]:
   def empty: A
-  def combine(a: A, a1: A): A
+  def combine(a: A, b: A): A
+  def zeroLike: A = empty
   def twice(a: A): A = combine(a, a)
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
 ```
 
-For example, a larger ordinary-clause form is:
-
-```scala
-@instance
-trait LargerDerivedMonoid[A]:
-  def empty: A
-  def combine(a: A, a1: A): A
-  def fold5(a: A, b: A, c: A, d: A, e: A): A =
-    combine(combine(combine(combine(a, b), c), d), e)
-```
-
-The concrete method must be the third and final direct member. It must be public,
-unannotated, non-polymorphic, free of unsupported modifiers, return `A`, and
-either declare no parameter clauses or one ordinary clause with one or more
-non-defaulted, unmodified parameters, each typed directly as `A`. The factory
-remains the same two-override factory shown above: the concrete method is
-inherited from the trait, so its body is not inspected, copied, re-authored, or
-lowered. Calling `DerivedMonoid.instance(0, _ + _).twice(21)` therefore
-dispatches through the generated `combine` override and returns `42`; the same
-dispatch principle holds for every parameter of `LargerDerivedMonoid.fold5`
-without changing the factory signature or authored overrides.
-
-Post-0.1.0 `main` also supports the parameterless counterpart:
-
-```scala
-@instance
-trait ZeroMonoid[A]:
-  def empty: A
-  def combine(a: A, a1: A): A
-  def zero: A = empty
-```
-
-The concrete parameterless method must be the third and final direct member,
-public, unannotated, non-polymorphic, free of unsupported modifiers, declare no
-parameter clauses, and return the enclosing type parameter exactly. It is
-inherited from the trait and dispatches through the generated `empty` override;
-the factory still authors only the two overrides shown above. In particular,
-`def zero(): A`, `infix def zero: A`, and modifier-bearing alternatives are not
-admitted.
+The factory remains the same two-override factory shown above. All concrete methods are inherited from the trait; AUXify does not inspect their bodies or copy, re-author, or lower them. Calls to `zeroLike`, `twice`, and `fold3` therefore dispatch through the generated `empty` and `combine` overrides on the same anonymous instance. Empty `()` clauses, curried or contextual clauses, defaults, method type parameters, unsupported modifiers, wrong parameter/result types, and concrete vals or vars remain rejected.
 
 Post-0.1.0 `main` also supports one final inherited concrete alias:
 
@@ -284,23 +249,9 @@ method overrides shown above. `Item` is inherited from `WrappedMonoid`; AUXify
 does not copy, re-author, or lower it. In particular, `infix type Item = A` is
 rejected through Macro-Paradise's normalized unsupported-modifier evidence.
 
-This slice requires exactly one invariant, unbounded enclosing type parameter and
-exactly two or three direct body members in source order: one public, unannotated,
-non-polymorphic abstract parameterless method returning that type parameter, then
-one public, unannotated, non-polymorphic abstract method with one ordinary clause of
-exactly two non-defaulted, unmodified parameters and the same parameter/result type,
-optionally followed by one bounded concrete method that is parameterless or has
-one ordinary non-contextual clause with one or more direct parameters of that
-type, or by the separate concrete alias form above. Classes/objects,
-variance or bounds, abstract vals/vars/types, concrete vals/vars/lazy vals, multiple
-concrete members, concrete members in other source positions or with other
-signatures, reordered abstract methods, extra members, multiple or
-contextual/default clauses, method type parameters, modifiers/annotations, and
-broader Scala-2 `@instance` behavior remain outside this slice.
+This slice requires exactly one invariant, unbounded enclosing type parameter and the two ordered abstract roles described above. They may be followed by zero or more concrete methods, each satisfying the parameterless-or-single-ordinary-clause direct-`A` policy, or by the separate exact single-final-member concrete alias form. Alias-plus-method tails, multiple aliases, classes/objects, variance or bounds, abstract vals/vars/types, concrete vals/vars/lazy vals, reordered abstract methods, unsupported extra members, curried/contextual/default clauses, method type parameters, modifiers/annotations, wrong parameter/result types, and broader Scala 2 `@instance` behavior remain outside this slice.
 
-The parameterless, arity-neutral ordinary-clause, and concrete-alias extensions are post-0.1.0
-`0.2.0-SNAPSHOT` development behavior. They do not change AUXify v0.1.0 and
-are not included in the public Giter8 starter.
+The parameterless, arity-neutral, multiple-inherited-method, and concrete-alias extensions are post-0.1.0 `0.2.0-SNAPSHOT` development behavior. They do not change AUXify v0.1.0 and are not included in the public Giter8 starter.
 
 Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
 Scala-3.3.8 parser's experimental method-level `erased`) through its normalized
@@ -314,8 +265,8 @@ development hardening graph, and AUXify makes no claim that 0.2.0-SNAPSHOT is
 published remotely.
 
 Simple `@apply` and the bounded `@instance` slice may be stacked in either source
-order on that exact common family, with or without one supported final inherited
-concrete member:
+order on that exact common family, with zero or more supported inherited concrete methods, or the separate exact
+single-final-member concrete alias:
 
 ```scala
 @apply

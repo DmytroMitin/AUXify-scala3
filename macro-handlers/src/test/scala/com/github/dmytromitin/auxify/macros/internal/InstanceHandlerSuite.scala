@@ -194,6 +194,44 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("inherits multiple mixed-arity concrete methods without authoring them") {
+    withExpansionInput(
+      """@current
+        |trait RichDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def zeroLike: A = empty
+        |  def twice(a: A): A = combine(a, a)
+        |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+        |""".stripMargin,
+      "RichDerivedMonoid"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
+        case other => fail(s"expected structured instance expansion, found $other")
+
+      assertEquals(
+        method.trailingParamss.flatten.map(_.name.toString),
+        List("emptyValue", "combineFunction")
+      )
+      val authoredMethods = scala.collection.mutable.ListBuffer.empty[String]
+      val traverser = new untpd.UntypedTreeTraverser:
+        override def traverse(tree: untpd.Tree)(using Context): Unit =
+          tree match
+            case definition: DefDef => authoredMethods += definition.name.toString
+            case _ => ()
+          traverseChildren(tree)
+      traverser.traverse(method.rhs)
+      assertEquals(
+        authoredMethods.toList.filterNot(_ == "<init>").sorted,
+        List("combine", "empty")
+      )
+    }
+  }
+
   test("rejects an infix concrete alias through normalized type-member modifiers") {
     withExpansionInput(
       """@current

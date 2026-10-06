@@ -6,5 +6,5 @@ import com.github.dmytromitin.auxify.macros.instance
 trait ZeroPlusUnsupported[A]:
   def empty: A
   def combine(a: A, a1: A): A
-  def zero: A = empty
   trait Nested
+  def zero: A = empty

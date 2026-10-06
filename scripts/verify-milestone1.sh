@@ -305,9 +305,9 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `ProtectedMethod`: direct method `empty` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `ThirdAbstract`: inherited method `twice` must be concrete' \
-  'unsupported @instance source shape for `TwoConcrete`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
-  'unsupported @instance source shape for `ConcreteVal`: direct body member at index 2 must be a method; found val' \
-  'unsupported @instance source shape for `ConcreteVar`: direct body member at index 2 must be a method; found var' \
+  'unsupported @instance source shape for `TwoConcrete`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
+  'unsupported @instance source shape for `ConcreteVal`: direct body member at index 3 must be a method; found val' \
+  'unsupported @instance source shape for `ConcreteVar`: direct body member at index 3 must be a method; found var' \
   'unsupported @instance source shape for `ConcreteLazyVal`: direct body member at index 2 must be a method; found val' \
   'unsupported @instance source shape for `PolyConcrete`: inherited concrete method `twice` must not declare method type parameters' \
   'unsupported @instance source shape for `ProtectedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
@@ -335,8 +335,8 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `TransparentInlineZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `ImplicitZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `ZeroFirst`: inherited method `combine` must be concrete' \
-  'unsupported @instance source shape for `ConcretePlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
-  'unsupported @instance source shape for `ZeroPlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `ConcretePlusUnsupported`: direct body member at index 3 must be a method; found nested trait' \
+  'unsupported @instance source shape for `ZeroPlusUnsupported`: direct body member at index 2 must be a method; found nested trait' \
   'unsupported @instance source shape for `NamedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
   'unsupported @instance source shape for `AppliedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
   'unsupported @instance source shape for `QualifiedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
@@ -346,8 +346,9 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `AnnotatedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AliasFirst`: inherited method `combine` must be concrete' \
-  'unsupported @instance source shape for `AliasPlusUnsupported`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
-  'unsupported @instance source shape for `TwoAliases`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4'; do
+  'unsupported @instance source shape for `AliasPlusUnsupported`: direct body member at index 2 must be a method; found type' \
+  'unsupported @instance source shape for `MethodThenAlias`: direct body member at index 3 must be a method; found type' \
+  'unsupported @instance source shape for `TwoAliases`: direct body member at index 2 must be a method; found type'; do
   grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
     fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -476,7 +477,7 @@ cat "$apply_instance_composition_negative_log"
   fail "negativeApplyInstanceComposition compiled successfully; the late instance rejection was lost"
 
 grep -Fq \
-  'unsupported @instance source shape for `LateInstanceRejection`: requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4' \
+  'unsupported @instance source shape for `LateInstanceRejection`: direct body member at index 3 must be a method; found nested trait' \
   "$apply_instance_composition_negative_log" ||
   fail "apply-instance late rejection omitted the deterministic instance decoder diagnostic"
 
@@ -652,6 +653,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
@@ -663,6 +665,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \

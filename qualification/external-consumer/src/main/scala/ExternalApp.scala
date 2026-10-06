@@ -89,6 +89,14 @@ trait LargerDerivedChoice[Element]:
     select(select(select(select(a, b), c), d), e)
 
 @instance
+trait RichDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zeroLike: A = empty
+  def twice(a: A): A = combine(a, a)
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
 trait ZeroMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -160,6 +168,22 @@ trait LargerInstanceThenApply[Element]:
   def select(left: Element, right: Element): Element
   def fold5(a: Element, b: Element, c: Element, d: Element, e: Element): Element =
     select(select(select(select(a, b), c), d), e)
+
+@apply
+@instance
+trait RichApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zeroLike: A = empty
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@instance
+@apply
+trait RichInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def duplicate(value: Element): Element = select(value, value)
+  def fold3(a: Element, b: Element, c: Element): Element = select(select(a, b), c)
 
 @apply
 @instance
@@ -273,6 +297,24 @@ object ExternalApp:
       LargerDerivedChoice.instance[String]("fallback", (left, right) => s"$left/$right")
     assert(largerDerived.fold5("a", "b", "c", "d", "e") == "a/b/c/d/e")
 
+    var richEmptyEvaluations = 0
+    var richCombineCalls = 0
+    val richDerived = RichDerivedMonoid.instance[Int](
+      {
+        richEmptyEvaluations += 1
+        richEmptyEvaluations
+      },
+      (left, right) =>
+        richCombineCalls += 1
+        left + right
+    )
+    assert(richEmptyEvaluations == 0)
+    assert(richDerived.zeroLike == 1)
+    assert(richDerived.twice(21) == 42)
+    assert(richDerived.fold3(10, 12, 20) == 42)
+    assert(richEmptyEvaluations == 1)
+    assert(richCombineCalls == 3)
+
     var zeroEvaluations = 0
     val zero: ZeroMonoid[Int] = ZeroMonoid.instance(
       {
@@ -347,6 +389,21 @@ object ExternalApp:
     given LargerInstanceThenApply[String] = largerReverse
     assert(LargerInstanceThenApply[String].eq(largerReverse))
     assert(largerReverse.fold5("a", "b", "c", "d", "e") == "a/b/c/d/e")
+
+    val richComposed = RichApplyThenInstance.instance[Int](0, _ + _)
+    given RichApplyThenInstance[Int] = richComposed
+    assert(RichApplyThenInstance[Int].eq(richComposed))
+    assert(richComposed.zeroLike == 0)
+    assert(richComposed.fold3(10, 12, 20) == 42)
+
+    val richReverse = RichInstanceThenApply.instance[String](
+      "external",
+      (left, right) => s"$left/$right"
+    )
+    given RichInstanceThenApply[String] = richReverse
+    assert(RichInstanceThenApply[String].eq(richReverse))
+    assert(richReverse.duplicate("same") == "same/same")
+    assert(richReverse.fold3("a", "b", "c") == "a/b/c")
 
     val zeroComposed = ZeroApplyThenInstance.instance[Int](0, _ + _)
     given ZeroApplyThenInstance[Int] = zeroComposed

@@ -135,6 +135,28 @@ object LargerInstanceThenApply:
 
 @apply
 @instance
+trait RichApplyThenInstance[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zeroLike: A = empty
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object RichApplyThenInstance:
+  val preserved = 199
+
+@instance
+@apply
+trait RichInstanceThenApply[Element]:
+  def fallback: Element
+  def select(left: Element, right: Element): Element
+  def duplicate(value: Element): Element = select(value, value)
+  def fold3(a: Element, b: Element, c: Element): Element = select(select(a, b), c)
+
+object RichInstanceThenApply:
+  val preserved = 200
+
+@apply
+@instance
 trait ZeroApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A

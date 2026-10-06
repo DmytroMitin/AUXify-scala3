@@ -56,55 +56,18 @@ private[internal] object InstanceSourceShapeDecoder:
               !typeParameter.hasContextBounds &&
               !typeParameter.isOrdinaryUpperBounded =>
           bodyView.members match
-            case List(parameterlessMember, binaryMember) =>
-              for
-                shape <- decodeAbstractRoles(
-                  traitName,
-                  typeParameter.name,
-                  parameterlessMember,
-                  binaryMember,
-                  Set.empty
-                )
-              yield shape
-            case List(parameterlessMember, binaryMember, inheritedMember) =>
-              inheritedMember.kind match
-                case DirectMemberKind.Method =>
-                  for
-                    inheritedMethod <- directMethod(
-                      traitName,
-                      index = 2,
-                      inheritedMember
-                    )
-                    _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-                    inheritedParameters <- inheritedTopology(
-                      traitName,
-                      inheritedMethod
-                    )
-                    _ <- inheritedParameters.foldLeft[
-                      Either[ExpansionDiagnostic, Unit]
-                    ](Right(())): (validated, parameter) =>
-                      validated.flatMap: _ =>
-                        inheritedParameterType(
-                          traitName,
-                          inheritedMethod,
-                          parameter,
-                          typeParameter.name
-                        )
-                    _ <- enclosingResult(
-                      traitName,
-                      "inherited concrete",
-                      inheritedMethod,
-                      typeParameter.name
-                    )
-                    shape <- decodeAbstractRoles(
-                      traitName,
-                      typeParameter.name,
-                      parameterlessMember,
-                      binaryMember,
-                      Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
-                    )
-                  yield shape
-                case DirectMemberKind.Type =>
+            case parameterlessMember :: binaryMember :: tail =>
+              tail match
+                case Nil =>
+                  decodeAbstractRoles(
+                    traitName,
+                    typeParameter.name,
+                    parameterlessMember,
+                    binaryMember,
+                    Set.empty
+                  )
+                case List(inheritedMember)
+                    if inheritedMember.kind == DirectMemberKind.Type =>
                   for
                     typeStructure <- typeStructureView.toRight(
                       ExpansionDiagnostic(
@@ -130,21 +93,31 @@ private[internal] object InstanceSourceShapeDecoder:
                       Set.empty
                     )
                   yield shape
-                case _ =>
-                  directMethod(traitName, index = 2, inheritedMember).flatMap(_ =>
-                    unsupported(
+                case inheritedMembers =>
+                  for
+                    additionallyOccupied <- inheritedMembers.zipWithIndex.foldLeft[
+                      Either[ExpansionDiagnostic, Set[String]]
+                    ](Right(Set.empty)): (validated, indexedMember) =>
+                      val (member, offset) = indexedMember
+                      validated.flatMap: occupied =>
+                        inheritedMethodOccupiedNames(
+                          traitName,
+                          index = offset + 2,
+                          member,
+                          typeParameter.name
+                        ).map(occupied ++ _)
+                    shape <- decodeAbstractRoles(
                       traitName,
-                      "unreachable third-member classification",
-                      inheritedMember.pos
+                      typeParameter.name,
+                      parameterlessMember,
+                      binaryMember,
+                      additionallyOccupied
                     )
-                  )
+                  yield shape
             case members =>
               unsupported(
                 traitName,
-                if members.size < 2 then
-                  s"requires exactly two direct body members; found ${members.size}"
-                else
-                  s"requires exactly two direct body members or exactly three with one supported inherited concrete method; found ${members.size}",
+                s"requires exactly two direct body members; found ${members.size}",
                 bodyView.pos
               )
         case _ =>
@@ -153,6 +126,34 @@ private[internal] object InstanceSourceShapeDecoder:
             "requires exactly one invariant unbounded enclosing type parameter",
             classView.classPos
           )
+
+  private def inheritedMethodOccupiedNames(
+      traitName: String,
+      index: Int,
+      member: DirectMember,
+      enclosingTypeParameterName: String
+  ): Either[ExpansionDiagnostic, Set[String]] =
+    for
+      inheritedMethod <- directMethod(traitName, index, member)
+      _ <- eligibleInheritedMethod(traitName, inheritedMethod)
+      inheritedParameters <- inheritedTopology(traitName, inheritedMethod)
+      _ <- inheritedParameters.foldLeft[Either[ExpansionDiagnostic, Unit]](
+        Right(())
+      ): (validated, parameter) =>
+        validated.flatMap: _ =>
+          inheritedParameterType(
+            traitName,
+            inheritedMethod,
+            parameter,
+            enclosingTypeParameterName
+          )
+      _ <- enclosingResult(
+        traitName,
+        "inherited concrete",
+        inheritedMethod,
+        enclosingTypeParameterName
+      )
+    yield Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
 
   private def thirdPositionConcreteAlias(
       traitName: String,

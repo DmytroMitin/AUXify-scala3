@@ -255,6 +255,66 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryMethodName, "select")
   }
 
+  test("admits two final inherited concrete methods without changing the factory shape") {
+    val decoded = decode(
+      """trait TwoDerivedMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |  def thrice(a: A): A = combine(twice(a), a)
+        |""".stripMargin,
+      "TwoDerivedMonoid"
+    )
+
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): TwoDerivedMonoid[A] = new TwoDerivedMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("admits three mixed-arity inherited concrete methods without changing the factory shape") {
+    val decoded = decode(
+      """trait RichMonoid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def zeroLike: A = empty
+        |  def twice(a: A): A = combine(a, a)
+        |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+        |""".stripMargin,
+      "RichMonoid"
+    )
+
+    assertEquals(
+      InstanceDefinitionBuilder.definition(decoded).syntax,
+      """def instance[A](emptyValue: => A, combineFunction: (A, A) => A): RichMonoid[A] = new RichMonoid[A] {
+        |  override def empty: A = emptyValue
+        |  override def combine(a: A, a1: A): A = combineFunction(a, a1)
+        |}""".stripMargin
+    )
+  }
+
+  test("freshens carriers past every inherited method and parameter in a renamed tail") {
+    val decoded = decode(
+      """trait RichChoice[Element]:
+        |  def fallback: Element
+        |  def select(left: Element, right: Element): Element
+        |  def emptyValue: Element = fallback
+        |  def combineFunction(emptyValue1: Element): Element = select(emptyValue1, emptyValue1)
+        |  def fold3(first: Element, emptyValue2: Element, combineFunction1: Element): Element =
+        |    select(select(first, emptyValue2), combineFunction1)
+        |""".stripMargin,
+      "RichChoice"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue3")
+    assertEquals(decoded.binaryCarrierName, "combineFunction2")
+    assertEquals(decoded.parameterlessMethodName, "fallback")
+    assertEquals(decoded.binaryMethodName, "select")
+  }
+
   test("admits one third-position concrete alias without changing the factory shape") {
     val decoded = decode(
       """trait WrappedMonoid[A]:
@@ -492,15 +552,70 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       "inherited method `twice` must be concrete"
     ),
     (
-      "two concrete methods",
-      """trait TwoConcrete[A]:
+      "valid inherited method followed by empty-clause method",
+      """trait ValidThenEmptyClause[A]:
         |  def empty: A
         |  def combine(a: A, a1: A): A
         |  def twice(a: A): A = combine(a, a)
-        |  def thrice(a: A): A = combine(twice(a), a)
+        |  def zero(): A = empty
         |""".stripMargin,
-      "TwoConcrete",
-      "requires exactly two direct body members or exactly three with one supported inherited concrete method; found 4"
+      "ValidThenEmptyClause",
+      "inherited concrete method `zero` requires one or more ordinary parameters in its single clause; found 0"
+    ),
+    (
+      "empty-clause method followed by valid inherited method",
+      """trait EmptyClauseThenValid[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def zero(): A = empty
+        |  def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "EmptyClauseThenValid",
+      "inherited concrete method `zero` requires one or more ordinary parameters in its single clause; found 0"
+    ),
+    (
+      "valid inherited method followed by concrete val",
+      """trait ValidThenVal[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |  val cached: A = empty
+        |""".stripMargin,
+      "ValidThenVal",
+      "direct body member at index 3 must be a method; found val"
+    ),
+    (
+      "concrete alias followed by inherited method",
+      """trait AliasThenMethod[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "AliasThenMethod",
+      "direct body member at index 2 must be a method; found type"
+    ),
+    (
+      "inherited method followed by concrete alias",
+      """trait MethodThenAlias[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |  type Item = A
+        |""".stripMargin,
+      "MethodThenAlias",
+      "direct body member at index 3 must be a method; found type"
+    ),
+    (
+      "multiple concrete aliases",
+      """trait MultipleAliases[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  type OtherItem = A
+        |""".stripMargin,
+      "MultipleAliases",
+      "direct body member at index 2 must be a method; found type"
     ),
     (
       "polymorphic concrete method",

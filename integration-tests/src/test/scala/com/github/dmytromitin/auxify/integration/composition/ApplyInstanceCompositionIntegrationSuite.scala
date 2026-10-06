@@ -133,6 +133,29 @@ class ApplyInstanceCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(LargerInstanceThenApply.preserved, 197)
   }
 
+  test("apply then instance supports multiple inherited concrete methods") {
+    val constructed = RichApplyThenInstance.instance(0, _ + _)
+    given RichApplyThenInstance[Int] = constructed
+
+    assert(RichApplyThenInstance[Int].eq(constructed))
+    assertEquals(constructed.zeroLike, 0)
+    assertEquals(constructed.fold3(10, 12, 20), 42)
+    assertEquals(RichApplyThenInstance.preserved, 199)
+  }
+
+  test("instance then apply supports renamed multiple inherited concrete methods") {
+    val constructed = RichInstanceThenApply.instance(
+      "fallback",
+      (left, right) => s"$left/$right"
+    )
+    given RichInstanceThenApply[String] = constructed
+
+    assert(RichInstanceThenApply[String].eq(constructed))
+    assertEquals(constructed.duplicate("same"), "same/same")
+    assertEquals(constructed.fold3("a", "b", "c"), "a/b/c")
+    assertEquals(RichInstanceThenApply.preserved, 200)
+  }
+
   test("apply then instance inherits the concrete parameterless method with by-name dispatch") {
     var evaluations = 0
     val constructed = ZeroApplyThenInstance.instance[Int](

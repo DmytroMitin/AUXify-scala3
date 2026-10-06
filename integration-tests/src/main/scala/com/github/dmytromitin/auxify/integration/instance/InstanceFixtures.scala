@@ -58,6 +58,17 @@ object LargerDerivedChoice:
   val preserved = 95
 
 @instance
+trait RichDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  def zeroLike: A = empty
+  def twice(a: A): A = combine(a, a)
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+object RichDerivedMonoid:
+  val preserved = 97
+
+@instance
 trait BinaryDerivedChoice[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
