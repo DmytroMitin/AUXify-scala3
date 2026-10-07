@@ -14,8 +14,7 @@ class DelegatedDefinitionBuilderSuite extends munit.FunSuite:
         "Show",
         "A",
         "show",
-        "a",
-        "String"
+        DelegatedSourceShapeDecoder.Variant.Unary("a", "String")
       )
 
       assertEquals(
@@ -55,8 +54,7 @@ class DelegatedDefinitionBuilderSuite extends munit.FunSuite:
         "Render",
         "Element",
         "render",
-        "value",
-        "Text"
+        DelegatedSourceShapeDecoder.Variant.Unary("value", "Text")
       )
       val lowered = DelegatedDefinitionBuilder
         .lower(shape)
@@ -84,8 +82,7 @@ class DelegatedDefinitionBuilderSuite extends munit.FunSuite:
         "Display",
         "Value",
         "display",
-        "inst",
-        "Text"
+        DelegatedSourceShapeDecoder.Variant.Unary("inst", "Text")
       )
       val lowered = DelegatedDefinitionBuilder
         .lower(shape)
@@ -106,6 +103,80 @@ class DelegatedDefinitionBuilderSuite extends munit.FunSuite:
       )
     }
   }
+
+  test("authors and lowers the parameterless forwarding variant as a stable select") {
+    withContext {
+      val shape = DelegatedSourceShapeDecoder.SourceShape(
+        "Empty",
+        "A",
+        "empty",
+        DelegatedSourceShapeDecoder.Variant.Parameterless
+      )
+
+      assertEquals(
+        DelegatedDefinitionBuilder.definition(shape).syntax,
+        "def empty[A](using inst: Empty[A]): A = inst.empty"
+      )
+
+      val lowered = DelegatedDefinitionBuilder
+        .lower(shape)
+        .fold(problem => fail(s"${problem.code}: ${problem.detail}"), identity)
+      assertEquals(
+        lowered.generatedSource,
+        "def empty[A](using inst: Empty[A]): A = inst.empty"
+      )
+      assertParameterlessShape(lowered.tree, "empty", "A", "inst", "Empty")
+      assertEquals(allTrees(lowered.tree).size, 10)
+    }
+  }
+
+  test("parameterless evidence freshness reserves the generated method name") {
+    withContext {
+      val shape = DelegatedSourceShapeDecoder.SourceShape(
+        "EmptyLike",
+        "Value",
+        "inst",
+        DelegatedSourceShapeDecoder.Variant.Parameterless
+      )
+      val lowered = DelegatedDefinitionBuilder
+        .lower(shape)
+        .fold(problem => fail(s"${problem.code}: ${problem.detail}"), identity)
+
+      assertEquals(
+        lowered.generatedSource,
+        "def inst[Value](using inst1: EmptyLike[Value]): Value = inst1.inst"
+      )
+      assertParameterlessShape(lowered.tree, "inst", "Value", "inst1", "EmptyLike")
+    }
+  }
+
+  private def assertParameterlessShape(
+      method: untpd.DefDef,
+      methodName: String,
+      typeParameterName: String,
+      contextualName: String,
+      constructorName: String
+  )(using Context): Unit =
+    assertEquals(method.name.toString, methodName)
+    assertEquals(method.leadingTypeParams.map(_.name.toString), List(typeParameterName))
+    method.trailingParamss match
+      case List(List(contextual: untpd.ValDef)) =>
+        assertEquals(contextual.name.toString, contextualName)
+        assertEquals(contextual.mods.flags, Flags.Param | Flags.Given)
+        contextual.tpt match
+          case untpd.AppliedTypeTree(untpd.Ident(constructor), List(untpd.Ident(argument))) =>
+            assertEquals(constructor.toString, constructorName)
+            assertEquals(argument.toString, typeParameterName)
+          case other => fail(s"expected unary contextual type, found $other")
+      case other => fail(s"expected only one contextual clause, found $other")
+    method.tpt match
+      case untpd.Ident(name) => assertEquals(name.toString, typeParameterName)
+      case other => fail(s"expected enclosing parameter result, found $other")
+    method.rhs match
+      case untpd.Select(untpd.Ident(receiver), selected) =>
+        assertEquals(receiver.toString, contextualName)
+        assertEquals(selected.toString, methodName)
+      case other => fail(s"expected stable selected forwarding body, found $other")
 
   private def assertExactShape(
       method: untpd.DefDef,

@@ -53,6 +53,14 @@ object Render:
   given Render[Int] with
     def render(a: Int): String = a.toString
 
+@delegated
+trait EmptyDelegated[A]:
+  def empty: A
+
+object EmptyDelegated:
+  given EmptyDelegated[Int] with
+    def empty: Int = 42
+
 @instance
 trait Monoid[A]:
   def empty: A
@@ -509,4 +517,5 @@ object ExternalApp:
     assert(DelegatedThenApply[String].show("external") == "delegated-first:external")
     assert(DelegatedThenApply.show("external") == "delegated-first:external")
     assert(DelegatedThenApply.preserved == 84)
+    assert(EmptyDelegated.empty[Int] == 42)
     println("AUXIFY_SCALA3_EXTERNAL_RUNTIME_PASS")

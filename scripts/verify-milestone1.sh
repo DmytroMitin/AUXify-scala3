@@ -6,8 +6,9 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
-quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
-stale_quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
+quasiquotes_commit="d601d0341be1028fc01a6c2d6aa26d29b8a8b8d1"
+stale_c060_quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
+stale_c054_quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
 dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
 ivy_home="$dependency_state_root/ivy"
 coursier_cache="$dependency_state_root/coursier-cache"
@@ -60,12 +61,15 @@ printf '%s\n' "$dependency_classpath"
 
 grep -Fq -- \
   "$dependency_state_root/ivy/local/com.github.dmytromitin/quasiquotes-scala3-dotty-internal_$scala_version" <<<"$dependency_classpath" ||
-  fail "macroHandlers did not resolve the exact task-owned C060 Quasiquotes artifact"
+  fail "macroHandlers did not resolve the exact task-owned C061 Quasiquotes artifact"
 grep -Fq -- \
   "$dependency_state_root/ivy/local/com.github.dmytromitin/macroparadise-scala3-plugin-api_$scala_version" <<<"$dependency_classpath" ||
   fail "macroHandlers did not resolve the exact task-owned Macro-Paradise artifact"
 
-if grep -Fq -- "$stale_quasiquotes_commit" <<<"$dependency_classpath"; then
+if grep -Fq -- "$stale_c060_quasiquotes_commit" <<<"$dependency_classpath"; then
+  fail "macroHandlers reused the stale C060 Quasiquotes dependency snapshot"
+fi
+if grep -Fq -- "$stale_c054_quasiquotes_commit" <<<"$dependency_classpath"; then
   fail "macroHandlers reused the stale C054 Quasiquotes dependency snapshot"
 fi
 
@@ -229,7 +233,17 @@ for expected_diagnostic in \
   'unsupported @delegated source shape for `ConcreteDelegated`: direct method `show` must be abstract' \
   'unsupported @delegated source shape for `AppliedResultDelegated`: direct method `show` result type must be one unqualified named type' \
   'unsupported @delegated source shape for `PolymorphicDelegated`: direct method `show` must not declare method type parameters' \
-  'unsupported @delegated source shape for `WrongTopologyDelegated`: direct method `show` requires exactly one ordinary parameter; found 2'; do
+  'unsupported @delegated source shape for `WrongTopologyDelegated`: direct method `show` requires exactly one ordinary parameter; found 2' \
+  'unsupported @delegated source shape for `ExplicitEmptyDelegated`: direct method `empty` requires exactly one ordinary parameter; found 0' \
+  'unsupported @delegated source shape for `WrongParameterlessResultDelegated`: parameterless method `empty` result type must use enclosing type parameter `A`' \
+  'unsupported @delegated source shape for `ContextualParameterlessDelegated`: direct method `empty` parameter clause must be ordinary and non-contextual' \
+  'unsupported @delegated source shape for `ExtraParameterlessDelegated`: requires exactly one direct body member; found 2' \
+  'unsupported @delegated source shape for `OneParameterNearMissDelegated`: direct method `empty` result type must be one unqualified named type' \
+  'unsupported @delegated source shape for `AppliedParameterlessResultDelegated`: parameterless method `empty` result type must use enclosing type parameter `A`' \
+  'unsupported @delegated source shape for `ValParameterlessDelegated`: the direct body member must be one method' \
+  'unsupported @delegated source shape for `VarParameterlessDelegated`: the direct body member must be one method' \
+  'unsupported @delegated source shape for `TypeParameterlessDelegated`: the direct body member must be one method' \
+  'unsupported @delegated source shape for `NestedParameterlessDelegated`: the direct body member must be one method'; do
   grep -Fq -- "$expected_diagnostic" "$delegated_negative_log" ||
     fail "delegated negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -699,6 +713,7 @@ external_root=""
 
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_PARAMETERLESS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'

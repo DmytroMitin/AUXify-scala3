@@ -44,6 +44,91 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
+
+  test("derives a parameterless stable-select method and creates the missing companion") {
+    withExpansionInput(
+      """@current
+        |trait Empty[A]:
+        |  def empty: A
+        |""".stripMargin,
+      "Empty"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      assertEquals(companion, None)
+      val method = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedMethod(output, "empty")
+        case other => fail("expected structured parameterless expansion")
+
+      assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
+      assertEquals(method.trailingParamss.map(_.map(_.name.toString)), List(List("inst")))
+      method.rhs match
+        case Select(Ident(receiver), selected) =>
+          assertEquals(receiver.toString, "inst")
+          assertEquals(selected.toString, "empty")
+        case other => fail("expected parameterless stable select")
+    }
+  }
+
+  test("parameterless generation preserves unrelated companion members") {
+    withExpansionInput(
+      """@current
+        |trait Default[Value]:
+        |  def fallback: Value
+        |
+        |object Default:
+        |  val before = 41
+        |  object Nested
+        |  val after = 43
+        |""".stripMargin,
+      "Default"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val originalNames = companion.toList.flatMap(_.impl.body.collect {
+        case member: MemberDef => member.name.toString
+      })
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val merged = output.companion.getOrElse(fail("missing merged companion"))
+          val names = merged.impl.body.collect {
+            case member: MemberDef => member.name.toString
+          }
+          assertEquals(names, originalNames :+ "fallback")
+        case other => fail("expected structured parameterless expansion")
+    }
+  }
+
+  test("parameterless PreserveExisting retains a direct same-name companion method") {
+    withExpansionInput(
+      """@current
+        |trait ExistingEmpty[A]:
+        |  def empty: A
+        |
+        |object ExistingEmpty:
+        |  def empty[A](using ExistingEmpty[A]): A = summon[ExistingEmpty[A]].empty
+        |  val retained = 7
+        |""".stripMargin,
+      "ExistingEmpty"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val original = companion.getOrElse(fail("missing fixture companion"))
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val preserved = output.companion.getOrElse(fail("missing preserved companion"))
+          assert(preserved.eq(original), clue(preserved))
+          assertEquals(
+            preserved.impl.body.collect {
+              case method: DefDef if method.name.toString == "empty" => method
+            }.size,
+            1
+          )
+        case other => fail("expected structured parameterless expansion")
+    }
+  }
+
   test("rejects normalized infix evidence on the delegated method role") {
     withExpansionInput(
       """@current
@@ -174,6 +259,41 @@ class DelegatedHandlerSuite extends munit.FunSuite:
             companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody)
           )
         case other => fail(s"expected controlled rejection, found $other")
+    }
+  }
+
+
+  test("parameterless bridge failure rolls back without a partial companion edit") {
+    withExpansionInput(
+      """@current
+        |trait Empty[A]:
+        |  def empty: A
+        |
+        |object Empty:
+        |  val retained = 13
+        |""".stripMargin,
+      "Empty"
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      val originalCompanionBody = companion.getOrElse(fail("missing companion")).impl.body
+
+      DelegatedHandler.expandWithLowering(input): (_, _) =>
+        Left(
+          DelegatedForwardingMethodPeerBridge.Failure(
+            "EXACT_FORWARDING_LOWERING_FAILED",
+            "controlled parameterless bridge failure"
+          )
+        )
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List("EXACT_FORWARDING_LOWERING_FAILED: controlled parameterless bridge failure")
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assert(companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody))
+        case other => fail("expected controlled parameterless bridge rejection")
     }
   }
 

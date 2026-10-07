@@ -8,6 +8,7 @@ import paradise3.api.{
   ExpansionDiagnostic
 }
 import paradise3.api.ExpansionTargetBodyView.{
+  DirectMemberKind,
   DirectMethod,
   DirectMethodStatus,
   DirectTypeShape,
@@ -15,12 +16,15 @@ import paradise3.api.ExpansionTargetBodyView.{
 }
 
 private[internal] object DelegatedSourceShapeDecoder:
+  enum Variant:
+    case Unary(parameterName: String, resultTypeName: String)
+    case Parameterless
+
   final case class SourceShape(
       traitName: String,
       typeParameterName: String,
       methodName: String,
-      parameterName: String,
-      resultTypeName: String
+      variant: Variant
   )
 
   def decode(
@@ -36,15 +40,28 @@ private[internal] object DelegatedSourceShapeDecoder:
             !typeParameter.isOrdinaryUpperBounded =>
         bodyView.members match
           case List(member) =>
-            member.method match
-              case Some(method) =>
-                decodeMethod(traitName, typeParameter.name, method)
-              case None =>
-                unsupported(
-                  traitName,
-                  "the direct body member must be one method",
-                  member.pos
-                )
+            if member.kind != DirectMemberKind.Method then
+              unsupported(
+                traitName,
+                "the direct body member must be one method",
+                member.pos
+              )
+            else
+              member.method match
+                case Some(method) if normalizedNameAvailable(method.name) =>
+                  decodeMethod(traitName, typeParameter.name, method)
+                case Some(method) =>
+                  unsupported(
+                    traitName,
+                    "the direct method must have an available normalized name",
+                    method.pos
+                  )
+                case None =>
+                  unsupported(
+                    traitName,
+                    "the direct body member must provide normalized method evidence",
+                    member.pos
+                  )
           case members =>
             unsupported(
               traitName,
@@ -88,6 +105,24 @@ private[internal] object DelegatedSourceShapeDecoder:
       )
     else
       method.parameterClauses match
+        case Nil =>
+          method.resultType match
+            case DirectTypeShape.EnclosingTypeParameter(name, _)
+                if name == typeParameterName =>
+              Right(
+                SourceShape(
+                  traitName,
+                  typeParameterName,
+                  method.name,
+                  Variant.Parameterless
+                )
+              )
+            case _ =>
+              unsupported(
+                traitName,
+                s"parameterless method `${method.name}` result type must use enclosing type parameter `$typeParameterName`",
+                method.resultTypePos
+              )
         case List(clause) =>
           if clause.isContextual || clause.isImplicit || clause.isGiven then
             unsupported(
@@ -119,8 +154,10 @@ private[internal] object DelegatedSourceShapeDecoder:
                               traitName,
                               typeParameterName,
                               method.name,
-                              parameter.name,
-                              resultTypeName
+                              Variant.Unary(
+                                parameter.name,
+                                resultTypeName
+                              )
                             )
                           )
                         case _ =>
@@ -147,6 +184,9 @@ private[internal] object DelegatedSourceShapeDecoder:
             s"direct method `${method.name}` requires exactly one ordinary parameter clause; found ${clauses.size}",
             method.pos
           )
+
+  private def normalizedNameAvailable(name: String): Boolean =
+    name != null && name.nonEmpty && name != "<error>" && name != "<unknown>"
 
   private def unsupported[A](
       traitName: String,

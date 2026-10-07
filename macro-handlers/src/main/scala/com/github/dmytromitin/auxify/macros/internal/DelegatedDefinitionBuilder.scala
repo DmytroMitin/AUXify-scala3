@@ -14,17 +14,25 @@ private[internal] object DelegatedDefinitionBuilder:
     val traitName = Type.Name(shape.traitName)
     val typeParameterName = Type.Name(shape.typeParameterName)
     val methodName = Term.Name(shape.methodName)
-    val parameterName = Term.Name(shape.parameterName)
-    val resultTypeName = Type.Name(shape.resultTypeName)
-    val evidenceName = Term.Name(freshEvidenceName(Set(shape.parameterName)))
     val typeParameter: Type.Param = tparam"$typeParameterName"
     val typeParameters: List[Type.Param] = typeParameter :: Nil
     val typeArguments: List[Type] = typeParameterName :: Nil
     val target: Type = t"$traitName[..$typeArguments]"
-    val ordinaryParameter: Term.Param = param"$parameterName: $typeParameterName"
-    val invocation: Term = q"$evidenceName.$methodName($parameterName)"
 
-    q"def $methodName[..$typeParameters]($ordinaryParameter)(using $evidenceName: $target): $resultTypeName = $invocation"
+    shape.variant match
+      case DelegatedSourceShapeDecoder.Variant.Unary(parameter, result) =>
+        val parameterName = Term.Name(parameter)
+        val resultTypeName = Type.Name(result)
+        val evidenceName = Term.Name(freshEvidenceName(Set(parameter)))
+        val ordinaryParameter: Term.Param = param"$parameterName: $typeParameterName"
+        val invocation: Term = q"$evidenceName.$methodName($parameterName)"
+
+        q"def $methodName[..$typeParameters]($ordinaryParameter)(using $evidenceName: $target): $resultTypeName = $invocation"
+      case DelegatedSourceShapeDecoder.Variant.Parameterless =>
+        val evidenceName = Term.Name(freshEvidenceName(Set(shape.methodName)))
+        val selection: Term = q"$evidenceName.$methodName"
+
+        q"def $methodName[..$typeParameters](using $evidenceName: $target): $typeParameterName = $selection"
 
   def lower(
       shape: DelegatedSourceShapeDecoder.SourceShape

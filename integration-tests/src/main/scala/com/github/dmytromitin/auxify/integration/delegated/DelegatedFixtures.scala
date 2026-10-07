@@ -33,3 +33,45 @@ object Existing:
     s"preserved:$a"
   given Existing[Int] with
     def describe(a: Int): String = s"generated:$a"
+
+
+
+@delegated
+trait Empty[A]:
+  def empty: A
+
+given Empty[Int] with
+  def empty: Int = 42
+
+
+@delegated
+trait Default[Value]:
+  def fallback: Value
+
+object Default:
+  val preservedBefore = 41
+  given Default[String] with
+    def fallback: String = "renamed"
+  val preservedAfter = 43
+
+
+@delegated
+trait EmptyLike[Value]:
+  def inst: Value
+
+object EmptyLike:
+  given EmptyLike[Int] with
+    def inst: Int = 42
+
+
+@delegated
+trait ExistingEmpty[A]:
+  def empty: A
+
+object ExistingEmpty:
+  var calls = 0
+  def empty[A](using ExistingEmpty[A]): A =
+    calls += 1
+    summon[ExistingEmpty[A]].empty
+  given ExistingEmpty[Int] with
+    def empty: Int = 42

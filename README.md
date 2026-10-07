@@ -50,7 +50,7 @@ current project READMEs for the latest development APIs.
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@instance` | Two disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, or (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@delegated` for the first `Show[A]`-style one-method forwarding shape | Supported first development slice | One public abstract direct method with one ordinary parameter of the enclosing type and one simple named result; richer forwarding remains later parity work |
+| `@delegated` | Two disjoint bounded development families | Exactly one public abstract direct method under one invariant unbounded type parameter: either the unary `show(a: A): String` family or the parameterless `empty: A` family; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including heterogeneous tails of supported inherited concrete methods and direct concrete aliases to the enclosing type parameter |
@@ -76,8 +76,8 @@ The documented AUXify 0.1.0 compatibility slices are publicly released. Current
 `main` is the 0.2.0-SNAPSHOT development line and additionally contains the
 post-0.1.0 inherited concrete type-alias and parameterless-or-arity-neutral
 ordinary-method `@instance` widenings, the disjoint one-abstract-type-member
-`@instance` factory, normalized modifier-admission hardening,
-and the bounded native extension-method `@syntax` slice. Ordinary development uses coherently
+`@instance` factory, normalized modifier-admission hardening, the parameterless
+`@delegated` family, and the bounded native extension-method `@syntax` slice. Ordinary development uses coherently
 source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
 0.4.0-SNAPSHOT graphs at their pinned accepted commits.
 
@@ -103,7 +103,8 @@ handlers are `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:
 That release does not include the concrete type-alias or concrete
 parameterless-method `@instance` inheritances documented below, nor the later
 one-abstract-type-member `@instance` family, normalized modifier-admission
-hardening, or `@syntax` slice. Those changes remain on the distinct post-release
+hardening, the parameterless `@delegated` family, or `@syntax` slice. Those
+changes remain on the distinct post-release
 `main` line and do not widen, rebase, or
 rewrite the 0.1.0 release or the public Giter8 starter.
 
@@ -315,7 +316,7 @@ transaction leaves no partial class or TASTy output. This is qualification of
 this pair and closed source envelope only. It does not imply composition with
 `@aux`, `@self`, `@delegated`, `@syntax`, or arbitrary annotation stacks.
 
-The first supported `@delegated` slice is:
+The two supported `@delegated` families are disjoint and deliberately bounded. The existing unary family is:
 
 ```scala
 import com.github.dmytromitin.auxify.macros.delegated
@@ -325,27 +326,29 @@ trait Show[A]:
   def show(a: A): String
 ```
 
-It conceptually adds this direct companion forwarder:
+It generates the semantic shape:
 
 ```scala
 def show[A](a: A)(using inst: Show[A]): String = inst.show(a)
 ```
 
-The evidence name is generated deterministically and avoids the ordinary
-parameter name; its exact spelling is not a compatibility contract. This slice
-requires exactly one invariant unbounded enclosing type parameter and exactly
-one public, abstract, unannotated direct method. That method must have no
-method-owned type parameters, exactly one ordinary clause containing exactly
-one non-defaulted unmodified parameter whose type is the enclosing type
-parameter, and one simple unqualified named result type. The generated method
-adds a final `using` instance and delegates directly to the same method name.
-A direct same-name companion member is preserved under the current bounded
-syntactic conflict policy, so no generated overload is added in that case.
+The parameterless family is:
 
-Additional methods or clauses, method-owned type parameters, contextual or
-default parameters, overloads, applied/qualified/function/path-dependent
-results, abstract-member result rewriting, and wider historical forwarding
-semantics remain later parity work.
+```scala
+@delegated
+trait Empty[A]:
+  def empty: A
+```
+
+and generates a contextual-only stable selection:
+
+```scala
+def empty[A](using inst: Empty[A]): A = inst.empty
+```
+
+Here parameterless means that the source method has no parameter clauses; `def empty(): A` is not equivalent and remains rejected. The result must be the direct enclosing type parameter. Both families require exactly one invariant, ordinary, unbounded enclosing type parameter and exactly one public, abstract, unannotated, non-polymorphic direct method. A direct same-name companion member is preserved, and the generated readable evidence name is freshened against generated-method term roles.
+
+Multiple methods, explicit empty clauses, contextual source methods, vals, vars, type members, applied or path-dependent parameterless results, and broader historical forwarding remain unsupported. These two families do not claim arbitrary delegated parity.
 
 The supported `@apply` and `@delegated` slices may be stacked in either source
 order when the same trait independently satisfies both existing closed target
@@ -812,6 +815,4 @@ two-common-simple-upper-bound / one-abstract-result-member full shape described
 above. This milestone does not claim arbitrary type-class derivation or full
 historical `@apply` parity.
 
-The verified `@delegated` target is likewise only the one-unbounded-parameter,
-one-public-abstract-method shape documented above; the external example does
-not imply full historical `@delegated` parity.
+The verified `@delegated` target is likewise limited to the two disjoint one-unbounded-parameter, one-public-abstract-method families documented above. The external examples prove both unary application and parameterless stable selection without implying full historical `@delegated` parity.
