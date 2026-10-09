@@ -27,6 +27,17 @@ object Container:
   val preserved = 142
 
 @instance
+trait Curried[A]:
+  def combine(a: A)(b: A): A
+
+object Curried:
+  val preserved = 242
+
+@instance
+trait CurriedCollision[Element]:
+  def combineFunction(left: Element)(right: Element): Element
+
+@instance
 trait ExistingOut[A]:
   type Out
 

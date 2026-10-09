@@ -49,7 +49,7 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Two disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, or (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result, or (3) exactly one public abstract curried method `def combine(a: A)(b: A): A`, generating a strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | Exactly one public abstract direct method under one invariant unbounded type parameter: either the unary `show(a: A): String` family or the parameterless `empty: A` family; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
@@ -76,7 +76,8 @@ The documented AUXify 0.1.0 compatibility slices are publicly released. Current
 `main` is the 0.2.0-SNAPSHOT development line and additionally contains the
 post-0.1.0 inherited concrete type-alias and parameterless-or-arity-neutral
 ordinary-method `@instance` widenings, the disjoint one-abstract-type-member
-`@instance` factory, normalized modifier-admission hardening, the parameterless
+`@instance` factory, the disjoint one-curried-abstract-method `@instance`
+factory, normalized modifier-admission hardening, the parameterless
 `@delegated` family, and the bounded native extension-method `@syntax` slice. Ordinary development uses coherently
 source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
 0.4.0-SNAPSHOT graphs at their pinned accepted commits.
@@ -103,7 +104,8 @@ handlers are `com.github.dmytromitin:auxify-scala3-macro-handlers_<exact-scala>:
 That release does not include the concrete type-alias or concrete
 parameterless-method `@instance` inheritances documented below, nor the later
 one-abstract-type-member `@instance` family, normalized modifier-admission
-hardening, the parameterless `@delegated` family, or `@syntax` slice. Those
+hardening, the one-curried-abstract-method `@instance` family, the
+parameterless `@delegated` family, or `@syntax` slice. Those
 changes remain on the distinct post-release
 `main` line and do not widen, rebase, or
 rewrite the 0.1.0 release or the public Giter8 starter.
@@ -245,6 +247,37 @@ anonymous concrete alias retain the source member name. Existing direct
 `instance` members and unrelated companion content follow the same preservation
 policy as the method family.
 
+Post-0.1.0 `0.2.0-SNAPSHOT` development also supports a third, disjoint
+curried-method factory family:
+
+```scala
+@instance
+trait Curried[A]:
+  def combine(a: A)(b: A): A
+```
+
+It conceptually adds:
+
+```scala
+def instance[A](combineFunction: A => A => A): Curried[A] =
+  new Curried[A]:
+    override def combine(a: A)(b: A): A =
+      combineFunction(a)(b)
+```
+
+The trait has exactly one invariant, ordinary, unbounded enclosing type
+parameter and exactly one direct public, unannotated, monomorphic abstract
+method. The source and generated override retain two separate ordinary
+one-parameter clauses. The strict carrier is the nested function type
+`A => A => A`, and the generated body applies it successively. Carrier names
+are freshened deterministically against generated-method term roles, including
+the source method and both source parameter names.
+
+A flattened single-clause source such as
+`def combine(a: A, b: A): A` is not this family and is rejected rather than
+rewritten to a flattened `(A, A) => A` carrier. Contextual clauses, defaults,
+extra clauses or members, and richer Scala 2 parity remain unsupported.
+
 Post-0.1.0 `0.2.0-SNAPSHOT` development supports a heterogeneous inherited tail after the two abstract roles. Every tail member is validated independently and must be either:
 
 - a public, unannotated, non-polymorphic concrete method, free of unsupported modifiers, returning `A`, with either no parameter clauses or one ordinary non-contextual clause of one or more non-defaulted, unmodified direct-`A` parameters; or
@@ -267,15 +300,16 @@ The factory remains the same two-carrier, two-override factory shown above. All 
 
 The method family still requires the two ordered abstract roles described above.
 Concrete vals, vars, and lazy vals; unsupported aliases or methods; nested
-definitions; empty `()` method clauses; curried or contextual clauses; defaults;
-method type parameters; unsupported modifiers; and wrong parameter or result
-types remain rejected. The abstract-type family does not accept bounded or
-multiple type members, abstract vals, methods, aliases, nested definitions, or
-mixed-member bodies. The two families are not freely mixable.
+definitions; empty `()` method clauses; curried or contextual clauses within
+that historical family; defaults; method type parameters; unsupported modifiers;
+and wrong parameter or result types remain rejected. The abstract-type family
+does not accept bounded or multiple type members, abstract vals, methods,
+aliases, nested definitions, or mixed-member bodies. The curried family accepts
+only its single exact method shape. The three families are not freely mixable.
 
-Both the heterogeneous inherited method/alias tail and the abstract-type factory
-are post-0.1.0 `0.2.0-SNAPSHOT` development behavior. They do not change AUXify
-v0.1.0 and are not included in the public Giter8 starter.
+The heterogeneous inherited method/alias tail, abstract-type factory, and
+curried-method factory are post-0.1.0 `0.2.0-SNAPSHOT` development behavior.
+They do not change AUXify v0.1.0 and are not included in the public Giter8 starter.
 
 Released Macro-Paradise 0.1.1 does not expose method-level `infix` (or the
 Scala-3.3.8 parser's experimental method-level `erased`) through its normalized

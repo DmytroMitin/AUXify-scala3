@@ -70,6 +70,224 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("dispatches an exact one-method curried source only to the curried family") {
+    withExpansionInput(
+      """@current
+        |trait Curried[A]:
+        |  def combine(a: A)(b: A): A
+        |""".stripMargin,
+      "Curried"
+    ) { (input, _, _, context) =>
+      given Context = context
+      var captured: Option[InstanceCurriedMethodSourceShapeDecoder.SourceShape] = None
+      val outcome = InstanceHandler.expandWithLowering(input): (shape, loweringContext) =>
+        shape match
+          case InstanceHandler.SourceShape.CurriedMethod(value) =>
+            captured = Some(value)
+            InstanceDefinitionBuilder.lower(
+              InstanceSourceShapeDecoder.SourceShape(
+                "Monoid",
+                "A",
+                "empty",
+                "combine",
+                "a",
+                "b",
+                "emptyValue",
+                "combineFunction"
+              )
+            )(using loweringContext)
+          case other => fail(s"expected curried family dispatch, found $other")
+
+      outcome match
+        case ExpansionOutcome.Structured(_) =>
+          assertEquals(
+            captured,
+            Some(
+              InstanceCurriedMethodSourceShapeDecoder.SourceShape(
+                "Curried",
+                "A",
+                "combine",
+                "a",
+                "b",
+                "combineFunction"
+              )
+            )
+          )
+        case other => fail(s"expected structured curried dispatch, found $other")
+    }
+  }
+
+  test("derives and places the canonical curried-method instance factory") {
+    withExpansionInput(
+      """@current
+        |trait Curried[A]:
+        |  def combine(a: A)(b: A): A
+        |""".stripMargin,
+      "Curried"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      assertEquals(companion, None)
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedInstance(StructuredOutcomeTestSupport.materialize(input, changes))
+        case other => fail(s"expected structured curried expansion, found $other")
+
+      assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
+      method.trailingParamss match
+        case List(List(carrier: ValDef)) =>
+          assertEquals(carrier.name.toString, "combineFunction")
+          carrier.tpt match
+            case Function(
+                  List(Ident(first)),
+                  Function(List(Ident(second)), Ident(result))
+                ) =>
+              assertEquals(
+                List(first.toString, second.toString, result.toString),
+                List("A", "A", "A")
+              )
+            case other => fail(s"expected nested unary carrier, found $other")
+        case other => fail(s"expected one strict carrier, found $other")
+      method.rhs match
+        case New(template: Template) =>
+          template.body match
+            case List(overrideMethod: DefDef) =>
+              assertEquals(
+                overrideMethod.trailingParamss.map(_.map(_.name.toString)),
+                List(List("a"), List("b"))
+              )
+              overrideMethod.rhs match
+                case Apply(
+                      Apply(Ident(callee), List(Ident(first))),
+                      List(Ident(second))
+                    ) =>
+                  assertEquals(callee.toString, "combineFunction")
+                  assertEquals(first.toString, "a")
+                  assertEquals(second.toString, "b")
+                case other => fail(s"expected successive applications, found $other")
+            case other => fail(s"expected one anonymous override, found $other")
+        case other => fail(s"expected anonymous implementation, found $other")
+    }
+  }
+
+  test("curried-method generation preserves renamed and collision-freshened roles") {
+    withExpansionInput(
+      """@current
+        |trait Chain[Element]:
+        |  def combineFunction(left: Element)(right: Element): Element
+        |""".stripMargin,
+      "Chain"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedInstance(StructuredOutcomeTestSupport.materialize(input, changes))
+        case other => fail(s"expected renamed curried expansion, found $other")
+
+      assertEquals(method.leadingTypeParams.map(_.name.toString), List("Element"))
+      assertEquals(
+        method.trailingParamss.flatten.map(_.name.toString),
+        List("combineFunction1")
+      )
+      assert(method.rhs.toString.contains("combineFunction1"), clue(method.rhs))
+      assert(method.rhs.toString.contains("left"), clue(method.rhs))
+      assert(method.rhs.toString.contains("right"), clue(method.rhs))
+    }
+  }
+
+  test("curried-method generation preserves unrelated companion members") {
+    withExpansionInput(
+      """@current
+        |trait Curried[A]:
+        |  def combine(a: A)(b: A): A
+        |
+        |object Curried:
+        |  val before = 41
+        |  object Nested
+        |  val after = 43
+        |""".stripMargin,
+      "Curried"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val originalNames = companion.toList.flatMap(_.impl.body.collect {
+        case member: MemberDef => member.name.toString
+      })
+      new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val names = output.companion.toList.flatMap(_.impl.body.collect {
+            case member: MemberDef => member.name.toString
+          })
+          assertEquals(names, originalNames :+ "instance")
+        case other => fail(s"expected preserved curried companion, found $other")
+    }
+  }
+
+  test("curried-method PreserveExisting retains a direct instance member") {
+    withExpansionInput(
+      """@current
+        |trait Curried[A]:
+        |  def combine(a: A)(b: A): A
+        |
+        |object Curried:
+        |  def instance[A](f: A => A => A): Curried[A] = ???
+        |  val retained = 7
+        |""".stripMargin,
+      "Curried"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      val original = companion.getOrElse(fail("missing fixture companion"))
+      val originalBody = original.impl.body
+      new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          val preserved = output.companion.getOrElse(fail("missing preserved companion"))
+          assert(preserved.eq(original), clue(preserved))
+          assert(preserved.impl.body.eq(originalBody), clue(preserved.impl.body))
+          assertEquals(
+            preserved.impl.body.collect {
+              case method: DefDef if method.name.toString == "instance" => method
+            }.size,
+            1
+          )
+        case other => fail(s"expected preserved direct instance, found $other")
+    }
+  }
+
+  test("curried bridge failure rolls back without partial companion mutation") {
+    withExpansionInput(
+      """@current
+        |trait Curried[A]:
+        |  def combine(a: A)(b: A): A
+        |
+        |object Curried:
+        |  val retained = 11
+        |""".stripMargin,
+      "Curried"
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      val existing = companion.getOrElse(fail("missing fixture companion"))
+      val originalCompanionBody = existing.impl.body
+
+      InstanceHandler.expandWithLowering(input): (_, _) =>
+        Left(
+          InstanceFactoryPeerBridge.Failure(
+            "EXACT_RAW_LOWERING_FAILED",
+            "controlled curried bridge failure"
+          )
+        )
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List("EXACT_RAW_LOWERING_FAILED: controlled curried bridge failure")
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assert(existing.impl.body.eq(originalCompanionBody), clue(existing.impl.body))
+        case other => fail(s"expected controlled curried rollback, found $other")
+    }
+  }
+
   test("derives renamed abstract-type roles and collision-free type parameters") {
     withExpansionInput(
       """@current

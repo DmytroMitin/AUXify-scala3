@@ -51,6 +51,21 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(Container.preserved, 142)
   }
 
+  test("constructs and runs the canonical curried factory") {
+    val value: Curried[Int] =
+      Curried.instance[Int](a => b => a + b)
+
+    assertEquals(value.combine(20)(22), 42)
+    assertEquals(Curried.preserved, 242)
+  }
+
+  test("constructs renamed curried roles with a collision-fresh carrier") {
+    val value: CurriedCollision[String] =
+      CurriedCollision.instance[String](left => right => s"$left/$right")
+
+    assertEquals(value.combineFunction("left")("right"), "left/right")
+  }
+
   test("preserves a direct existing abstract-type instance factory") {
     val value: ExistingOut[Int] { type Out = String } =
       ExistingOut.instance[Int, String]

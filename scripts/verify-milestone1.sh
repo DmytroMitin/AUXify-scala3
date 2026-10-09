@@ -6,7 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
 macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
-quasiquotes_commit="d601d0341be1028fc01a6c2d6aa26d29b8a8b8d1"
+quasiquotes_commit="e5ee36156fa0ed75e5aa04de42c9eacb6db656fb"
+stale_c061_quasiquotes_commit="d601d0341be1028fc01a6c2d6aa26d29b8a8b8d1"
 stale_c060_quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
 stale_c054_quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
 dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
@@ -61,11 +62,14 @@ printf '%s\n' "$dependency_classpath"
 
 grep -Fq -- \
   "$dependency_state_root/ivy/local/com.github.dmytromitin/quasiquotes-scala3-dotty-internal_$scala_version" <<<"$dependency_classpath" ||
-  fail "macroHandlers did not resolve the exact task-owned C061 Quasiquotes artifact"
+  fail "macroHandlers did not resolve the exact task-owned C063 Quasiquotes artifact"
 grep -Fq -- \
   "$dependency_state_root/ivy/local/com.github.dmytromitin/macroparadise-scala3-plugin-api_$scala_version" <<<"$dependency_classpath" ||
   fail "macroHandlers did not resolve the exact task-owned Macro-Paradise artifact"
 
+if grep -Fq -- "$stale_c061_quasiquotes_commit" <<<"$dependency_classpath"; then
+  fail "macroHandlers reused the stale C061 Quasiquotes dependency snapshot"
+fi
 if grep -Fq -- "$stale_c060_quasiquotes_commit" <<<"$dependency_classpath"; then
   fail "macroHandlers reused the stale C060 Quasiquotes dependency snapshot"
 fi
@@ -297,7 +301,7 @@ fi
 
 : >"$instance_negative_log"
 instance_negative_status=1
-for source_pattern in '[A-S].*[.]scala' '[T-Z].*[.]scala'; do
+for source_pattern in '[A-H].*[.]scala' '[I-P].*[.]scala' '[Q-S].*[.]scala' '[T-Z].*[.]scala'; do
   run_sbt 'negativeInstanceUnsupported / clean'
   if run_sbt "set negativeInstanceUnsupported / Compile / sources := (negativeInstanceUnsupported / Compile / sources).value.filter(file => file.getName.matches(\"$source_pattern\") || file.getName == \"Other.scala\")" 'negativeInstanceUnsupported / Compile / compile' >>"$instance_negative_log" 2>&1; then
     batch_status=0
@@ -348,6 +352,22 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `AnnotatedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InlineConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `CurriedConcrete`: inherited concrete method `combineAgain` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @instance source shape for `CurriedFlattened`: curried method `combine` requires exactly two ordinary parameter clauses; found 1' \
+  'unsupported @instance source shape for `CurriedUnary`: curried method `combine` requires exactly two ordinary parameter clauses; found 1' \
+  'unsupported @instance source shape for `CurriedThreeClauses`: curried method `combine` requires exactly two ordinary parameter clauses; found 3' \
+  'unsupported @instance source shape for `CurriedEmptyFirst`: curried method `combine` first parameter clause requires exactly one ordinary parameter; found 0' \
+  'unsupported @instance source shape for `CurriedEmptySecond`: curried method `combine` second parameter clause requires exactly one ordinary parameter; found 0' \
+  'unsupported @instance source shape for `CurriedContextualSecond`: curried method `combine` second parameter clause must be ordinary and non-contextual' \
+  'unsupported @instance source shape for `CurriedTwoFirst`: curried method `combine` first parameter clause requires exactly one ordinary parameter; found 2' \
+  'unsupported @instance source shape for `CurriedTwoSecond`: curried method `combine` second parameter clause requires exactly one ordinary parameter; found 2' \
+  'unsupported @instance source shape for `CurriedDefaultFirst`: curried method `combine` first parameter `a` must be named, ordinary, non-defaulted, and unmodified' \
+  'unsupported @instance source shape for `CurriedDefaultSecond`: curried method `combine` second parameter `b` must be named, ordinary, non-defaulted, and unmodified' \
+  'unsupported @instance source shape for `CurriedWrongFirst`: curried method `combine` first parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedWrongSecond`: curried method `combine` second parameter `b` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedWrongResult`: curried method `combine` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedPolymorphic`: curried method `combine` must not declare method type parameters' \
+  'unsupported @instance source shape for `CurriedPrivate`: curried method `combine` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `CurriedExtraVal`: parameterless method `combine` must declare no parameter clauses; found 2' \
   'unsupported @instance source shape for `ImplicitConcrete`: inherited concrete method `combineAgain` parameter clause must be ordinary and non-contextual' \
   'unsupported @instance source shape for `WrongConcreteEarlyParameter`: inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `WrongConcreteMiddleParameter`: inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`' \
@@ -385,7 +405,7 @@ for expected_diagnostic in \
   'found 0 type parameters' \
   'unsupported @instance source shape for `TypeMemberAbstractVal`: requires exactly two direct body members; found 1' \
   'unsupported @instance source shape for `TypeMemberAbstractVar`: requires exactly two direct body members; found 1' \
-  'unsupported @instance source shape for `TypeMemberDirectMethod`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberDirectMethod`: curried method `value` requires exactly two ordinary parameter clauses; found 0' \
   'unsupported @instance source shape for `TypeMemberAlias`: direct type member `Out` must be abstract, not a concrete alias' \
   'unsupported @instance source shape for `TypeMemberLowerBound`: abstract type member `Out` must be unbounded' \
   'unsupported @instance source shape for `TypeMemberUpperBound`: abstract type member `Out` must be unbounded' \
@@ -724,6 +744,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_PA
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_HETEROGENEOUS_INHERITED_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'

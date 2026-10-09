@@ -76,6 +76,10 @@ trait HasOut[A]:
   type Out
 
 @instance
+trait Curried[A]:
+  def combine(a: A)(b: A): A
+
+@instance
 trait DerivedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -329,6 +333,9 @@ object ExternalApp:
       Choice.instance("external", (left, right) => s"$left/$right")
     assert(renamed.fallback == "external")
     assert(renamed.select("left", "right") == "left/right")
+
+    val curried: Curried[Int] = Curried.instance[Int](a => b => a + b)
+    assert(curried.combine(20)(22) == 42)
 
     val derived: DerivedMonoid[Int] = DerivedMonoid.instance(0, _ + _)
     assert(derived.twice(21) == 42)

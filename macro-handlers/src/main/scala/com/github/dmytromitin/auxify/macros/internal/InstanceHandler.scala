@@ -31,12 +31,17 @@ final class InstanceHandler extends ExpansionHandler:
           InstanceDefinitionBuilder.lower(value)(using context)
         case InstanceHandler.SourceShape.AbstractTypeMember(value) =>
           InstanceAbstractTypeMemberDefinitionBuilder.lower(value)(using context)
+        case InstanceHandler.SourceShape.CurriedMethod(value) =>
+          InstanceCurriedMethodDefinitionBuilder.lower(value)(using context)
 
 private[internal] object InstanceHandler:
   enum SourceShape:
     case Methods(value: InstanceSourceShapeDecoder.SourceShape)
     case AbstractTypeMember(
         value: InstanceAbstractTypeMemberSourceShapeDecoder.SourceShape
+    )
+    case CurriedMethod(
+        value: InstanceCurriedMethodSourceShapeDecoder.SourceShape
     )
 
   type Lowering = (
@@ -80,6 +85,11 @@ private[internal] object InstanceHandler:
                     member.pos
                   )
                 )
+          case List(member)
+              if member.kind == ExpansionTargetBodyView.DirectMemberKind.Method =>
+            InstanceCurriedMethodSourceShapeDecoder
+              .decode(classView, bodyView)
+              .map(SourceShape.CurriedMethod.apply)
           case _ =>
             InstanceSourceShapeDecoder
               .decode(classView, bodyView, typeStructure)
