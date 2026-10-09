@@ -4,13 +4,15 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
-scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
-macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
-quasiquotes_commit="e5ee36156fa0ed75e5aa04de42c9eacb6db656fb"
+source "$script_dir/dev-dependency-config.sh"
+
+scala_version="${AUXIFY_SCALA_VERSION:-$AUXIFY_DEFAULT_SCALA_VERSION}"
+macro_paradise_commit="$AUXIFY_MACRO_PARADISE_COMMIT"
+quasiquotes_commit="$AUXIFY_QUASIQUOTES_COMMIT"
 stale_c061_quasiquotes_commit="d601d0341be1028fc01a6c2d6aa26d29b8a8b8d1"
 stale_c060_quasiquotes_commit="1fd2bd49445e905947c83025139b2ba1db40696b"
 stale_c054_quasiquotes_commit="4104a7cc7058069ba7692370ec0da6b4d85096be"
-dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
+dependency_state_root="$(auxify_dependency_state_root "$product_root" "$scala_version")"
 ivy_home="$dependency_state_root/ivy"
 coursier_cache="$dependency_state_root/coursier-cache"
 
@@ -24,10 +26,7 @@ fail() {
 [[ "$(pwd -P)" == "$product_root" ]] ||
   fail "run scripts/verify-milestone1.sh from the product root"
 
-case "$scala_version" in
-  3.3.8|3.8.4|3.9.0) ;;
-  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8, 3.8.4, or 3.9.0" ;;
-esac
+auxify_validate_scala_version "$scala_version" || exit 1
 
 [[ -d "$ivy_home/local/com.github.dmytromitin" && -d "$coursier_cache" ]] ||
   fail "exact source-built dependencies are absent; run scripts/prepare-ci-dependencies.sh first"

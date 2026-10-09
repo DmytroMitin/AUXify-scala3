@@ -5,14 +5,9 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 product_root="$(cd "$script_dir/.." && pwd -P)"
 
-macro_paradise_repository="https://github.com/DmytroMitin/macroparadise-scala3.git"
-macro_paradise_commit="aae704ca42ff01ee44e663fb024c726a357716c7"
-macro_paradise_version="0.2.0-SNAPSHOT"
-quasiquotes_repository="https://github.com/DmytroMitin/quasiquotes-scala3.git"
-quasiquotes_commit="e5ee36156fa0ed75e5aa04de42c9eacb6db656fb"
-quasiquotes_version="0.4.0-SNAPSHOT"
-quasiquotes_binary_scala_version="3.3.8"
-scala_version="${AUXIFY_SCALA_VERSION:-3.8.4}"
+source "$script_dir/dev-dependency-config.sh"
+
+scala_version="${AUXIFY_SCALA_VERSION:-$AUXIFY_DEFAULT_SCALA_VERSION}"
 
 fail() {
   printf 'CI dependency preparation failed: %s\n' "$1" >&2
@@ -22,17 +17,14 @@ fail() {
 [[ "$(pwd -P)" == "$product_root" ]] ||
   fail "run scripts/prepare-ci-dependencies.sh from the product root"
 
-case "$scala_version" in
-  3.3.8|3.8.4|3.9.0) ;;
-  *) fail "unsupported exact Scala version: $scala_version; expected 3.3.8, 3.8.4, or 3.9.0" ;;
-esac
+auxify_validate_scala_version "$scala_version" || exit 1
 
 printf 'AUXIFY_SCALA_VERSION=%s\n' "$scala_version"
-printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$macro_paradise_commit"
-printf 'MACRO_PARADISE_DEVELOPMENT_VERSION=%s\n' "$macro_paradise_version"
-printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$quasiquotes_commit"
-printf 'QUASIQUOTES_DEVELOPMENT_VERSION=%s\n' "$quasiquotes_version"
-printf 'QUASIQUOTES_BINARY_ARTIFACT_SCALA_VERSION=%s\n' "$quasiquotes_binary_scala_version"
+printf 'MACRO_PARADISE_EXPECTED_COMMIT=%s\n' "$AUXIFY_MACRO_PARADISE_COMMIT"
+printf 'MACRO_PARADISE_DEVELOPMENT_VERSION=%s\n' "$AUXIFY_MACRO_PARADISE_VERSION"
+printf 'QUASIQUOTES_EXPECTED_COMMIT=%s\n' "$AUXIFY_QUASIQUOTES_COMMIT"
+printf 'QUASIQUOTES_DEVELOPMENT_VERSION=%s\n' "$AUXIFY_QUASIQUOTES_VERSION"
+printf 'QUASIQUOTES_BINARY_ARTIFACT_SCALA_VERSION=%s\n' "$AUXIFY_QUASIQUOTES_BINARY_SCALA_VERSION"
 
 for command in git sbt java sha256sum; do
   command -v "$command" >/dev/null 2>&1 ||
@@ -42,7 +34,7 @@ done
 dependency_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-ci-dependencies.XXXXXX")"
 trap 'rm -rf -- "$dependency_root"' EXIT
 
-dependency_state_root="$product_root/target/ci-dependencies/$scala_version-$macro_paradise_commit-$quasiquotes_commit"
+dependency_state_root="$(auxify_dependency_state_root "$product_root" "$scala_version")"
 ivy_home="$dependency_state_root/ivy"
 coursier_cache="$dependency_state_root/coursier-cache"
 mkdir -p "$ivy_home" "$coursier_cache"
@@ -73,8 +65,8 @@ macro_paradise_checkout="$dependency_root/macroparadise-scala3"
 quasiquotes_checkout="$dependency_root/quasiquotes-scala3"
 
 clone_at_commit \
-  "$macro_paradise_repository" \
-  "$macro_paradise_commit" \
+  "$AUXIFY_MACRO_PARADISE_REPOSITORY" \
+  "$AUXIFY_MACRO_PARADISE_COMMIT" \
   "$macro_paradise_checkout" \
   MACRO_PARADISE
 
@@ -89,8 +81,8 @@ clone_at_commit \
 )
 
 clone_at_commit \
-  "$quasiquotes_repository" \
-  "$quasiquotes_commit" \
+  "$AUXIFY_QUASIQUOTES_REPOSITORY" \
+  "$AUXIFY_QUASIQUOTES_COMMIT" \
   "$quasiquotes_checkout" \
   QUASIQUOTES
 
@@ -98,7 +90,7 @@ clone_at_commit \
   cd "$quasiquotes_checkout"
   sbt -batch \
     -Dsbt.ivy.home="$ivy_home" \
-    "++$quasiquotes_binary_scala_version!" \
+    "++$AUXIFY_QUASIQUOTES_BINARY_SCALA_VERSION!" \
     "core/publishLocal" \
     "neutralScalameta/publishLocal" \
     "++$scala_version!" \
@@ -125,13 +117,13 @@ hash_single_artifact() {
 
 hash_single_artifact \
   "quasiquotes-scala3-core_3" \
-  "*/$quasiquotes_version/jars/*.jar"
+  "*/$AUXIFY_QUASIQUOTES_VERSION/jars/*.jar"
 hash_single_artifact \
   "quasiquotes-scala3-neutral-scalameta_3" \
-  "*/$quasiquotes_version/jars/*.jar"
+  "*/$AUXIFY_QUASIQUOTES_VERSION/jars/*.jar"
 hash_single_artifact \
   "quasiquotes-scala3-dotty-internal_$scala_version" \
-  "*/$quasiquotes_version/jars/*.jar"
+  "*/$AUXIFY_QUASIQUOTES_VERSION/jars/*.jar"
 
 # The dependency state lives below the root target directory, so root/clean would
 # delete the source-built artifacts. Clean every consumer subproject explicitly
@@ -158,7 +150,23 @@ sbt -batch \
   'negativeInstanceUnsupported / clean' \
   'negativeSyntaxUnsupported / clean'
 
+provenance_dir="$dependency_state_root/provenance"
+mkdir -p "$provenance_dir"
+metadata_tmp="$(mktemp "$provenance_dir/dependencies.env.XXXXXX")"
+checksums_tmp="$(mktemp "$provenance_dir/dependencies.sha256.XXXXXX")"
+auxify_dependency_provenance "$scala_version" >"$metadata_tmp"
+(
+  cd "$ivy_home"
+  while IFS= read -r artifact; do
+    [[ -f "$artifact" ]] ||
+      fail "required prepared artifact is missing: $artifact"
+    sha256sum "$artifact"
+  done < <(auxify_required_dependency_artifacts "$scala_version")
+) >"$checksums_tmp"
+mv "$checksums_tmp" "$provenance_dir/dependencies.sha256"
+mv "$metadata_tmp" "$provenance_dir/dependencies.env"
+
 printf 'AUXIFY_SCALA3_CI_DEPENDENCIES_PREPARED scala=%s macro_paradise=%s quasiquotes=%s\n' \
   "$scala_version" \
-  "$macro_paradise_version" \
-  "$quasiquotes_version"
+  "$AUXIFY_MACRO_PARADISE_VERSION" \
+  "$AUXIFY_QUASIQUOTES_VERSION"

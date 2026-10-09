@@ -20,6 +20,87 @@ exact Scala 3.9.0 and also supports exact Scala 3.3.8 and 3.8.4. It demonstrates
 the five released annotation families—`@apply`, `@aux`, `@instance`,
 `@delegated`, and `@self`—plus their released bounded composition examples.
 
+## Contributing from source
+
+Current `main` uses source-built Macro-Paradise `0.2.0-SNAPSHOT` and
+Quasiquotes `0.4.0-SNAPSHOT` artifacts that are not available from Maven
+Central. A first-time contributor needs Git, sbt, network access, and JDK 25.
+The default development line is exact Scala 3.8.4.
+
+From a fresh clone, run one explicit bootstrap command:
+
+```sh
+git clone https://github.com/DmytroMitin/AUXify-scala3.git
+cd AUXify-scala3
+./scripts/bootstrap-dev.sh
+```
+
+The script builds the exact pinned peer commits in disposable checkouts,
+validates their Ivy metadata and JAR checksums, and makes the five required
+snapshot modules available in the normal local Ivy repository. It records the
+source commits and selected Scala line beside checksum evidence. A matching
+rerun is a fast validation-only operation; if another `publishLocal` process
+overwrites one of the same-version snapshots, rerunning the bootstrap restores
+the accepted pinned set.
+
+Then open the project in IntelliJ IDEA, select JDK 25 as the sbt JRE if
+necessary, and import or reload the sbt build normally. Do not add a custom
+`-Dsbt.ivy.home` VM parameter. The corresponding command-line resolution
+smoke is:
+
+```sh
+sbt -batch 'macroHandlers / update'
+```
+
+To prepare another qualified compiler line, set the selector explicitly:
+
+```sh
+AUXIFY_SCALA_VERSION=3.3.8 ./scripts/bootstrap-dev.sh
+AUXIFY_SCALA_VERSION=3.9.0 ./scripts/bootstrap-dev.sh
+```
+
+Use the matching `-Dauxify.scalaVersion=...` selector for command-line work on
+those non-default lines. Rerun the bootstrap after switching lines, after the
+pinned peer SHAs change in this repository, or whenever another local
+`publishLocal` replaces the same snapshot coordinates.
+
+### Manual pinned peer publication
+
+Contributors who want to perform the peer publication themselves can use the
+same exact source identities. The following publishes to sbt's ordinary local
+Ivy repository; it is local developer setup, not Maven Central publication:
+
+```sh
+export AUXIFY_SCALA_VERSION=3.8.4
+work_root="$(mktemp -d)"
+
+git clone --filter=blob:none --no-checkout https://github.com/DmytroMitin/macroparadise-scala3.git "$work_root/macroparadise-scala3"
+git -C "$work_root/macroparadise-scala3" checkout --detach aae704ca42ff01ee44e663fb024c726a357716c7
+(cd "$work_root/macroparadise-scala3" && sbt -batch -Dmacroparadise.exactScalaVersion="$AUXIFY_SCALA_VERSION" "++$AUXIFY_SCALA_VERSION!" "pluginApi/publishLocal" "plugin/publishLocal")
+
+git clone --filter=blob:none --no-checkout https://github.com/DmytroMitin/quasiquotes-scala3.git "$work_root/quasiquotes-scala3"
+git -C "$work_root/quasiquotes-scala3" checkout --detach e5ee36156fa0ed75e5aa04de42c9eacb6db656fb
+(cd "$work_root/quasiquotes-scala3" && sbt -batch "++3.3.8!" "core/publishLocal" "neutralScalameta/publishLocal" "++$AUXIFY_SCALA_VERSION!" "dottyInternal/publishLocal")
+```
+
+The checked-in bootstrap is safer for routine use because it takes pins and
+module layout from the same source as canonical verification and retains
+checksum-backed provenance. Manual same-version publication has no durable
+source identity by itself; rerun `./scripts/bootstrap-dev.sh` to restore and
+verify the repository's accepted graph.
+
+`scripts/prepare-ci-dependencies.sh` serves a different purpose. It publishes
+into a SHA-keyed Ivy repository below `target/ci-dependencies` for isolated
+CI/Codex qualification. `scripts/bootstrap-dev.sh` consumes that validated
+graph and explicitly copies only the required peer coordinates into the normal
+local Ivy repository used by ordinary sbt and IntelliJ. Neither script
+publishes remotely.
+
+External library users who want only released AUXify should use the public
+`0.1.0` modules or the Giter8 quick start above. The source bootstrap is for
+contributors importing current `0.2.0-SNAPSHOT` development; it does not make
+current `main` available from Maven Central.
+
 ## Talk
 
 **Can Scala 3 Have Macro Annotations Again? Rebuilding Macro Paradise** was
@@ -531,30 +612,24 @@ from exact accepted source rather than resolved as a public release.
 
 ### Preferred development setup with the Macro-Paradise sbt plugin
 
-From an AUXify checkout, prepare the pinned Macro-Paradise compiler/API and
-Quasiquotes chain, then publish the AUXify marker and handler to the same
-task-owned local Ivy repository. The generic Macro-Paradise sbt plugin remains
-the public 0.1.1 adapter:
+For an AUXify source checkout and ordinary IntelliJ import, run the contributor
+bootstrap documented above. It prepares the pinned Macro-Paradise compiler/API
+and Quasiquotes chain in the normal local Ivy repository:
 
 ```sh
-AUXIFY_SCALA_VERSION=3.8.4 ./scripts/prepare-ci-dependencies.sh
-sbt -Dauxify.scalaVersion=3.8.4 -batch "macroAnnotations/publishLocal" "macroHandlers/publishLocal"
+./scripts/bootstrap-dev.sh
 ```
 
-Use `3.3.8` or `3.9.0` consistently in both selectors to prepare either other
-qualified line. Omitting both selectors retains the default Scala 3.8.4 behavior.
-
-Despite its CI-oriented name, `prepare-ci-dependencies.sh` is also the
-checked-in, reproducible helper for this local-development setup. It accepts
-exactly `AUXIFY_SCALA_VERSION=3.3.8`, `AUXIFY_SCALA_VERSION=3.8.4`, or
-`AUXIFY_SCALA_VERSION=3.9.0`. It clones and verifies the exact accepted
-Macro-Paradise provider and Quasiquotes product
-`1fd2bd49445e905947c83025139b2ba1db40696b` in disposable checkouts. It then
-publishes Macro-Paradise 0.2.0-SNAPSHOT plus Quasiquotes 0.4.0-SNAPSHOT
-`core`/`neutral-scalameta` at their 3.3.8 binary-artifact baseline and
-`dotty-internal` at the selected exact compiler line. The task-owned Ivy and
-Coursier roots exclude same-coordinate stale snapshots; the helper reports the
-source identities, versions, and required Quasiquotes artifact hashes.
+The generic Macro-Paradise sbt plugin remains the public 0.1.1 adapter.
+Omitting `AUXIFY_SCALA_VERSION` retains the default Scala 3.8.4 behavior;
+`3.3.8` and `3.9.0` are the other accepted exact selectors. The bootstrap
+and canonical preparation share one checked-in pin source. Canonical
+`prepare-ci-dependencies.sh` continues to clone Macro-Paradise
+`aae704ca42ff01ee44e663fb024c726a357716c7` and Quasiquotes
+`e5ee36156fa0ed75e5aa04de42c9eacb6db656fb` into disposable checkouts,
+publishing only into its SHA-keyed isolated repository. The contributor
+bootstrap validates that manifest and copies only the five required peer
+coordinates into ordinary local Ivy.
 
 The preferred development build explicitly selects Macro-Paradise compiler/API
 version `0.2.0-SNAPSHOT` through exact full-cross modules. Deliberate
@@ -574,7 +649,15 @@ release containing the required extension-module bridge before an all-public
 dependency graph can be claimed. No future peer release version is selected
 here; the public generic sbt plugin 0.1.1 remains a separate build adapter.
 
-The two sbt tasks then publish AUXify's own modules locally:
+Publishing AUXify's own modules is needed only when a separate local project
+will consume current `0.2.0-SNAPSHOT` coordinates. After the contributor
+bootstrap, run:
+
+```sh
+sbt -Dauxify.scalaVersion=3.8.4 -batch "macroAnnotations/publishLocal" "macroHandlers/publishLocal"
+```
+
+Those two tasks publish:
 
 - `macroAnnotations/publishLocal` publishes the one Scala-binary marker module
   imported by user source;
@@ -582,9 +665,9 @@ The two sbt tasks then publish AUXify's own modules locally:
   dependency metadata that lets sbt resolve its transitive classpath. It is
   published separately for each of the three exact compiler lines.
 
-These operations publish Macro-Paradise, the required Quasiquotes chain, and
-AUXify development artifacts locally inside the task-owned repository. They do
-not publish to Maven Central or another remote repository. The fixed AUXify
+The bootstrap publishes the peer graph into normal local Ivy; the two optional
+tasks publish AUXify development artifacts into that same normal repository.
+None publishes to Maven Central or another remote repository. The fixed AUXify
 0.1.0 compatibility rehearsal remains separate and continues to resolve public
 Quasiquotes 0.3.0.
 
@@ -652,7 +735,7 @@ When the sbt plugin is unavailable or deliberately disabled, the
 following explicit setup remains the supported manual escape hatch. It is also
 the executable reference for the marker/compiler-plugin/handler/runtime and
 Zinc boundaries hidden by the preferred plugin-backed setup. Manual users need
-`prepare-ci-dependencies.sh` plus the two AUXify `publishLocal` tasks above, but
+`bootstrap-dev.sh` plus the two AUXify `publishLocal` tasks above, but
 do not need to prepare `sbt-macroparadise`.
 
 Use this `build.sbt` in the separate project:
@@ -856,8 +939,9 @@ companion and adds the materializer when it has no direct member named
 
 The development implementation depends on the source-built Scala 3
 Macro-Paradise 0.2.0-SNAPSHOT compiler/API graph and exact source-built
-Quasiquotes 0.4.0-SNAPSHOT graph from the exact pinned commit. Preparing those peers and AUXify through
-the task-owned local repository remains a development-only step; this README
+Quasiquotes 0.4.0-SNAPSHOT graph from the exact pinned commit. Preparing those
+peers through the contributor bootstrap, and optionally publishing AUXify into
+the normal local Ivy repository, remain development-only steps; this README
 does not present either snapshot coordinate as remotely available. Ordinary
 runtime excludes both the AUXify handler and Quasiquotes implementation/tooling.
 
