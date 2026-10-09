@@ -117,6 +117,60 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("keeps a reversed historical two-method source in the methods family") {
+    withExpansionInput(
+      """@current
+        |trait Reversed[A]:
+        |  def combine(a: A, a1: A): A
+        |  def empty: A
+        |""".stripMargin,
+      "Reversed"
+    ) { (input, _, _, context) =>
+      given Context = context
+      var lowerCalled = false
+      InstanceHandler.expandWithLowering(input): (_, _) =>
+        lowerCalled = true
+        fail("reversed historical source must not reach peer lowering")
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @instance source shape for `Reversed`: parameterless method `combine` must declare no parameter clauses; found 1"
+            )
+          )
+          assert(!lowerCalled)
+        case other => fail(s"expected controlled historical rejection, found $other")
+    }
+  }
+
+  test("keeps a flattened curried source with a concrete tail in the curried family") {
+    withExpansionInput(
+      """@current
+        |trait Flattened[A]:
+        |  def combine(a: A, b: A): A
+        |  def twice(a: A): A = combine(a, a)
+        |""".stripMargin,
+      "Flattened"
+    ) { (input, _, _, context) =>
+      given Context = context
+      var lowerCalled = false
+      InstanceHandler.expandWithLowering(input): (_, _) =>
+        lowerCalled = true
+        fail("flattened curried source must not reach peer lowering")
+      match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @instance source shape for `Flattened`: curried method `combine` requires exactly two ordinary parameter clauses; found 1"
+            )
+          )
+          assert(!lowerCalled)
+        case other => fail(s"expected controlled curried rejection, found $other")
+    }
+  }
+
   test("derives and places the canonical curried-method instance factory") {
     withExpansionInput(
       """@current
@@ -165,6 +219,47 @@ class InstanceHandlerSuite extends munit.FunSuite:
                   assertEquals(second.toString, "b")
                 case other => fail(s"expected successive applications, found $other")
             case other => fail(s"expected one anonymous override, found $other")
+        case other => fail(s"expected anonymous implementation, found $other")
+    }
+  }
+
+  test("inherits a heterogeneous curried tail without authoring any tail member") {
+    withExpansionInput(
+      """@current
+        |trait RichCurried[A]:
+        |  def combine(a: A)(b: A): A
+        |  type combineFunction = A
+        |  def twice(a: A): A = combine(a)(a)
+        |  type Value = A
+        |  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+        |""".stripMargin,
+      "RichCurried"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedInstance(StructuredOutcomeTestSupport.materialize(input, changes))
+        case other => fail(s"expected heterogeneous curried expansion, found $other")
+
+      assertEquals(
+        method.trailingParamss.flatten.map(_.name.toString),
+        List("combineFunction")
+      )
+      method.rhs match
+        case New(template: Template) =>
+          assertEquals(
+            template.body.collect {
+              case definition: DefDef if definition.name.toString != "<init>" =>
+                definition.name.toString
+            },
+            List("combine")
+          )
+          assertEquals(
+            template.body.collect { case definition: TypeDef =>
+              definition.name.toString
+            },
+            Nil
+          )
         case other => fail(s"expected anonymous implementation, found $other")
     }
   }
@@ -227,6 +322,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
       """@current
         |trait Curried[A]:
         |  def combine(a: A)(b: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a)(a)
         |
         |object Curried:
         |  def instance[A](f: A => A => A): Curried[A] = ???
@@ -258,6 +355,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
       """@current
         |trait Curried[A]:
         |  def combine(a: A)(b: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a)(a)
         |
         |object Curried:
         |  val retained = 11

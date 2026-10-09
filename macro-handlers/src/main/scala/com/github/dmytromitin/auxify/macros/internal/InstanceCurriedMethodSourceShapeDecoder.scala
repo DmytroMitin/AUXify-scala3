@@ -5,6 +5,7 @@ import dotty.tools.dotc.util.SrcPos
 import paradise3.api.{
   ExpansionDiagnostic,
   ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
   ExpansionTargetView
 }
 import paradise3.api.ExpansionTargetBodyView.{
@@ -29,7 +30,8 @@ private[internal] object InstanceCurriedMethodSourceShapeDecoder:
 
   def decode(
       classView: ExpansionTargetView,
-      bodyView: ExpansionTargetBodyView
+      bodyView: ExpansionTargetBodyView,
+      typeStructureView: Option[ExpansionTargetTypeStructureView] = None
   ): Either[ExpansionDiagnostic, SourceShape] =
     val traitName = classView.className
     for
@@ -66,15 +68,15 @@ private[internal] object InstanceCurriedMethodSourceShapeDecoder:
             s"enclosing type parameter `${enclosing.name}` must be invariant, ordinary, unbounded, non-higher-kinded, and free of context bounds",
             enclosing.pos
           )
-      member <- bodyView.members match
-        case List(value) => Right(value)
-        case members =>
+      members <- bodyView.members match
+        case head :: tail => Right((head, tail))
+        case Nil =>
           unsupported(
             traitName,
-            s"curried-method family requires exactly one direct body member; found ${members.size}",
+            "curried-method family requires exactly one direct body member; found 0",
             bodyView.pos
           )
-      method <- directMethod(traitName, member)
+      method <- directMethod(traitName, members._1)
       _ <- eligibleMethod(traitName, method)
       clauses <- method.parameterClauses match
         case first :: second :: Nil => Right((first, second))
@@ -109,9 +111,18 @@ private[internal] object InstanceCurriedMethodSourceShapeDecoder:
             s"curried method `${method.name}` result type must use enclosing type parameter `${enclosing.name}`",
             method.resultTypePos
           )
+      additionallyOccupied <-
+        InstanceInheritedConcreteTailValidator.validate(
+          traitName,
+          enclosing.name,
+          members._2,
+          firstBodyIndex = 1,
+          typeStructureView
+        )
       carrier = freshCarrierName(
         "combineFunction",
-        Set("instance", method.name, first.name, second.name)
+        Set("instance", method.name, first.name, second.name) ++
+          additionallyOccupied
       )
     yield SourceShape(
       traitName,

@@ -17,11 +17,6 @@ import paradise3.api.ExpansionTargetBodyView.{
   DirectTypeShape,
   DirectVisibility
 }
-import paradise3.api.ExpansionTargetTypeStructureView.{
-  Bound,
-  DirectTypeMember,
-  DirectTypeMemberKind
-}
 
 private[internal] object InstanceSourceShapeDecoder:
   final case class SourceShape(
@@ -58,18 +53,14 @@ private[internal] object InstanceSourceShapeDecoder:
           bodyView.members match
             case parameterlessMember :: binaryMember :: tail =>
               for
-                additionallyOccupied <- tail.zipWithIndex.foldLeft[
-                  Either[ExpansionDiagnostic, Set[String]]
-                ](Right(Set.empty)): (validated, indexedMember) =>
-                  val (member, offset) = indexedMember
-                  validated.flatMap: occupied =>
-                    inheritedMemberOccupiedNames(
-                      traitName,
-                      index = offset + 2,
-                      member,
-                      typeParameter.name,
-                      typeStructureView
-                    ).map(occupied ++ _)
+                additionallyOccupied <-
+                  InstanceInheritedConcreteTailValidator.validate(
+                    traitName,
+                    typeParameter.name,
+                    tail,
+                    firstBodyIndex = 2,
+                    typeStructureView
+                  )
                 shape <- decodeAbstractRoles(
                   traitName,
                   typeParameter.name,
@@ -89,145 +80,6 @@ private[internal] object InstanceSourceShapeDecoder:
             traitName,
             "requires exactly one invariant unbounded enclosing type parameter",
             classView.classPos
-          )
-
-  private def inheritedMemberOccupiedNames(
-      traitName: String,
-      index: Int,
-      member: DirectMember,
-      enclosingTypeParameterName: String,
-      typeStructureView: Option[ExpansionTargetTypeStructureView]
-  ): Either[ExpansionDiagnostic, Set[String]] =
-    member.kind match
-      case DirectMemberKind.Method =>
-        inheritedMethodOccupiedNames(
-          traitName,
-          index,
-          member,
-          enclosingTypeParameterName
-        )
-      case DirectMemberKind.Type =>
-        for
-          typeStructure <- typeStructureView.toRight(
-            ExpansionDiagnostic(
-              s"unsupported @instance source shape for `$traitName`: direct body member at index $index must provide normalized type-member evidence",
-              member.pos
-            )
-          )
-          alias <- concreteAliasAtIndex(
-            traitName,
-            index,
-            typeStructure,
-            member.pos
-          )
-          _ <- eligibleConcreteAlias(
-            traitName,
-            alias,
-            enclosingTypeParameterName
-          )
-        yield Set.empty
-      case _ =>
-        directMethod(traitName, index, member).map(_ => Set.empty)
-
-  private def inheritedMethodOccupiedNames(
-      traitName: String,
-      index: Int,
-      member: DirectMember,
-      enclosingTypeParameterName: String
-  ): Either[ExpansionDiagnostic, Set[String]] =
-    for
-      inheritedMethod <- directMethod(traitName, index, member)
-      _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-      inheritedParameters <- inheritedTopology(traitName, inheritedMethod)
-      _ <- inheritedParameters.foldLeft[Either[ExpansionDiagnostic, Unit]](
-        Right(())
-      ): (validated, parameter) =>
-        validated.flatMap: _ =>
-          inheritedParameterType(
-            traitName,
-            inheritedMethod,
-            parameter,
-            enclosingTypeParameterName
-          )
-      _ <- enclosingResult(
-        traitName,
-        "inherited concrete",
-        inheritedMethod,
-        enclosingTypeParameterName
-      )
-    yield Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
-
-  private def concreteAliasAtIndex(
-      traitName: String,
-      index: Int,
-      typeStructureView: ExpansionTargetTypeStructureView,
-      fallbackPos: SrcPos
-  ): Either[ExpansionDiagnostic, DirectTypeMember] =
-    typeStructureView.directTypeMembers.filter(_.bodyIndex == index) match
-      case List(alias) => Right(alias)
-      case Nil =>
-        unsupported(
-          traitName,
-          s"direct body member at index $index must provide normalized type-member evidence",
-          fallbackPos
-        )
-      case aliases =>
-        unsupported(
-          traitName,
-          s"direct body member at index $index must provide exactly one normalized direct type member; found ${aliases.size}",
-          aliases.headOption.map(_.pos).getOrElse(fallbackPos)
-        )
-
-  private def eligibleConcreteAlias(
-      traitName: String,
-      alias: DirectTypeMember,
-      enclosingTypeParameterName: String
-  ): Either[ExpansionDiagnostic, Unit] =
-    val aliasName = alias.name
-    if !normalizedNameAvailable(aliasName) then
-      unsupported(
-        traitName,
-        "inherited concrete type alias must have an available normalized name",
-        alias.pos
-      )
-    else if alias.kind != DirectTypeMemberKind.Alias then
-      unsupported(
-        traitName,
-        s"inherited type member `$aliasName` must be a concrete alias",
-        alias.pos
-      )
-    else if alias.typeParameters.nonEmpty then
-      unsupported(
-        traitName,
-        s"inherited concrete type alias `$aliasName` must not declare type parameters",
-        alias.pos
-      )
-    else if
-      alias.modifiers.visibility != DirectVisibility.Public ||
-        alias.modifiers.hasAnnotations ||
-        alias.modifiers.annotationCount != 0 ||
-        alias.modifiers.unsupportedFlags.nonEmpty
-    then
-      unsupported(
-        traitName,
-        s"inherited concrete type alias `$aliasName` must be public, unannotated, and free of unsupported modifiers",
-        alias.pos
-      )
-    else if alias.lowerBound != Bound.Absent || alias.upperBound != Bound.Absent then
-      unsupported(
-        traitName,
-        s"inherited concrete type alias `$aliasName` must not declare lower or upper bounds",
-        alias.pos
-      )
-    else
-      alias.aliasTarget match
-        case Some(DirectTypeShape.EnclosingTypeParameter(name, _))
-            if name == enclosingTypeParameterName => Right(())
-        case _ =>
-          unsupported(
-            traitName,
-            s"inherited concrete type alias `$aliasName` must target enclosing type parameter `$enclosingTypeParameterName`",
-            alias.pos
           )
 
   private def decodeAbstractRoles(
@@ -354,93 +206,6 @@ private[internal] object InstanceSourceShapeDecoder:
         method.pos
       )
     else Right(())
-
-  private def eligibleInheritedMethod(
-      traitName: String,
-      method: DirectMethod
-  ): Either[ExpansionDiagnostic, Unit] =
-    if
-      method.modifiers.visibility != DirectVisibility.Public ||
-        method.modifiers.hasAnnotations ||
-        method.modifiers.annotationCount != 0 ||
-        method.modifiers.unsupportedFlags.nonEmpty
-    then
-      unsupported(
-        traitName,
-        s"inherited concrete method `${method.name}` must be public, unannotated, and free of unsupported modifiers",
-        method.pos
-      )
-    else if method.status != DirectMethodStatus.Concrete then
-      unsupported(
-        traitName,
-        s"inherited method `${method.name}` must be concrete",
-        method.pos
-      )
-    else if method.typeParameters.nonEmpty then
-      unsupported(
-        traitName,
-        s"inherited concrete method `${method.name}` must not declare method type parameters",
-        method.pos
-      )
-    else Right(())
-
-  private def inheritedTopology(
-      traitName: String,
-      method: DirectMethod
-  ): Either[ExpansionDiagnostic, List[DirectMethodParameter]] =
-    method.parameterClauses match
-      case Nil => Right(Nil)
-      case List(clause) =>
-        if clause.isContextual || clause.isImplicit || clause.isGiven then
-          unsupported(
-            traitName,
-            s"inherited concrete method `${method.name}` parameter clause must be ordinary and non-contextual",
-            clause.pos
-          )
-        else if clause.parameters.isEmpty then
-          unsupported(
-            traitName,
-            s"inherited concrete method `${method.name}` requires one or more ordinary parameters in its single clause; found 0",
-            clause.pos
-          )
-        else Right(clause.parameters)
-      case clauses =>
-        unsupported(
-          traitName,
-          s"inherited concrete method `${method.name}` requires exactly one ordinary parameter clause; found ${clauses.size}",
-          method.pos
-        )
-
-  private def inheritedParameterType(
-      traitName: String,
-      method: DirectMethod,
-      parameter: DirectMethodParameter,
-      enclosingTypeParameterName: String
-  ): Either[ExpansionDiagnostic, Unit] =
-    if
-      !normalizedNameAvailable(parameter.name) ||
-        parameter.hasDefault ||
-        parameter.isContextual ||
-        parameter.isImplicit ||
-        parameter.isGiven ||
-        parameter.isVal ||
-        parameter.isVar
-    then
-      unsupported(
-        traitName,
-        s"inherited concrete method `${method.name}` parameter `${parameter.name}` must be ordinary, non-defaulted, and unmodified",
-        parameter.pos
-      )
-    else
-      parameter.parameterType match
-        case DirectTypeShape.EnclosingTypeParameter(name, _)
-            if name == enclosingTypeParameterName => Right(())
-        case _ =>
-          unsupported(
-            traitName,
-            s"inherited concrete method `${method.name}` parameter `${parameter.name}` must use enclosing type parameter `$enclosingTypeParameterName`",
-            parameter.typePos
-          )
 
   private def parameterlessTopology(
       traitName: String,

@@ -49,7 +49,7 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result, or (3) exactly one public abstract curried method `def combine(a: A)(b: A): A`, generating a strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by an optional validated heterogeneous inherited concrete method/direct-alias tail, generating the same strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | Exactly one public abstract direct method under one invariant unbounded type parameter: either the unary `show(a: A): String` family or the parameterless `empty: A` family; richer forwarding remains later parity work |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
@@ -266,17 +266,35 @@ def instance[A](combineFunction: A => A => A): Curried[A] =
 ```
 
 The trait has exactly one invariant, ordinary, unbounded enclosing type
-parameter and exactly one direct public, unannotated, monomorphic abstract
-method. The source and generated override retain two separate ordinary
-one-parameter clauses. The strict carrier is the nested function type
-`A => A => A`, and the generated body applies it successively. Carrier names
-are freshened deterministically against generated-method term roles, including
-the source method and both source parameter names.
+parameter. Its first member is one direct public, unannotated, monomorphic
+abstract method with two separate ordinary one-parameter clauses. The strict
+carrier is the nested function type `A => A => A`, and the generated body
+applies it successively. The required method may be followed by zero or more
+validated inherited members. Each tail member must be either:
+
+- a public, unannotated, non-polymorphic concrete method, free of unsupported
+  modifiers, returning `A`, with either no parameter clauses or one ordinary
+  non-contextual clause of one or more non-defaulted, unmodified direct-`A`
+  parameters; or
+- a public, unannotated, monomorphic concrete type alias, free of unsupported
+  modifiers and bounds, whose target is exactly the enclosing `A`.
+
+Methods and aliases may be interleaved and multiple aliases are allowed.
+Carrier names are freshened deterministically against generated-method term
+roles and all inherited concrete method and parameter names. Alias names remain
+in the type namespace and do not reserve generated term-carrier names. Tail
+members are inherited unchanged: AUXify does not inspect, copy, re-author, or
+lower their bodies or aliases, and the generated curried factory and anonymous
+override remain unchanged from the empty-tail form.
 
 A flattened single-clause source such as
 `def combine(a: A, b: A): A` is not this family and is rejected rather than
 rewritten to a flattened `(A, A) => A` carrier. Contextual clauses, defaults,
-extra clauses or members, and richer Scala 2 parity remain unsupported.
+extra abstract members, concrete vals/vars/lazy vals, nested definitions,
+explicit empty `()` tail clauses, curried tail methods, unsupported modifiers,
+polymorphic or bounded aliases, and wrong parameter/result/alias types remain
+unsupported. This is a bounded inherited-tail extension, not arbitrary member
+composition.
 
 Post-0.1.0 `0.2.0-SNAPSHOT` development supports a heterogeneous inherited tail after the two abstract roles. Every tail member is validated independently and must be either:
 
@@ -305,7 +323,8 @@ that historical family; defaults; method type parameters; unsupported modifiers;
 and wrong parameter or result types remain rejected. The abstract-type family
 does not accept bounded or multiple type members, abstract vals, methods,
 aliases, nested definitions, or mixed-member bodies. The curried family accepts
-only its single exact method shape. The three families are not freely mixable.
+its exact required method shape plus only the optional validated inherited tail
+described above. The three families are not freely mixable.
 
 The heterogeneous inherited method/alias tail, abstract-type factory, and
 curried-method factory are post-0.1.0 `0.2.0-SNAPSHOT` development behavior.

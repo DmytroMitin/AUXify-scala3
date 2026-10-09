@@ -85,10 +85,10 @@ private[internal] object InstanceHandler:
                     member.pos
                   )
                 )
-          case List(member)
-              if member.kind == ExpansionTargetBodyView.DirectMemberKind.Method =>
+          case members
+              if curriedFirstCandidate(members) =>
             InstanceCurriedMethodSourceShapeDecoder
-              .decode(classView, bodyView)
+              .decode(classView, bodyView, typeStructure)
               .map(SourceShape.CurriedMethod.apply)
           case _ =>
             InstanceSourceShapeDecoder
@@ -110,3 +110,20 @@ private[internal] object InstanceHandler:
           MemberConflictPolicy.PreserveExisting
         )(edit)
       yield placed
+
+  private def curriedFirstCandidate(
+      members: List[ExpansionTargetBodyView.DirectMember]
+  ): Boolean =
+    members match
+      case first :: tail
+          if first.kind == ExpansionTargetBodyView.DirectMemberKind.Method =>
+        first.method.exists: method =>
+          val clauseCount = method.parameterClauses.size
+          tail.isEmpty ||
+          clauseCount >= 2 ||
+          clauseCount == 1 && !tail.headOption.exists: next =>
+            next.kind == ExpansionTargetBodyView.DirectMemberKind.Method &&
+            next.method.exists(
+              _.status == ExpansionTargetBodyView.DirectMethodStatus.Abstract
+            )
+      case _ => false

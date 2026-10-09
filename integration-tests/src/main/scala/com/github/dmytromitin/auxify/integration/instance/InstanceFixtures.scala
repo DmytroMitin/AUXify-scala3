@@ -38,6 +38,30 @@ trait CurriedCollision[Element]:
   def combineFunction(left: Element)(right: Element): Element
 
 @instance
+trait RichCurried[A]:
+  def combine(a: A)(b: A): A
+  type combineFunction = A
+  def twice(a: A): A = combine(a)(a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+
+object RichCurried:
+  val preserved = 243
+
+@instance
+trait ExistingRichCurried[A]:
+  def combine(a: A)(b: A): A
+  type Item = A
+  def twice(a: A): A = combine(a)(a)
+
+object ExistingRichCurried:
+  var instanceCalls = 0
+  def instance[A](f: A => A => A): ExistingRichCurried[A] =
+    instanceCalls += 1
+    new ExistingRichCurried[A]:
+      def combine(a: A)(b: A): A = f(a)(b)
+
+@instance
 trait ExistingOut[A]:
   type Out
 

@@ -301,7 +301,10 @@ fi
 
 : >"$instance_negative_log"
 instance_negative_status=1
-for source_pattern in '[A-H].*[.]scala' '[I-P].*[.]scala' '[Q-S].*[.]scala' '[T-Z].*[.]scala'; do
+for source_pattern in \
+  '[A-B].*[.]scala' 'C[^u].*[.]scala' 'Curried.*[.]scala' \
+  '[D-H].*[.]scala' '[I-P].*[.]scala' '[Q-S].*[.]scala' \
+  'T.*[.]scala' '[U-Z].*[.]scala'; do
   run_sbt 'negativeInstanceUnsupported / clean'
   if run_sbt "set negativeInstanceUnsupported / Compile / sources := (negativeInstanceUnsupported / Compile / sources).value.filter(file => file.getName.matches(\"$source_pattern\") || file.getName == \"Other.scala\")" 'negativeInstanceUnsupported / Compile / compile' >>"$instance_negative_log" 2>&1; then
     batch_status=0
@@ -367,7 +370,20 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `CurriedWrongResult`: curried method `combine` result type must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `CurriedPolymorphic`: curried method `combine` must not declare method type parameters' \
   'unsupported @instance source shape for `CurriedPrivate`: curried method `combine` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `CurriedExtraVal`: parameterless method `combine` must declare no parameter clauses; found 2' \
+  'unsupported @instance source shape for `CurriedExtraVal`: direct body member at index 1 must be a method; found val' \
+  'unsupported @instance source shape for `CurriedTailAliasThenEmptyClause`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
+  'unsupported @instance source shape for `CurriedTailMethodThenWrongAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedTailLateInvalid`: inherited concrete method `invalid` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @instance source shape for `CurriedTailContextual`: inherited concrete method `invalid` parameter clause must be ordinary and non-contextual' \
+  'unsupported @instance source shape for `CurriedTailPolymorphic`: inherited concrete method `invalid` must not declare method type parameters' \
+  'unsupported @instance source shape for `CurriedTailPrivateMethod`: inherited concrete method `invalid` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `CurriedTailAnnotatedMethod`: inherited concrete method `invalid` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `CurriedTailWrongParameter`: inherited concrete method `invalid` parameter `value` must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedTailWrongResult`: inherited concrete method `invalid` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedTailAbstractAlias`: inherited type member `Item` must be a concrete alias' \
+  'unsupported @instance source shape for `CurriedTailPrivateAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @instance source shape for `CurriedTailNestedTrait`: direct body member at index 1 must be a method; found nested trait' \
+  'unsupported @instance source shape for `CurriedTailAdditionalAbstractMethod`: inherited method `other` must be concrete' \
   'unsupported @instance source shape for `ImplicitConcrete`: inherited concrete method `combineAgain` parameter clause must be ordinary and non-contextual' \
   'unsupported @instance source shape for `WrongConcreteEarlyParameter`: inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`' \
   'unsupported @instance source shape for `WrongConcreteMiddleParameter`: inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`' \
@@ -439,6 +455,12 @@ if grep -Eq \
 fi
 
 for source in \
+  CurriedExtraVal CurriedTailAliasThenEmptyClause \
+  CurriedTailMethodThenWrongAlias CurriedTailLateInvalid \
+  CurriedTailContextual CurriedTailPolymorphic CurriedTailPrivateMethod \
+  CurriedTailAnnotatedMethod CurriedTailWrongParameter CurriedTailWrongResult \
+  CurriedTailAbstractAlias CurriedTailPrivateAlias CurriedTailNestedTrait \
+  CurriedTailAdditionalAbstractMethod \
   TypeMemberNoParameter TypeMemberTwoParameters TypeMemberVariant \
   TypeMemberBoundedParameter TypeMemberHigherKinded TypeMemberContextBound \
   TypeMemberAlias TypeMemberLowerBound TypeMemberUpperBound \
@@ -448,7 +470,7 @@ for source in \
   TypeMemberAbstractVal TypeMemberAbstractVar TypeMemberDirectMethod \
   TypeMemberNestedTrait TypeMemberNestedClass TypeMemberNestedObject; do
   grep -Eq "$source[.]scala:[0-9]+:[0-9]+" "$instance_negative_log" ||
-    fail "abstract-type-member negative diagnostic is not source-positioned: $source"
+    fail "instance negative diagnostic is not source-positioned: $source"
 done
 
 instance_classes="$product_root/negative-instance-unsupported/target/scala-$scala_version/classes"
@@ -745,6 +767,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_HETEROGENEOUS_INHERITED_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_METHOD_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'

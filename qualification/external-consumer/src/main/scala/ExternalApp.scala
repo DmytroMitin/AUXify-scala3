@@ -80,6 +80,14 @@ trait Curried[A]:
   def combine(a: A)(b: A): A
 
 @instance
+trait RichCurried[A]:
+  def combine(a: A)(b: A): A
+  type combineFunction = A
+  def twice(a: A): A = combine(a)(a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+
+@instance
 trait DerivedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
@@ -336,6 +344,22 @@ object ExternalApp:
 
     val curried: Curried[Int] = Curried.instance[Int](a => b => a + b)
     assert(curried.combine(20)(22) == 42)
+
+    var richCurriedCalls = 0
+    val richCurried: RichCurried[Int] =
+      RichCurried.instance[Int](a =>
+        b =>
+          richCurriedCalls += 1
+          a + b
+      )
+    val richCurriedItem: richCurried.combineFunction = 42
+    val richCurriedValue: richCurried.Value = 42
+    assert(summon[richCurried.combineFunction =:= Int](richCurriedItem) == 42)
+    assert(summon[richCurried.Value =:= Int](richCurriedValue) == 42)
+    assert(richCurried.combine(20)(22) == 42)
+    assert(richCurried.twice(21) == 42)
+    assert(richCurried.fold3(10, 12, 20) == 42)
+    assert(richCurriedCalls == 4)
 
     val derived: DerivedMonoid[Int] = DerivedMonoid.instance(0, _ + _)
     assert(derived.twice(21) == 42)

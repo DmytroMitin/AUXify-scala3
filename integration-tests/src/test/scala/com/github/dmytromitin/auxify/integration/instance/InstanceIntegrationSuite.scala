@@ -66,6 +66,41 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(value.combineFunction("left")("right"), "left/right")
   }
 
+  test("inherits the curried heterogeneous tail with virtual dispatch and two aliases") {
+    var combineCalls = 0
+    val value: RichCurried[Int] =
+      RichCurried.instance[Int](a =>
+        b =>
+          combineCalls += 1
+          a + b
+      )
+
+    val item: value.combineFunction = 42
+    val result: value.Value = 42
+    val itemEquality: value.combineFunction =:= Int =
+      summon[value.combineFunction =:= Int]
+    val resultEquality: value.Value =:= Int = summon[value.Value =:= Int]
+
+    assertEquals(itemEquality(item), 42)
+    assertEquals(resultEquality(result), 42)
+    assertEquals(value.combine(20)(22), 42)
+    assertEquals(combineCalls, 1)
+    assertEquals(value.twice(21), 42)
+    assertEquals(combineCalls, 2)
+    assertEquals(value.fold3(10, 12, 20), 42)
+    assertEquals(combineCalls, 4)
+    assertEquals(RichCurried.preserved, 243)
+  }
+
+  test("preserves an existing curried heterogeneous-tail instance factory") {
+    val value = ExistingRichCurried.instance[Int](a => b => a + b)
+    val item: value.Item = 42
+
+    assertEquals(item, 42)
+    assertEquals(value.twice(21), 42)
+    assertEquals(ExistingRichCurried.instanceCalls, 1)
+  }
+
   test("preserves a direct existing abstract-type instance factory") {
     val value: ExistingOut[Int] { type Out = String } =
       ExistingOut.instance[Int, String]

@@ -5,7 +5,11 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.{
+  ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
+  ExpansionTargetView
+}
 
 class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
   test("decodes the canonical curried-method instance family") {
@@ -54,6 +58,291 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
       "combineFunction1"
     )
   }
+
+  test("admits inherited concrete methods of mixed supported arities") {
+    assertEquals(
+      decode(
+        """trait RichCurried[A]:
+          |  def combine(a: A)(b: A): A
+          |  def identity: A = ???
+          |  def twice(a: A): A = combine(a)(a)
+          |  def fold2(a: A, b: A): A = combine(a)(b)
+          |  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+          |""".stripMargin,
+        "RichCurried"
+      ),
+      InstanceCurriedMethodSourceShapeDecoder.SourceShape(
+        "RichCurried",
+        "A",
+        "combine",
+        "a",
+        "b",
+        "combineFunction"
+      )
+    )
+  }
+
+  test("admits aliases and methods interleaved while aliases stay outside the term namespace") {
+    val source =
+      """trait Interleaved[Element]:
+        |  def append(left: Element)(right: Element): Element
+        |  type combineFunction = Element
+        |  def combineFunction1(value: Element): Element = append(value)(value)
+        |  type Value = Element
+        |  def fold3(combineFunction2: Element, middle: Element, end: Element): Element =
+        |    append(append(combineFunction2)(middle))(end)
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      "Interleaved"
+    )
+
+    assertEquals(
+      InstanceCurriedMethodSourceShapeDecoder
+        .decode(classView, bodyView, Some(typeStructureView))
+        .fold(diagnostic => fail(diagnostic.message), identity),
+      InstanceCurriedMethodSourceShapeDecoder.SourceShape(
+        "Interleaved",
+        "Element",
+        "append",
+        "left",
+        "right",
+        "combineFunction"
+      )
+    )
+  }
+
+  test("admits every source-ordered method and alias tail arrangement") {
+    val rows = List(
+      (
+        "AliasOnly",
+        """trait AliasOnly[A]:
+          |  def combine(a: A)(b: A): A
+          |  type Item = A
+          |""".stripMargin
+      ),
+      (
+        "MethodThenAlias",
+        """trait MethodThenAlias[A]:
+          |  def combine(a: A)(b: A): A
+          |  def twice(a: A): A = combine(a)(a)
+          |  type Item = A
+          |""".stripMargin
+      ),
+      (
+        "AliasThenMethod",
+        """trait AliasThenMethod[A]:
+          |  def combine(a: A)(b: A): A
+          |  type Item = A
+          |  def twice(a: A): A = combine(a)(a)
+          |""".stripMargin
+      ),
+      (
+        "MultipleAliases",
+        """trait MultipleAliases[A]:
+          |  def combine(a: A)(b: A): A
+          |  type Item = A
+          |  type Value = A
+          |  type Result = A
+          |""".stripMargin
+      )
+    )
+
+    rows.foreach: (traitName, source) =>
+      assert(
+        decodeEitherWithTypeStructure(source, traitName).isRight,
+        clues(traitName, decodeEitherWithTypeStructure(source, traitName))
+      )
+  }
+
+  test("freshens the carrier across every inherited method and parameter") {
+    val source =
+      """trait FreshTail[Element]:
+        |  def append(left: Element)(right: Element): Element
+        |  type combineFunction = Element
+        |  def combineFunction(combineFunction1: Element): Element =
+        |    append(combineFunction1)(combineFunction1)
+        |  def combineFunction2(combineFunction3: Element, end: Element): Element =
+        |    append(combineFunction3)(end)
+        |""".stripMargin
+
+    assertEquals(
+      decodeEitherWithTypeStructure(source, "FreshTail")
+        .fold(diagnostic => fail(diagnostic.message), identity)
+        .carrierName,
+      "combineFunction4"
+    )
+  }
+
+  test("matches every concrete alias by its exact source body index") {
+    val source =
+      """trait IndexedAliases[A]:
+        |  def combine(a: A)(b: A): A
+        |  type First = A
+        |  type Second = A
+        |  type Third = A
+        |  type Fourth = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      "IndexedAliases"
+    )
+    assertEquals(
+      typeStructureView.directTypeMembers.map(_.bodyIndex),
+      List(1, 2, 3, 4)
+    )
+
+    List(1, 2, 3, 4).foreach: index =>
+      val aliases = typeStructureView.directTypeMembers
+      val atIndex = aliases.find(_.bodyIndex == index).getOrElse(
+        fail(s"missing fixture alias at $index")
+      )
+      val missing = typeStructureView.copy(
+        directTypeMembers = aliases.filterNot(_.bodyIndex == index)
+      )
+      assertRejected(
+        InstanceCurriedMethodSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          Some(missing)
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+
+      val duplicate = typeStructureView.copy(
+        directTypeMembers = aliases :+ atIndex
+      )
+      assertRejected(
+        InstanceCurriedMethodSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          Some(duplicate)
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide exactly one normalized direct type member; found 2"
+      )
+
+      val mismatched = typeStructureView.copy(
+        directTypeMembers = aliases.map(alias =>
+          if alias.bodyIndex == index then alias.copy(bodyIndex = index + 10)
+          else alias
+        )
+      )
+      assertRejected(
+        InstanceCurriedMethodSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          Some(mismatched)
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+  }
+
+  test("validates the required curried role before any inherited tail member") {
+    assertRejected(
+      decodeEitherWithTypeStructure(
+        """trait RequiredFirst[A]:
+          |  def combine(a: A)(b: A): String
+          |  val invalid: A
+          |""".stripMargin,
+        "RequiredFirst"
+      ),
+      "RequiredFirst",
+      "curried method `combine` result type must use enclosing type parameter `A`"
+    )
+  }
+
+  private val rejectedTailSources = List(
+    (
+      "valid alias before an empty-clause method",
+      """trait AliasThenEmpty[A]:
+        |  def combine(a: A)(b: A): A
+        |  type Item = A
+        |  def invalid(): A = ???
+        |""".stripMargin,
+      "AliasThenEmpty",
+      "inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0"
+    ),
+    (
+      "valid method before a wrong-target alias",
+      """trait MethodThenWrongAlias[A]:
+        |  def combine(a: A)(b: A): A
+        |  def twice(a: A): A = combine(a)(a)
+        |  type Item = String
+        |""".stripMargin,
+      "MethodThenWrongAlias",
+      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+    ),
+    (
+      "late invalid method after several valid members",
+      """trait LateInvalid[A]:
+        |  def combine(a: A)(b: A): A
+        |  type Item = A
+        |  def twice(a: A): A = combine(a)(a)
+        |  type Value = A
+        |  def invalid(a: A)(b: A): A = combine(a)(b)
+        |""".stripMargin,
+      "LateInvalid",
+      "inherited concrete method `invalid` requires exactly one ordinary parameter clause; found 2"
+    ),
+    (
+      "contextual inherited method",
+      """trait ContextualTail[A]:
+        |  def combine(a: A)(b: A): A
+        |  def invalid(using value: A): A = value
+        |""".stripMargin,
+      "ContextualTail",
+      "inherited concrete method `invalid` parameter clause must be ordinary and non-contextual"
+    ),
+    (
+      "polymorphic inherited method",
+      """trait PolymorphicTail[A]:
+        |  def combine(a: A)(b: A): A
+        |  def invalid[B](value: A): A = value
+        |""".stripMargin,
+      "PolymorphicTail",
+      "inherited concrete method `invalid` must not declare method type parameters"
+    ),
+    (
+      "private inherited alias",
+      """trait PrivateAliasTail[A]:
+        |  def combine(a: A)(b: A): A
+        |  private type Item = A
+        |""".stripMargin,
+      "PrivateAliasTail",
+      "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "additional abstract method",
+      """trait AbstractTail[A]:
+        |  def combine(a: A)(b: A): A
+        |  def other(a: A): A
+        |""".stripMargin,
+      "AbstractTail",
+      "inherited method `other` must be concrete"
+    ),
+    (
+      "unsupported later value",
+      """trait ValueTail[A]:
+        |  def combine(a: A)(b: A): A
+        |  type Item = A
+        |  val cached: A
+        |""".stripMargin,
+      "ValueTail",
+      "direct body member at index 2 must be a method; found val"
+    )
+  )
+
+  rejectedTailSources.foreach: (label, source, traitName, reason) =>
+    test(s"rejects $label") {
+      assertRejected(
+        decodeEitherWithTypeStructure(source, traitName),
+        traitName,
+        reason
+      )
+    }
 
   private val rejectedSources = List(
     (
@@ -271,7 +560,7 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
         |  def other: A
         |""".stripMargin,
       "Extra",
-      "curried-method family requires exactly one direct body member; found 2"
+      "inherited method `other` must be concrete"
     )
   )
 
@@ -381,6 +670,15 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
     val (classView, bodyView) = decodeViews(source, traitName)
     InstanceCurriedMethodSourceShapeDecoder.decode(classView, bodyView)
 
+  private def decodeEitherWithTypeStructure(source: String, traitName: String) =
+    val (classView, bodyView, typeStructureView) =
+      decodeAllViews(source, traitName)
+    InstanceCurriedMethodSourceShapeDecoder.decode(
+      classView,
+      bodyView,
+      Some(typeStructureView)
+    )
+
   private def decodeViews(
       source: String,
       traitName: String
@@ -394,3 +692,24 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
     val classView = ExpansionTargetView.decode(primary).fold(d => fail(d.message), identity)
     val bodyView = ExpansionTargetBodyView.decode(primary).fold(d => fail(d.message), identity)
     (classView, bodyView)
+
+  private def decodeAllViews(
+      source: String,
+      traitName: String
+  ): (
+      ExpansionTargetView,
+      ExpansionTargetBodyView,
+      ExpansionTargetTypeStructureView
+  ) =
+    val unit = CompilationUnit(s"${traitName}CurriedInstance.scala", source)
+    given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
+    val primary = new Parsers.Parser(unit.source).parse() match
+      case PackageDef(_, List(value: TypeDef)) => value
+      case value: TypeDef => value
+      case other => fail(s"missing primary TypeDef for $traitName in $other")
+    val classView = ExpansionTargetView.decode(primary).fold(d => fail(d.message), identity)
+    val bodyView = ExpansionTargetBodyView.decode(primary).fold(d => fail(d.message), identity)
+    val typeStructureView = ExpansionTargetTypeStructureView
+      .decode(primary)
+      .fold(d => fail(d.message), identity)
+    (classView, bodyView, typeStructureView)
