@@ -23,13 +23,17 @@ private[internal] object DelegatedDefinitionBuilder:
       case DelegatedSourceShapeDecoder.Variant.Unary(parameter, result) =>
         val parameterName = Term.Name(parameter)
         val resultTypeName = Type.Name(result)
-        val evidenceName = Term.Name(freshEvidenceName(Set(parameter)))
+        val evidenceName = Term.Name(
+          freshEvidenceName(Set(parameter) ++ shape.occupiedTermNames)
+        )
         val ordinaryParameter: Term.Param = param"$parameterName: $typeParameterName"
         val invocation: Term = q"$evidenceName.$methodName($parameterName)"
 
         q"def $methodName[..$typeParameters]($ordinaryParameter)(using $evidenceName: $target): $resultTypeName = $invocation"
       case DelegatedSourceShapeDecoder.Variant.Parameterless =>
-        val evidenceName = Term.Name(freshEvidenceName(Set(shape.methodName)))
+        val evidenceName = Term.Name(
+          freshEvidenceName(Set(shape.methodName) ++ shape.occupiedTermNames)
+        )
         val selection: Term = q"$evidenceName.$methodName"
 
         q"def $methodName[..$typeParameters](using $evidenceName: $target): $typeParameterName = $selection"

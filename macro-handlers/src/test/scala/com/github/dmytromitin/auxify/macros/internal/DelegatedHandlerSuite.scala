@@ -44,6 +44,89 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("freshens unary evidence across inherited concrete method term roles") {
+    withExpansionInput(
+      """@current
+        |trait FreshShow[A]:
+        |  def show(value: A): String
+        |  def inst(inst1: A): A = inst1
+        |""".stripMargin,
+      "FreshShow"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val output = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          StructuredOutcomeTestSupport.materialize(input, changes)
+        case other => fail(s"expected structured delegated expansion, found $other")
+
+      val generated = output.companion.toList.flatMap(_.impl.body).collect {
+        case method: DefDef if method.name.toString == "show" => method
+      }
+      assertEquals(generated.size, 1)
+      assertEquals(
+        generated.head.trailingParamss.map(_.map(_.name.toString)),
+        List(List("value"), List("inst2"))
+      )
+    }
+  }
+
+  test("uses normalized alias evidence without reserving its type-only name") {
+    withExpansionInput(
+      """@current
+        |trait AliasShow[A]:
+        |  def show(value: A): String
+        |  type inst = A
+        |""".stripMargin,
+      "AliasShow"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedMethod(output, "show")
+        case other => fail(s"expected alias-tail delegated expansion, found $other")
+
+      assertEquals(
+        method.trailingParamss.map(_.map(_.name.toString)),
+        List(List("value"), List("inst"))
+      )
+    }
+  }
+
+  test("parameterless inherited tails keep one stable-select forwarder and fresh evidence") {
+    withExpansionInput(
+      """@current
+        |trait RichEmpty[A]:
+        |  def empty: A
+        |  type inst = A
+        |  def inst(inst1: A): A = inst1
+        |  type Value = A
+        |""".stripMargin,
+      "RichEmpty"
+    ) { (input, _, companion, context) =>
+      given Context = context
+      assertEquals(companion, None)
+      val output = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          StructuredOutcomeTestSupport.materialize(input, changes)
+        case other => fail(s"expected structured parameterless tail expansion, found $other")
+
+      val generated = output.companion.toList.flatMap(_.impl.body).collect {
+        case method: DefDef => method
+      }
+      assertEquals(generated.map(_.name.toString), List("empty"))
+      assertEquals(
+        generated.head.trailingParamss.map(_.map(_.name.toString)),
+        List(List("inst2"))
+      )
+      generated.head.rhs match
+        case Select(Ident(receiver), selected) =>
+          assertEquals(receiver.toString, "inst2")
+          assertEquals(selected.toString, "empty")
+        case other => fail(s"expected parameterless stable select, found $other")
+    }
+  }
+
 
   test("derives a parameterless stable-select method and creates the missing companion") {
     withExpansionInput(
@@ -105,6 +188,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       """@current
         |trait ExistingEmpty[A]:
         |  def empty: A
+        |  type Item = A
+        |  def duplicate(a: A): A = a
         |
         |object ExistingEmpty:
         |  def empty[A](using ExistingEmpty[A]): A = summon[ExistingEmpty[A]].empty
@@ -206,6 +291,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       """@current
         |trait Existing[A]:
         |  def show(a: A): String
+        |  type Item = A
+        |  def duplicate(a: A): A = a
         |
         |object Existing:
         |  def show[A](a: A): String = "preserved"
@@ -262,6 +349,91 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("a late invalid inherited member rejects without a partial companion edit") {
+    withExpansionInput(
+      """@current
+        |trait LateInvalid[A]:
+        |  def show(a: A): String
+        |  type Item = A
+        |  def duplicate(a: A): A = a
+        |  val invalid: A
+        |
+        |object LateInvalid:
+        |  val retained = 17
+        |""".stripMargin,
+      "LateInvalid"
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      val originalCompanionBody = companion.getOrElse(fail("missing companion")).impl.body
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated source shape for `LateInvalid`: direct body member at index 3 must be a method; found val"
+            )
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assert(companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody))
+        case other => fail(s"expected controlled late-tail rejection, found $other")
+    }
+  }
+
+  test("rejects inherited tails when delegated is stacked with apply") {
+    withExpansionInput(
+      """@current
+        |trait StackedTail[A]:
+        |  def show(a: A): String
+        |  type Item = A
+        |  def duplicate(a: A): A = a
+        |
+        |object StackedTail:
+        |  val retained = 19
+        |""".stripMargin,
+      "StackedTail",
+      List(
+        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated"
+      )
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      val originalCompanionBody = companion.getOrElse(fail("missing companion")).impl.body
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated composition shape for `StackedTail`: inherited concrete tails are not supported when stacked with @apply"
+            )
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assert(companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody))
+        case other => fail(s"expected controlled stacked-tail rejection, found $other")
+    }
+  }
+
+  test("missing primary member remains a controlled delegated rejection") {
+    withExpansionInput(
+      """@current
+        |trait Missing[A]
+        |""".stripMargin,
+      "Missing"
+    ) { (input, _, _, context) =>
+      given Context = context
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated source shape for `Missing`: requires exactly one direct body member; found 0"
+            )
+          )
+        case other => fail(s"expected controlled missing-member rejection, found $other")
+    }
+  }
+
 
   test("parameterless bridge failure rolls back without a partial companion edit") {
     withExpansionInput(
@@ -302,6 +474,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       """@current
         |trait Show[A]:
         |  def show(a: A): String
+        |  type Item = A
+        |  def duplicate(a: A): A = a
         |
         |object Show:
         |  val retained = 11
@@ -335,7 +509,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
 
   private def withExpansionInput[A](
       source: String,
-      className: String
+      className: String,
+      sourceOrderedHandledAnnotationNames: List[String] = Nil
   )(run: (ExpansionInput, TypeDef, Option[ModuleDef], Context) => A): A =
     val unit = CompilationUnit(s"${className}DelegatedHandlerFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
@@ -353,7 +528,8 @@ class DelegatedHandlerSuite extends munit.FunSuite:
         primary,
         companion,
         Set(className),
-        Some(currentAnnotation)
+        Some(currentAnnotation),
+        sourceOrderedHandledAnnotationNames
       ),
       primary,
       companion,

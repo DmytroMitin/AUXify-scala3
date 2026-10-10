@@ -5,7 +5,12 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetView}
+import paradise3.api.{
+  ExpansionDiagnostic,
+  ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
+  ExpansionTargetView
+}
 import paradise3.api.ExpansionTargetBodyView.DirectMemberKind
 
 class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
@@ -49,6 +54,160 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("decodes a unary primary followed by one inherited concrete method") {
+    assertEquals(
+      decode(
+        """trait RichShow[A]:
+          |  def show(a: A): String
+          |  def duplicate(a: A): A = a
+          |""".stripMargin,
+        "RichShow"
+      ),
+      DelegatedSourceShapeDecoder.SourceShape(
+        traitName = "RichShow",
+        typeParameterName = "A",
+        methodName = "show",
+        variant = DelegatedSourceShapeDecoder.Variant.Unary(
+          parameterName = "a",
+          resultTypeName = "String"
+        ),
+        occupiedTermNames = Set("duplicate", "a")
+      )
+    )
+  }
+
+  test("admits both primary families with every supported inherited method arity") {
+    val rows = List(
+      (
+        "RichUnary",
+        """trait RichUnary[A]:
+          |  def show(a: A): String
+          |  def identity: A = ???
+          |  def duplicate(a: A): A = a
+          |  def pick(a: A, b: A): A = a
+          |""".stripMargin,
+        Set("identity", "duplicate", "a", "pick", "b")
+      ),
+      (
+        "RichParameterless",
+        """trait RichParameterless[A]:
+          |  def empty: A
+          |  def identity: A = ???
+          |  def duplicate(a: A): A = a
+          |  def pick(a: A, b: A): A = a
+          |""".stripMargin,
+        Set("identity", "duplicate", "a", "pick", "b")
+      )
+    )
+
+    rows.foreach: (traitName, source, occupied) =>
+      assertEquals(
+        decodeEitherWithTypeStructure(source, traitName)
+          .fold(diagnostic => fail(diagnostic.message), identity)
+          .occupiedTermNames,
+        occupied
+      )
+  }
+
+  test("admits aliases and methods in every source order for both primary families") {
+    val primaryRows = List(
+      ("Unary", "def show(a: A): String"),
+      ("Parameterless", "def empty: A")
+    )
+    val tailRows = List(
+      ("AliasOnly", "type Item = A"),
+      ("MethodThenAlias", "def twice(a: A): A = a\n  type Item = A"),
+      ("AliasThenMethod", "type Item = A\n  def twice(a: A): A = a"),
+      (
+        "Interleaved",
+        "type First = A\n  def twice(a: A): A = a\n  type Second = A\n  def pick(a: A, b: A): A = b\n  type Third = A"
+      )
+    )
+
+    for
+      (primaryLabel, primary) <- primaryRows
+      (tailLabel, tail) <- tailRows
+    do
+      val traitName = s"${primaryLabel}${tailLabel}"
+      val source = s"trait $traitName[A]:\n  $primary\n  $tail\n"
+      assert(
+        decodeEitherWithTypeStructure(source, traitName).isRight,
+        clues(traitName, decodeEitherWithTypeStructure(source, traitName))
+      )
+  }
+
+  test("freshens across inherited method roles while aliases stay outside the term namespace") {
+    val decoded = decodeEitherWithTypeStructure(
+      """trait FreshDelegated[Element]:
+        |  def render(value: Element): Text
+        |  type inst = Element
+        |  def inst(inst1: Element): Element = inst1
+        |  type Value = Element
+        |  def inst2(inst3: Element, end: Element): Element = end
+        |""".stripMargin,
+      "FreshDelegated"
+    ).fold(diagnostic => fail(diagnostic.message), identity)
+
+    assertEquals(decoded.occupiedTermNames, Set("inst", "inst1", "inst2", "inst3", "end"))
+  }
+
+  test("matches every inherited alias by its exact source body index") {
+    val source =
+      """trait IndexedDelegated[A]:
+        |  def show(a: A): String
+        |  type First = A
+        |  def twice(a: A): A = a
+        |  type Second = A
+        |  type Third = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(source, "IndexedDelegated")
+    assertEquals(typeStructureView.directTypeMembers.map(_.bodyIndex), List(1, 3, 4))
+
+    List(1, 3, 4).foreach: index =>
+      val aliases = typeStructureView.directTypeMembers
+      val atIndex = aliases.find(_.bodyIndex == index).getOrElse(fail(s"missing alias at $index"))
+      val missing = typeStructureView.copy(
+        directTypeMembers = aliases.filterNot(_.bodyIndex == index)
+      )
+      assertRejected(
+        DelegatedSourceShapeDecoder.decode("IndexedDelegated", classView, bodyView, Some(missing)),
+        "IndexedDelegated",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+
+      val duplicate = typeStructureView.copy(directTypeMembers = aliases :+ atIndex)
+      assertRejected(
+        DelegatedSourceShapeDecoder.decode("IndexedDelegated", classView, bodyView, Some(duplicate)),
+        "IndexedDelegated",
+        s"direct body member at index $index must provide exactly one normalized direct type member; found 2"
+      )
+
+      val mismatched = typeStructureView.copy(
+        directTypeMembers = aliases.map(alias =>
+          if alias.bodyIndex == index then alias.copy(bodyIndex = index + 10) else alias
+        )
+      )
+      assertRejected(
+        DelegatedSourceShapeDecoder.decode("IndexedDelegated", classView, bodyView, Some(mismatched)),
+        "IndexedDelegated",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+  }
+
+  test("validates the required primary method before any inherited tail member") {
+    assertRejected(
+      decodeEitherWithTypeStructure(
+        """trait RequiredFirst[A]:
+          |  def show(a: A): List[String]
+          |  val invalid: A
+          |""".stripMargin,
+        "RequiredFirst"
+      ),
+      "RequiredFirst",
+      "direct method `show` result type must be one unqualified named type"
+    )
+  }
+
 
   test("decodes a parameterless direct-enclosing-result source as its closed variant") {
     assertEquals(
@@ -66,6 +225,179 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
       )
     )
   }
+
+  private val rejectedTailShapes = List(
+    (
+      "abstract inherited method",
+      """trait AbstractTail[A]:
+        |  def show(a: A): String
+        |  def other(a: A): A
+        |""".stripMargin,
+      "AbstractTail",
+      "inherited method `other` must be concrete"
+    ),
+    (
+      "explicit empty clause",
+      """trait EmptyClauseTail[A]:
+        |  def show(a: A): String
+        |  def other(): A = ???
+        |""".stripMargin,
+      "EmptyClauseTail",
+      "inherited concrete method `other` requires one or more ordinary parameters in its single clause; found 0"
+    ),
+    (
+      "curried inherited method",
+      """trait CurriedTail[A]:
+        |  def show(a: A): String
+        |  def other(a: A)(b: A): A = a
+        |""".stripMargin,
+      "CurriedTail",
+      "inherited concrete method `other` requires exactly one ordinary parameter clause; found 2"
+    ),
+    (
+      "contextual inherited method",
+      """trait ContextualTail[A]:
+        |  def show(a: A): String
+        |  def other(using a: A): A = a
+        |""".stripMargin,
+      "ContextualTail",
+      "inherited concrete method `other` parameter clause must be ordinary and non-contextual"
+    ),
+    (
+      "defaulted inherited parameter",
+      """trait DefaultedTail[A]:
+        |  def show(a: A): String
+        |  def other(a: A = ???): A = a
+        |""".stripMargin,
+      "DefaultedTail",
+      "inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified"
+    ),
+    (
+      "polymorphic inherited method",
+      """trait PolymorphicTail[A]:
+        |  def show(a: A): String
+        |  def other[B](a: A): A = a
+        |""".stripMargin,
+      "PolymorphicTail",
+      "inherited concrete method `other` must not declare method type parameters"
+    ),
+    (
+      "modifier-bearing inherited method",
+      """trait InfixTail[A]:
+        |  def show(a: A): String
+        |  infix def other(a: A): A = a
+        |""".stripMargin,
+      "InfixTail",
+      "inherited concrete method `other` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "private inherited method",
+      """trait PrivateMethodTail[A]:
+        |  def show(a: A): String
+        |  private def other(a: A): A = a
+        |""".stripMargin,
+      "PrivateMethodTail",
+      "inherited concrete method `other` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "annotated inherited method",
+      """trait AnnotatedMethodTail[A]:
+        |  def show(a: A): String
+        |  @deprecated def other(a: A): A = a
+        |""".stripMargin,
+      "AnnotatedMethodTail",
+      "inherited concrete method `other` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "wrong inherited parameter type",
+      """trait WrongParameterTail[A]:
+        |  def show(a: A): String
+        |  def other(a: String): A = ???
+        |""".stripMargin,
+      "WrongParameterTail",
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A`"
+    ),
+    (
+      "wrong inherited result type",
+      """trait WrongResultTail[A]:
+        |  def show(a: A): String
+        |  def other(a: A): String = a.toString
+        |""".stripMargin,
+      "WrongResultTail",
+      "inherited concrete method `other` result type must use enclosing type parameter `A`"
+    ),
+    (
+      "abstract inherited type",
+      """trait AbstractTypeTail[A]:
+        |  def show(a: A): String
+        |  type Item
+        |""".stripMargin,
+      "AbstractTypeTail",
+      "inherited type member `Item` must be a concrete alias"
+    ),
+    (
+      "bounded inherited type",
+      """trait BoundedTypeTail[A]:
+        |  def show(a: A): String
+        |  type Item <: A
+        |""".stripMargin,
+      "BoundedTypeTail",
+      "inherited type member `Item` must be a concrete alias"
+    ),
+    (
+      "polymorphic inherited alias",
+      """trait PolymorphicAliasTail[A]:
+        |  def show(a: A): String
+        |  type Item[B] = A
+        |""".stripMargin,
+      "PolymorphicAliasTail",
+      "inherited concrete type alias `Item` must not declare type parameters"
+    ),
+    (
+      "private inherited alias",
+      """trait PrivateAliasTail[A]:
+        |  def show(a: A): String
+        |  private type Item = A
+        |""".stripMargin,
+      "PrivateAliasTail",
+      "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "annotated inherited alias",
+      """trait AnnotatedAliasTail[A]:
+        |  def show(a: A): String
+        |  @deprecated type Item = A
+        |""".stripMargin,
+      "AnnotatedAliasTail",
+      "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "wrong inherited alias target",
+      """trait WrongAliasTail[A]:
+        |  def show(a: A): String
+        |  type Item = String
+        |""".stripMargin,
+      "WrongAliasTail",
+      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+    ),
+    (
+      "late invalid member",
+      """trait LateInvalidTail[A]:
+        |  def empty: A
+        |  type First = A
+        |  def twice(a: A): A = a
+        |  type Second = A
+        |  val invalid: A
+        |""".stripMargin,
+      "LateInvalidTail",
+      "direct body member at index 4 must be a method; found val"
+    )
+  )
+
+  rejectedTailShapes.foreach: (label, source, traitName, reason) =>
+    test(s"rejects tail $label") {
+      assertRejected(decodeEitherWithTypeStructure(source, traitName), traitName, reason)
+    }
 
   private val rejectedShapes = List(
     (
@@ -290,7 +622,7 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
         |  val extra: Int
         |""".stripMargin,
       "ExtraMember",
-      "requires exactly one direct body member; found 2"
+      "direct body member at index 1 must be a method; found val"
     ),
     (
       "protected method",
@@ -395,6 +727,27 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
     val (classView, bodyView) = decodeViews(unit)
     DelegatedSourceShapeDecoder.decode(traitName, classView, bodyView)
 
+  private def decodeEitherWithTypeStructure(source: String, traitName: String) =
+    val (classView, bodyView, typeStructureView) = decodeAllViews(source, traitName)
+    DelegatedSourceShapeDecoder.decode(
+      traitName,
+      classView,
+      bodyView,
+      Some(typeStructureView)
+    )
+
+  private def assertRejected(
+      decoded: Either[ExpansionDiagnostic, DelegatedSourceShapeDecoder.SourceShape],
+      traitName: String,
+      reason: String
+  ): Unit =
+    val diagnostic = decoded.left.toOption.getOrElse(fail(s"$traitName unexpectedly decoded"))
+    assertEquals(
+      diagnostic.message,
+      s"unsupported @delegated source shape for `$traitName`: $reason"
+    )
+    assert(diagnostic.pos.span.exists, clues(diagnostic))
+
   private def decodeViews(unit: CompilationUnit)(using Context) =
     val primary = new Parsers.Parser(unit.source).parse() match
       case PackageDef(_, List(value: TypeDef)) => value
@@ -407,3 +760,24 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
     (classView, bodyView)
+
+  private def decodeAllViews(
+      source: String,
+      traitName: String
+  ): (
+      ExpansionTargetView,
+      ExpansionTargetBodyView,
+      ExpansionTargetTypeStructureView
+  ) =
+    val unit = CompilationUnit(s"${traitName}DelegatedDecoderFixture.scala", source)
+    given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
+    val primary = new Parsers.Parser(unit.source).parse() match
+      case PackageDef(_, List(value: TypeDef)) => value
+      case value: TypeDef => value
+      case other => fail(s"missing primary TypeDef in $other")
+    val classView = ExpansionTargetView.decode(primary).fold(d => fail(d.message), identity)
+    val bodyView = ExpansionTargetBodyView.decode(primary).fold(d => fail(d.message), identity)
+    val typeStructureView = ExpansionTargetTypeStructureView
+      .decode(primary)
+      .fold(d => fail(d.message), identity)
+    (classView, bodyView, typeStructureView)

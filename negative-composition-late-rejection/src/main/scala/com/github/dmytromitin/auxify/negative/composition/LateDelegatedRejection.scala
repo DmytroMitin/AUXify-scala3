@@ -5,4 +5,6 @@ import com.github.dmytromitin.auxify.macros.{apply, delegated}
 @apply
 @delegated
 trait LateDelegatedRejection[A]:
-  def show(a: A): List[String]
+  def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a

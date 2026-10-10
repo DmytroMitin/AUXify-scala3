@@ -5,7 +5,8 @@ import dotty.tools.dotc.util.SrcPos
 import paradise3.api.{
   ExpansionTargetBodyView,
   ExpansionTargetView,
-  ExpansionDiagnostic
+  ExpansionDiagnostic,
+  ExpansionTargetTypeStructureView
 }
 import paradise3.api.ExpansionTargetBodyView.{
   DirectMemberKind,
@@ -24,13 +25,15 @@ private[internal] object DelegatedSourceShapeDecoder:
       traitName: String,
       typeParameterName: String,
       methodName: String,
-      variant: Variant
+      variant: Variant,
+      occupiedTermNames: Set[String] = Set.empty
   )
 
   def decode(
       traitName: String,
       classView: ExpansionTargetView,
-      bodyView: ExpansionTargetBodyView
+      bodyView: ExpansionTargetBodyView,
+      typeStructureView: Option[ExpansionTargetTypeStructureView] = None
   ): Either[ExpansionDiagnostic, SourceShape] =
     classView.typeParameters match
       case List(typeParameter)
@@ -39,7 +42,7 @@ private[internal] object DelegatedSourceShapeDecoder:
             !typeParameter.hasContextBounds &&
             !typeParameter.isOrdinaryUpperBounded =>
         bodyView.members match
-          case List(member) =>
+          case member :: tail =>
             if member.kind != DirectMemberKind.Method then
               unsupported(
                 traitName,
@@ -49,7 +52,17 @@ private[internal] object DelegatedSourceShapeDecoder:
             else
               member.method match
                 case Some(method) if normalizedNameAvailable(method.name) =>
-                  decodeMethod(traitName, typeParameter.name, method)
+                  for
+                    primary <- decodeMethod(traitName, typeParameter.name, method)
+                    occupied <- InstanceInheritedConcreteTailValidator.validate(
+                      traitName,
+                      typeParameter.name,
+                      tail,
+                      firstBodyIndex = 1,
+                      typeStructureView,
+                      diagnosticAnnotation = "@delegated"
+                    )
+                  yield primary.copy(occupiedTermNames = occupied)
                 case Some(method) =>
                   unsupported(
                     traitName,
@@ -62,10 +75,10 @@ private[internal] object DelegatedSourceShapeDecoder:
                     "the direct body member must provide normalized method evidence",
                     member.pos
                   )
-          case members =>
+          case Nil =>
             unsupported(
               traitName,
-              s"requires exactly one direct body member; found ${members.size}",
+              "requires exactly one direct body member; found 0",
               bodyView.pos
             )
       case _ =>

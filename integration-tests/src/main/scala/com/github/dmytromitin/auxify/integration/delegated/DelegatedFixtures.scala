@@ -23,6 +23,30 @@ object Render:
     def render(value: Long): Text = Text(s"rendered:$value")
 
 @delegated
+trait RichShow[A]:
+  def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
+  def pick(a: A, b: A): A = b
+
+object RichShow:
+  given RichShow[Int] with
+    def show(a: Int): String = a.toString
+
+@delegated
+trait RichEmpty[A]:
+  def empty: A
+  def inst(inst1: A): A = inst1
+  type inst = A
+  def pick(a: A, b: A): A = b
+  type Value = A
+
+object RichEmpty:
+  given RichEmpty[Int] with
+    def empty: Int = 42
+
+@delegated
 trait Existing[A]:
   def describe(a: A): String
 

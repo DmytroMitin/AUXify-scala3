@@ -61,6 +61,29 @@ object EmptyDelegated:
   given EmptyDelegated[Int] with
     def empty: Int = 42
 
+@delegated
+trait RichRender[A]:
+  def render(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
+  def pick(a: A, b: A): A = b
+
+object RichRender:
+  given RichRender[Int] with
+    def render(a: Int): String = a.toString
+
+@delegated
+trait RichEmptyDelegated[A]:
+  def empty: A
+  def inst(inst1: A): A = inst1
+  type inst = A
+  type Value = A
+
+object RichEmptyDelegated:
+  given RichEmptyDelegated[Int] with
+    def empty: Int = 42
+
 @instance
 trait Monoid[A]:
   def empty: A
@@ -323,6 +346,23 @@ object ExternalApp:
     assert(generatedSelf eq selfQualified)
 
     assert(Render.render(42) == "42")
+
+    val richRender = summon[RichRender[Int]]
+    val richRenderItem: richRender.Item = 42
+    val richRenderValue: richRender.Value = 42
+    assert(RichRender.render(42) == "42")
+    assert(richRender.duplicate(42) == 42)
+    assert(richRender.pick(41, 42) == 42)
+    assert(summon[richRender.Item =:= Int](richRenderItem) == 42)
+    assert(summon[richRender.Value =:= Int](richRenderValue) == 42)
+
+    val richEmptyDelegated = summon[RichEmptyDelegated[Int]]
+    val richEmptyInst: richEmptyDelegated.inst = 42
+    val richEmptyValue: richEmptyDelegated.Value = 42
+    assert(RichEmptyDelegated.empty[Int] == 42)
+    assert(richEmptyDelegated.inst(42) == 42)
+    assert(summon[richEmptyDelegated.inst =:= Int](richEmptyInst) == 42)
+    assert(summon[richEmptyDelegated.Value =:= Int](richEmptyValue) == 42)
 
     var emptyEvaluations = 0
     val intAddition: Monoid[Int] = Monoid.instance(

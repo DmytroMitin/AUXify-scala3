@@ -28,7 +28,8 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       enclosingTypeParameterName: String,
       members: List[DirectMember],
       firstBodyIndex: Int,
-      typeStructureView: Option[ExpansionTargetTypeStructureView]
+      typeStructureView: Option[ExpansionTargetTypeStructureView],
+      diagnosticAnnotation: String = "@instance"
   ): Either[ExpansionDiagnostic, Set[String]] =
     members.zipWithIndex.foldLeft[Either[ExpansionDiagnostic, Set[String]]](
       Right(Set.empty)
@@ -36,6 +37,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       val (member, offset) = indexedMember
       validated.flatMap: occupied =>
         inheritedMemberOccupiedNames(
+          diagnosticAnnotation,
           traitName,
           index = firstBodyIndex + offset,
           member,
@@ -44,6 +46,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         ).map(occupied ++ _)
 
   private def inheritedMemberOccupiedNames(
+      diagnosticAnnotation: String,
       traitName: String,
       index: Int,
       member: DirectMember,
@@ -53,6 +56,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
     member.kind match
       case DirectMemberKind.Method =>
         inheritedMethodOccupiedNames(
+          diagnosticAnnotation,
           traitName,
           index,
           member,
@@ -61,47 +65,54 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       case DirectMemberKind.Type =>
         for
           typeStructure <- typeStructureView.toRight(
-            ExpansionDiagnostic(
-              s"unsupported @instance source shape for `$traitName`: direct body member at index $index must provide normalized type-member evidence",
+            diagnostic(
+              diagnosticAnnotation,
+              traitName,
+              s"direct body member at index $index must provide normalized type-member evidence",
               member.pos
             )
           )
           alias <- concreteAliasAtIndex(
+            diagnosticAnnotation,
             traitName,
             index,
             typeStructure,
             member.pos
           )
           _ <- eligibleConcreteAlias(
+            diagnosticAnnotation,
             traitName,
             alias,
             enclosingTypeParameterName
           )
         yield Set.empty
       case _ =>
-        directMethod(traitName, index, member).map(_ => Set.empty)
+        directMethod(diagnosticAnnotation, traitName, index, member).map(_ => Set.empty)
 
   private def inheritedMethodOccupiedNames(
+      diagnosticAnnotation: String,
       traitName: String,
       index: Int,
       member: DirectMember,
       enclosingTypeParameterName: String
   ): Either[ExpansionDiagnostic, Set[String]] =
     for
-      inheritedMethod <- directMethod(traitName, index, member)
-      _ <- eligibleInheritedMethod(traitName, inheritedMethod)
-      inheritedParameters <- inheritedTopology(traitName, inheritedMethod)
+      inheritedMethod <- directMethod(diagnosticAnnotation, traitName, index, member)
+      _ <- eligibleInheritedMethod(diagnosticAnnotation, traitName, inheritedMethod)
+      inheritedParameters <- inheritedTopology(diagnosticAnnotation, traitName, inheritedMethod)
       _ <- inheritedParameters.foldLeft[Either[ExpansionDiagnostic, Unit]](
         Right(())
       ): (validated, parameter) =>
         validated.flatMap: _ =>
           inheritedParameterType(
+            diagnosticAnnotation,
             traitName,
             inheritedMethod,
             parameter,
             enclosingTypeParameterName
           )
       _ <- enclosingResult(
+        diagnosticAnnotation,
         traitName,
         "inherited concrete",
         inheritedMethod,
@@ -110,6 +121,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
     yield Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
 
   private def concreteAliasAtIndex(
+      diagnosticAnnotation: String,
       traitName: String,
       index: Int,
       typeStructureView: ExpansionTargetTypeStructureView,
@@ -119,18 +131,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       case List(alias) => Right(alias)
       case Nil =>
         unsupported(
+          diagnosticAnnotation,
           traitName,
           s"direct body member at index $index must provide normalized type-member evidence",
           fallbackPos
         )
       case aliases =>
         unsupported(
+          diagnosticAnnotation,
           traitName,
           s"direct body member at index $index must provide exactly one normalized direct type member; found ${aliases.size}",
           aliases.headOption.map(_.pos).getOrElse(fallbackPos)
         )
 
   private def eligibleConcreteAlias(
+      diagnosticAnnotation: String,
       traitName: String,
       alias: DirectTypeMember,
       enclosingTypeParameterName: String
@@ -138,18 +153,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
     val aliasName = alias.name
     if !normalizedNameAvailable(aliasName) then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         "inherited concrete type alias must have an available normalized name",
         alias.pos
       )
     else if alias.kind != DirectTypeMemberKind.Alias then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited type member `$aliasName` must be a concrete alias",
         alias.pos
       )
     else if alias.typeParameters.nonEmpty then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete type alias `$aliasName` must not declare type parameters",
         alias.pos
@@ -161,12 +179,14 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         alias.modifiers.unsupportedFlags.nonEmpty
     then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete type alias `$aliasName` must be public, unannotated, and free of unsupported modifiers",
         alias.pos
       )
     else if alias.lowerBound != Bound.Absent || alias.upperBound != Bound.Absent then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete type alias `$aliasName` must not declare lower or upper bounds",
         alias.pos
@@ -177,18 +197,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
             if name == enclosingTypeParameterName => Right(())
         case _ =>
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"inherited concrete type alias `$aliasName` must target enclosing type parameter `$enclosingTypeParameterName`",
             alias.pos
           )
 
   private def directMethod(
+      diagnosticAnnotation: String,
       traitName: String,
       index: Int,
       member: DirectMember
   ): Either[ExpansionDiagnostic, DirectMethod] =
     if member.kind != DirectMemberKind.Method then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"direct body member at index $index must be a method; found ${memberKindLabel(member.kind)}",
         member.pos
@@ -198,18 +221,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         case Some(method) if normalizedNameAvailable(method.name) => Right(method)
         case Some(method) =>
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"direct method at index $index must have an available normalized name",
             method.pos
           )
         case None =>
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"direct body member at index $index must provide normalized method evidence",
             member.pos
           )
 
   private def eligibleInheritedMethod(
+      diagnosticAnnotation: String,
       traitName: String,
       method: DirectMethod
   ): Either[ExpansionDiagnostic, Unit] =
@@ -220,18 +246,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         method.modifiers.unsupportedFlags.nonEmpty
     then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete method `${method.name}` must be public, unannotated, and free of unsupported modifiers",
         method.pos
       )
     else if method.status != DirectMethodStatus.Concrete then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited method `${method.name}` must be concrete",
         method.pos
       )
     else if method.typeParameters.nonEmpty then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete method `${method.name}` must not declare method type parameters",
         method.pos
@@ -239,6 +268,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
     else Right(())
 
   private def inheritedTopology(
+      diagnosticAnnotation: String,
       traitName: String,
       method: DirectMethod
   ): Either[ExpansionDiagnostic, List[DirectMethodParameter]] =
@@ -247,12 +277,14 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       case List(clause) =>
         if clause.isContextual || clause.isImplicit || clause.isGiven then
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"inherited concrete method `${method.name}` parameter clause must be ordinary and non-contextual",
             clause.pos
           )
         else if clause.parameters.isEmpty then
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"inherited concrete method `${method.name}` requires one or more ordinary parameters in its single clause; found 0",
             clause.pos
@@ -260,12 +292,14 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         else Right(clause.parameters)
       case clauses =>
         unsupported(
+          diagnosticAnnotation,
           traitName,
           s"inherited concrete method `${method.name}` requires exactly one ordinary parameter clause; found ${clauses.size}",
           method.pos
         )
 
   private def inheritedParameterType(
+      diagnosticAnnotation: String,
       traitName: String,
       method: DirectMethod,
       parameter: DirectMethodParameter,
@@ -281,6 +315,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         parameter.isVar
     then
       unsupported(
+        diagnosticAnnotation,
         traitName,
         s"inherited concrete method `${method.name}` parameter `${parameter.name}` must be ordinary, non-defaulted, and unmodified",
         parameter.pos
@@ -291,12 +326,14 @@ private[internal] object InstanceInheritedConcreteTailValidator:
             if name == enclosingTypeParameterName => Right(())
         case _ =>
           unsupported(
+            diagnosticAnnotation,
             traitName,
             s"inherited concrete method `${method.name}` parameter `${parameter.name}` must use enclosing type parameter `$enclosingTypeParameterName`",
             parameter.typePos
           )
 
   private def enclosingResult(
+      diagnosticAnnotation: String,
       traitName: String,
       role: String,
       method: DirectMethod,
@@ -307,6 +344,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
           if name == enclosingTypeParameterName => Right(())
       case _ =>
         unsupported(
+          diagnosticAnnotation,
           traitName,
           s"$role method `${method.name}` result type must use enclosing type parameter `$enclosingTypeParameterName`",
           method.resultTypePos
@@ -326,13 +364,20 @@ private[internal] object InstanceInheritedConcreteTailValidator:
     case DirectMemberKind.Other => "other"
 
   private def unsupported[A](
+      diagnosticAnnotation: String,
       traitName: String,
       reason: String,
       pos: SrcPos
   ): Left[ExpansionDiagnostic, A] =
-    Left(
-      ExpansionDiagnostic(
-        s"unsupported @instance source shape for `$traitName`: $reason",
-        pos
-      )
+    Left(diagnostic(diagnosticAnnotation, traitName, reason, pos))
+
+  private def diagnostic(
+      diagnosticAnnotation: String,
+      traitName: String,
+      reason: String,
+      pos: SrcPos
+  ): ExpansionDiagnostic =
+    ExpansionDiagnostic(
+      s"unsupported $diagnosticAnnotation source shape for `$traitName`: $reason",
+      pos
     )

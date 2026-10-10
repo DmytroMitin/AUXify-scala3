@@ -220,6 +220,7 @@ for self_negative_log in "$self_conflict_log" "$self_unsupported_log"; do
   fi
 done
 
+run_sbt 'negativeDelegatedUnsupported / clean'
 if run_sbt 'negativeDelegatedUnsupported / Compile / compile' >"$delegated_negative_log" 2>&1; then
   delegated_negative_status=0
 else
@@ -240,13 +241,31 @@ for expected_diagnostic in \
   'unsupported @delegated source shape for `ExplicitEmptyDelegated`: direct method `empty` requires exactly one ordinary parameter; found 0' \
   'unsupported @delegated source shape for `WrongParameterlessResultDelegated`: parameterless method `empty` result type must use enclosing type parameter `A`' \
   'unsupported @delegated source shape for `ContextualParameterlessDelegated`: direct method `empty` parameter clause must be ordinary and non-contextual' \
-  'unsupported @delegated source shape for `ExtraParameterlessDelegated`: requires exactly one direct body member; found 2' \
+  'unsupported @delegated source shape for `ExtraParameterlessDelegated`: direct body member at index 1 must be a method; found val' \
   'unsupported @delegated source shape for `OneParameterNearMissDelegated`: direct method `empty` result type must be one unqualified named type' \
   'unsupported @delegated source shape for `AppliedParameterlessResultDelegated`: parameterless method `empty` result type must use enclosing type parameter `A`' \
   'unsupported @delegated source shape for `ValParameterlessDelegated`: the direct body member must be one method' \
   'unsupported @delegated source shape for `VarParameterlessDelegated`: the direct body member must be one method' \
   'unsupported @delegated source shape for `TypeParameterlessDelegated`: the direct body member must be one method' \
-  'unsupported @delegated source shape for `NestedParameterlessDelegated`: the direct body member must be one method'; do
+  'unsupported @delegated source shape for `NestedParameterlessDelegated`: the direct body member must be one method' \
+  'unsupported @delegated source shape for `AbstractTailDelegated`: inherited method `other` must be concrete' \
+  'unsupported @delegated source shape for `EmptyClauseTailDelegated`: inherited concrete method `other` requires one or more ordinary parameters in its single clause; found 0' \
+  'unsupported @delegated source shape for `CurriedTailDelegated`: inherited concrete method `other` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @delegated source shape for `ContextualTailDelegated`: inherited concrete method `other` parameter clause must be ordinary and non-contextual' \
+  'unsupported @delegated source shape for `DefaultedTailDelegated`: inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified' \
+  'unsupported @delegated source shape for `PolymorphicTailDelegated`: inherited concrete method `other` must not declare method type parameters' \
+  'unsupported @delegated source shape for `WrongTailTypesDelegated`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @delegated source shape for `WrongTailResultDelegated`: inherited concrete method `other` result type must use enclosing type parameter `A`' \
+  'unsupported @delegated source shape for `ValueTailDelegated`: direct body member at index 1 must be a method; found val' \
+  'unsupported @delegated source shape for `VariableTailDelegated`: direct body member at index 1 must be a method; found var' \
+  'unsupported @delegated source shape for `LazyValueTailDelegated`: direct body member at index 1 must be a method; found val' \
+  'unsupported @delegated source shape for `NestedClassTailDelegated`: direct body member at index 1 must be a method; found nested class' \
+  'unsupported @delegated source shape for `NestedObjectTailDelegated`: direct body member at index 1 must be a method; found nested object' \
+  'unsupported @delegated source shape for `NestedTraitTailDelegated`: direct body member at index 1 must be a method; found nested trait' \
+  'unsupported @delegated source shape for `AbstractAliasTailDelegated`: inherited type member `Item` must be a concrete alias' \
+  'unsupported @delegated source shape for `PolymorphicAliasTailDelegated`: inherited concrete type alias `Item` must not declare type parameters' \
+  'unsupported @delegated source shape for `PrivateAliasTailDelegated`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @delegated source shape for `WrongAliasTailDelegated`: inherited concrete type alias `Item` must target enclosing type parameter `A`'; do
   grep -Fq -- "$expected_diagnostic" "$delegated_negative_log" ||
     fail "delegated negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -261,6 +280,12 @@ if grep -Eq \
   '^[[:space:]]*at[[:space:]]+[[:alnum:]_$./<>-]+\.[[:alnum:]_$<>-]+\([^)]*\)[[:space:]]*$' \
   "$delegated_negative_log"; then
   fail "delegated negative compile emitted an uncaught stack frame"
+fi
+
+delegated_classes="$product_root/negative-delegated-unsupported/target/scala-$scala_version/classes"
+if [[ -d "$delegated_classes" ]] && find "$delegated_classes" -type f \
+  \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+  fail "delegated rejection left partial class or TASTy output"
 fi
 
 if run_sbt 'negativeAuxUnsupported / Compile / compile' >"$aux_negative_log" 2>&1; then
@@ -548,9 +573,9 @@ cat "$composition_negative_log"
   fail "negativeCompositionLateRejection compiled successfully; the late delegated rejection was lost"
 
 grep -Fq \
-  'unsupported @delegated source shape for `LateDelegatedRejection`: direct method `show` result type must be one unqualified named type' \
+  'unsupported @delegated composition shape for `LateDelegatedRejection`: inherited concrete tails are not supported when stacked with @apply' \
   "$composition_negative_log" ||
-  fail "late composition rejection omitted the deterministic delegated decoder diagnostic"
+  fail "late composition rejection omitted the deterministic delegated composition diagnostic"
 
 if grep -Eiq \
   'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
@@ -755,6 +780,7 @@ external_root=""
 printf '%s\n' 'AUXIFY_SCALA3_SELF_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_PARAMETERLESS_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_DELEGATED_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'

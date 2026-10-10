@@ -9,7 +9,8 @@ object ExpansionInputTestFactory:
       primary: untpd.TypeDef,
       companion: Option[untpd.ModuleDef],
       occupiedDefinitionNames: Set[String],
-      currentAnnotation: Option[untpd.Tree]
+      currentAnnotation: Option[untpd.Tree],
+      sourceOrderedHandledAnnotationNames: List[String] = Nil
   )(using Context): ExpansionInput =
     new ExpansionInput(
       ExpansionTarget.fromTree(primary).fold(
@@ -19,5 +20,6 @@ object ExpansionInputTestFactory:
       companion.map(ExpansionTarget.Object.apply),
       new ExpansionContainerContext(occupiedDefinitionNames),
       currentAnnotation.getOrElse(untpd.EmptyTree),
-      List(annotationName)
+      if sourceOrderedHandledAnnotationNames.nonEmpty then sourceOrderedHandledAnnotationNames
+      else List(annotationName)
     )
