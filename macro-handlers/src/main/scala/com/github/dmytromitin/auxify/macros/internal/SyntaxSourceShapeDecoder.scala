@@ -4,6 +4,7 @@ import dotty.tools.dotc.util.SrcPos
 
 import paradise3.api.{
   ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView,
   ExpansionTargetView,
   ExpansionDiagnostic
 }
@@ -30,7 +31,8 @@ private[internal] object SyntaxSourceShapeDecoder:
 
   def decode(
       classView: ExpansionTargetView,
-      bodyView: ExpansionTargetBodyView
+      bodyView: ExpansionTargetBodyView,
+      typeStructureView: Option[ExpansionTargetTypeStructureView] = None
   ): Either[ExpansionDiagnostic, SourceShape] =
     val traitName = classView.className
     if !normalizedNameAvailable(traitName) then
@@ -60,7 +62,7 @@ private[internal] object SyntaxSourceShapeDecoder:
               !typeParameter.hasContextBounds &&
               !typeParameter.isOrdinaryUpperBounded =>
           bodyView.members match
-            case List(member) =>
+            case member :: tail =>
               for
                 method <- directMethod(traitName, member)
                 _ <- eligibleMethod(traitName, method)
@@ -78,11 +80,19 @@ private[internal] object SyntaxSourceShapeDecoder:
                   typeParameter.name
                 )
                 _ <- enclosingResult(traitName, method, typeParameter.name)
+                inheritedOccupied <- InstanceInheritedConcreteTailValidator.validate(
+                  traitName,
+                  typeParameter.name,
+                  tail,
+                  firstBodyIndex = 1,
+                  typeStructureView,
+                  diagnosticAnnotation = "@syntax"
+                )
                 occupied = Set(
                   method.name,
                   parameters.head.name,
                   parameters(1).name
-                )
+                ) ++ inheritedOccupied
               yield SourceShape(
                 traitName = traitName,
                 enclosingTypeParameterName = typeParameter.name,
@@ -95,10 +105,10 @@ private[internal] object SyntaxSourceShapeDecoder:
                 remainingParameterName = parameters(1).name,
                 evidenceParameterName = freshEvidenceName(occupied)
               )
-            case members =>
+            case Nil =>
               unsupported(
                 traitName,
-                s"requires exactly one direct body member; found ${members.size}",
+                "requires exactly one direct body member; found 0",
                 bodyView.pos
               )
         case _ =>

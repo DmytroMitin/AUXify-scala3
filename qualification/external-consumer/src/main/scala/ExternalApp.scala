@@ -308,6 +308,11 @@ trait DelegatedThenApply[A]:
 @syntax
 trait ExternalSyntaxMonoid[A]:
   def combine(left: A, right: A): A
+  type Item = A
+  def twice(value: A): A = combine(value, value)
+  type Value = A
+  def fold3(first: A, second: A, third: A): A =
+    combine(combine(first, second), third)
 
 object DelegatedThenApply:
   val preserved = 84
@@ -326,6 +331,13 @@ object ExternalApp:
       def combine(left: Int, right: Int): Int = left + right
 
     assert(20.combine(22) == 42)
+    val syntaxInstance = summon[ExternalSyntaxMonoid[Int]]
+    val syntaxItem: syntaxInstance.Item = 42
+    val syntaxValue: syntaxInstance.Value = 42
+    assert(syntaxInstance.twice(21) == 42)
+    assert(syntaxInstance.fold3(10, 12, 20) == 42)
+    assert(summon[syntaxInstance.Item =:= Int](syntaxItem) == 42)
+    assert(summon[syntaxInstance.Value =:= Int](syntaxValue) == 42)
 
     assert(Show[String].show("external") == "external")
 

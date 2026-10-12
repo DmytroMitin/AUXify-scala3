@@ -9,6 +9,7 @@ import paradise3.api.{
   ExpansionHandler,
   ExpansionInput,
   ExpansionOutcome,
+  ExpansionTargetBodyView,
   ExpansionTargetKind
 }
 import paradise3.api.helpers.{
@@ -52,7 +53,31 @@ private[internal] object SyntaxHandler:
       for
         targetView <- input.targetView
         bodyView <- input.targetBodyView
-        shape <- SyntaxSourceShapeDecoder.decode(targetView, bodyView)
+        _ <-
+          if
+            bodyView.members.sizeCompare(1) > 0 &&
+              input.sourceOrderedHandledAnnotationNames.exists(name =>
+                name == "com.github.dmytromitin.auxify.macros.apply" ||
+                  name == "com.github.dmytromitin.auxify.macros.delegated"
+              )
+          then
+            Left(
+              ExpansionDiagnostic(
+                s"unsupported @syntax composition shape for `${input.primary.name}`: inherited concrete tails are not supported when stacked with @apply or @delegated",
+                input.currentAnnotation.sourcePos
+              )
+            )
+          else Right(())
+        typeStructure <-
+          if bodyView.members.exists(
+              _.kind == ExpansionTargetBodyView.DirectMemberKind.Type
+            ) then input.targetTypeStructureView.map(Some(_))
+          else Right(None)
+        shape <- SyntaxSourceShapeDecoder.decode(
+          targetView,
+          bodyView,
+          typeStructure
+        )
         lowered <- lower(
           SyntaxDefinitionBuilder.module(shape),
           s"AuxifyGenerated${shape.traitName}Syntax.scala",

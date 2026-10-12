@@ -524,7 +524,7 @@ for expected_diagnostic in \
   'unsupported @syntax source shape for `SyntaxVariantOwner`: requires exactly one invariant unbounded enclosing type parameter' \
   'unsupported @syntax source shape for `SyntaxBoundedOwner`: requires exactly one invariant unbounded enclosing type parameter' \
   'unsupported @syntax source shape for `SyntaxNoBodyMember`: requires exactly one direct body member; found 0' \
-  'unsupported @syntax source shape for `SyntaxMultipleBodyMembers`: requires exactly one direct body member; found 2' \
+  'unsupported @syntax source shape for `SyntaxMultipleBodyMembers`: inherited method `other` must be concrete' \
   'unsupported @syntax source shape for `SyntaxNonMethodMember`: the direct body member must be a method' \
   'unsupported @syntax source shape for `SyntaxConcreteMethod`: direct method `combine` must be abstract' \
   'unsupported @syntax source shape for `SyntaxAnnotatedMethod`: direct method `combine` must be public, unannotated, and free of unsupported modifiers' \
@@ -536,9 +536,58 @@ for expected_diagnostic in \
   'unsupported @syntax source shape for `SyntaxWrongParameterCount`: direct method `combine` requires exactly two ordinary parameters; found 1' \
   'unsupported @syntax source shape for `SyntaxWrongParameterType`: direct method `combine` parameter `a1` must use enclosing type parameter `A`' \
   'unsupported @syntax source shape for `SyntaxWrongResultType`: direct method `combine` result type must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxAbstractTypeTail`: inherited type member `Item` must be a concrete alias' \
+  'unsupported @syntax source shape for `SyntaxValueTail`: direct body member at index 1 must be a method; found val' \
+  'unsupported @syntax source shape for `SyntaxVariableTail`: direct body member at index 1 must be a method; found var' \
+  'unsupported @syntax source shape for `SyntaxLazyValueTail`: direct body member at index 1 must be a method; found val' \
+  'unsupported @syntax source shape for `SyntaxNestedClassTail`: direct body member at index 1 must be a method; found nested class' \
+  'unsupported @syntax source shape for `SyntaxNestedTraitTail`: direct body member at index 1 must be a method; found nested trait' \
+  'unsupported @syntax source shape for `SyntaxNestedObjectTail`: direct body member at index 1 must be a method; found nested object' \
+  'unsupported @syntax source shape for `SyntaxWrongAliasTail`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxBoundedAliasTail`: inherited type member `Item` must be a concrete alias' \
+  'unsupported @syntax source shape for `SyntaxPolymorphicAliasTail`: inherited concrete type alias `Item` must not declare type parameters' \
+  'unsupported @syntax source shape for `SyntaxPrivateAliasTail`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxAnnotatedAliasTail`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxEmptyClauseTail`: inherited concrete method `other` requires one or more ordinary parameters in its single clause; found 0' \
+  'unsupported @syntax source shape for `SyntaxCurriedTail`: inherited concrete method `other` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @syntax source shape for `SyntaxContextualTail`: inherited concrete method `other` parameter clause must be ordinary and non-contextual' \
+  'unsupported @syntax source shape for `SyntaxDefaultedTail`: inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified' \
+  'unsupported @syntax source shape for `SyntaxPolymorphicTail`: inherited concrete method `other` must not declare method type parameters' \
+  'unsupported @syntax source shape for `SyntaxInfixTail`: inherited concrete method `other` must be public, unannotated, and free of unsupported modifiers' \
+  'unsupported @syntax source shape for `SyntaxWrongTailTypes`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxWrongTailResult`: inherited concrete method `other` result type must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxLateInvalidTail`: direct body member at index 4 must be a method; found val' \
   'unsupported @syntax source shape for `syntax`: trait name `syntax` conflicts with the fixed generated nested object name `syntax`'; do
   grep -Fq -- "$expected_diagnostic" "$syntax_negative_log" ||
     fail "syntax negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+for source_line in \
+  'MultipleBodyMembers:8' \
+  'AbstractTypeTail:8' \
+  'AnnotatedAliasTail:9' \
+  'BoundedAliasTail:8' \
+  'ContextualTail:8' \
+  'CurriedTail:8' \
+  'DefaultedTail:8' \
+  'EmptyClauseTail:8' \
+  'InfixTail:8' \
+  'LateInvalidTail:11' \
+  'LazyValueTail:8' \
+  'NestedClassTail:8' \
+  'NestedObjectTail:8' \
+  'NestedTraitTail:8' \
+  'PolymorphicAliasTail:8' \
+  'PolymorphicTail:8' \
+  'PrivateAliasTail:8' \
+  'ValueTail:8' \
+  'VariableTail:8' \
+  'WrongAliasTail:8' \
+  'WrongTailResult:8' \
+  'WrongTailTypes:8'; do
+  source="${source_line%%:*}"
+  line="${source_line##*:}"
+  grep -Eq "$source[.]scala:$line:[0-9]+" "$syntax_negative_log" ||
+    fail "syntax inherited-tail diagnostic is not at the exact source member: $source_line"
 done
 
 if grep -Eiq \
@@ -576,6 +625,10 @@ grep -Fq \
   'unsupported @delegated composition shape for `LateDelegatedRejection`: inherited concrete tails are not supported when stacked with @apply' \
   "$composition_negative_log" ||
   fail "late composition rejection omitted the deterministic delegated composition diagnostic"
+grep -Fq \
+  'unsupported @syntax composition shape for `LateSyntaxRejection`: inherited concrete tails are not supported when stacked with @apply or @delegated' \
+  "$composition_negative_log" ||
+  fail "late composition rejection omitted the deterministic syntax composition diagnostic"
 
 if grep -Eiq \
   'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
@@ -794,6 +847,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_PA
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_HETEROGENEOUS_INHERITED_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'

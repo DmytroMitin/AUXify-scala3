@@ -37,3 +37,17 @@ class SyntaxIntegrationSuite extends munit.FunSuite:
     assertEquals(NestedSyntax.Nested.syntax.retained, 42)
     assertEquals(20.join(22), 42)
   }
+
+
+  test("heterogeneous-tail native extension returns 42") {
+    assertEquals(SyntaxRuntime.richExtension, 42)
+  }
+
+  test("heterogeneous-tail inherited concrete methods return 42") {
+    assertEquals(SyntaxRuntime.richTwice, 42)
+    assertEquals(SyntaxRuntime.richFold3, 42)
+  }
+
+  test("heterogeneous-tail inherited alias retains the enclosing type") {
+    assertEquals(SyntaxRuntime.richAlias, 42)
+  }

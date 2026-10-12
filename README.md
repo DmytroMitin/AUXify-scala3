@@ -135,7 +135,7 @@ current project READMEs for the latest development APIs.
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including heterogeneous tails of supported inherited concrete methods and direct concrete aliases to the enclosing type parameter |
-| `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly; generates native Scala 3 extension syntax and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly, optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; generates exactly one native Scala 3 extension for the primary method and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
 
@@ -159,7 +159,8 @@ post-0.1.0 inherited concrete type-alias and parameterless-or-arity-neutral
 ordinary-method `@instance` widenings, the disjoint one-abstract-type-member
 `@instance` factory, the disjoint one-curried-abstract-method `@instance`
 factory, normalized modifier-admission hardening, the parameterless
-`@delegated` family, and the bounded native extension-method `@syntax` slice. Ordinary development uses coherently
+`@delegated` family, and the bounded native extension-method
+`@syntax` slice with its validated heterogeneous inherited tail. Ordinary development uses coherently
 source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
 0.4.0-SNAPSHOT graphs at their pinned accepted commits.
 
@@ -186,7 +187,8 @@ That release does not include the concrete type-alias or concrete
 parameterless-method `@instance` inheritances documented below, nor the later
 one-abstract-type-member `@instance` family, normalized modifier-admission
 hardening, the one-curried-abstract-method `@instance` family, the
-parameterless `@delegated` family, or `@syntax` slice. Those
+parameterless `@delegated` family, or `@syntax` slice and its inherited
+tail. Those
 changes remain on the distinct post-release
 `main` line and do not widen, rebase, or
 rewrite the 0.1.0 release or the public Giter8 starter.
@@ -572,24 +574,53 @@ assert(20.combine(22) == 42)
 ```
 
 This bounded slice requires a top-level ordinary non-case, non-sealed trait
-with exactly one invariant unbounded type parameter, no constructor parameters,
-and exactly one direct public abstract method. The method must be unannotated,
-have no unsupported modifiers or method type parameters, and have exactly one
-ordinary non-contextual clause with two parameters; both parameter types and
-the result type must be that enclosing type parameter directly. Names are
-source-derived and generated receiver, remaining-argument, and evidence names
-are freshened deterministically.
+with exactly one invariant unbounded type parameter and no constructor
+parameters. Its first direct body member is the one public abstract primary
+method. The method must be unannotated, have no unsupported modifiers or method
+type parameters, and have exactly one ordinary non-contextual clause with two
+parameters; both parameter types and the result type must be that enclosing
+type parameter directly. Names are source-derived and generated receiver,
+remaining-argument, and evidence names are freshened deterministically.
+
+The primary method may be followed, in source order, by any number of inherited
+concrete methods and direct concrete aliases. Each method must be public,
+unannotated, non-polymorphic, and modifier-free, return the enclosing type
+parameter directly, and have either no parameter clauses or one ordinary
+non-contextual clause containing one or more named, unmodified, non-defaulted
+parameters of that same direct type. Each alias must be public, unannotated,
+unbounded, monomorphic, modifier-free, and have the exact shape
+`type Member = A`. Methods and aliases may be interleaved:
+
+```scala
+@syntax
+trait RichMonoid[A]:
+  def combine(a: A, a1: A): A
+  type Item = A
+  def inst(a: A): A = a
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+```
+
+The generated `Monoid.syntax`-shaped module still contains exactly one
+extension method, for `combine`. `Item`, `Value`, `inst`, and `fold3`
+remain ordinary inherited members of `RichMonoid`; AUXify does not copy,
+re-author, or lower their definitions. Concrete method and parameter names
+participate in evidence-binder freshness, while type-only alias names do not.
 
 A missing companion is created. Existing unrelated companion members retain
 their order. A direct term member named `syntax` (object, def, or val) is
 preserved and suppresses generation without creating a duplicate; a direct type
 member or a nested same-name definition is not a direct term conflict.
 
-Classes, objects, variance or bounds, other owner/member cardinalities,
-concrete or modified methods, extra or contextual clauses, broader result
-families, overloads, and arbitrary annotation composition remain later parity
-work. This slice is not part of released AUXify 0.1.0 or the public Giter8
-starter, which continue to use only released 0.1.0 behavior.
+Classes, objects, variance or bounds, a missing or nonconforming primary
+method, additional abstract methods or types, vals, vars, lazy vals, nested
+definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic
+or modifier-bearing tail methods, non-`A` tail parameter or result types, and
+nonconforming aliases remain rejected. The inherited tail is intentionally
+rejected when `@syntax` is stacked with `@apply` or `@delegated`; this is
+not arbitrary annotation composition or a claim of recovered Scala 2 parity.
+The slice is not part of released AUXify 0.1.0 or the public Giter8 starter,
+which continue to use only released 0.1.0 behavior.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 
