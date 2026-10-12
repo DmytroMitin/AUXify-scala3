@@ -8,3 +8,4 @@ trait LateDelegatedRejection[A]:
   def show(a: A): String
   type Item = A
   def duplicate(a: A): A = a
+  val invalid: A

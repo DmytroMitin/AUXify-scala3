@@ -328,6 +328,29 @@ object DelegatedThenApply:
   given DelegatedThenApply[String] with
     def show(a: String): String = s"delegated-first:$a"
 
+@apply
+@delegated
+trait ExternalRichShow[A]:
+  def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
+
+object ExternalRichShow:
+  given ExternalRichShow[Int] with
+    def show(a: Int): String = s"external-rich:$a"
+
+@delegated
+@apply
+trait ExternalReverseRichShow[Element]:
+  def render(value: Element): String
+  def retain(value: Element): Element = value
+  type Item = Element
+
+object ExternalReverseRichShow:
+  given ExternalReverseRichShow[String] with
+    def render(value: String): String = s"external-reverse:$value"
+
 object ExternalApp:
   def main(args: Array[String]): Unit =
     val output: HasOut[Int] { type Out = String } =
@@ -621,4 +644,19 @@ object ExternalApp:
     assert(DelegatedThenApply.show("external") == "delegated-first:external")
     assert(DelegatedThenApply.preserved == 84)
     assert(EmptyDelegated.empty[Int] == 42)
+    val externalRich = ExternalRichShow[Int]
+    val externalItem: externalRich.Item = 42
+    val externalValue: externalRich.Value = 43
+    assert(ExternalRichShow[Int].eq(externalRich))
+    assert(ExternalRichShow.show(42) == "external-rich:42")
+    assert(externalRich.duplicate(42) == 42)
+    assert(summon[externalRich.Item =:= Int](externalItem) == 42)
+    assert(summon[externalRich.Value =:= Int](externalValue) == 43)
+
+    val externalReverse = ExternalReverseRichShow[String]
+    val externalReverseItem: externalReverse.Item = "typed"
+    assert(ExternalReverseRichShow[String].eq(externalReverse))
+    assert(ExternalReverseRichShow.render("value") == "external-reverse:value")
+    assert(externalReverse.retain("retained") == "retained")
+    assert(summon[externalReverse.Item =:= String](externalReverseItem) == "typed")
     println("AUXIFY_SCALA3_EXTERNAL_RUNTIME_PASS")

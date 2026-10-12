@@ -132,7 +132,7 @@ current project READMEs for the latest development APIs.
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-`A` alias tail, (2) one public unbounded abstract type member first, followed by an optional validated inherited concrete method/direct-`A` alias tail, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by the same optional validated heterogeneous tail, generating the strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | One public abstract primary method under one invariant unbounded type parameter—either unary `show(a: A): String` or parameterless `empty: A`—optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; exactly the primary method receives one companion forwarder |
-| Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
+| Stacked `@apply` + `@delegated` | Supported bounded composition slice with inherited tails | Both source orders on the exact shared one-invariant-unbounded-parameter, unary-abstract-primary family, optionally followed by the validated heterogeneous inherited concrete method/direct-`A` alias tail; parameterless and binary delegated stacks remain outside this composition claim |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including heterogeneous tails of supported inherited concrete methods and direct concrete aliases to the enclosing type parameter |
 | `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly, optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; generates exactly one native Scala 3 extension for the primary method and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
@@ -518,32 +518,43 @@ Only `show` receives a companion forwarder. `Item`, `Value`, `duplicate`, and `p
 
 Additional abstract methods or types, vals, vars, nested definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic/modifier-bearing concrete methods, non-`A` method parameters or results, and nonconforming aliases remain rejected. This tail support is AUXify-owned additive compatibility; it is not presented as recovered Scala 2 semantics or arbitrary delegated parity.
 
-The supported `@apply` and `@delegated` slices may be stacked in either source
-order when the same trait independently satisfies both existing closed target
-profiles:
+The supported `@apply` and unary `@delegated` slices may be stacked in either
+source order when the same trait independently satisfies both existing closed
+target profiles. The unary abstract primary may now be followed by the same
+validated heterogeneous inherited concrete tail as standalone `@delegated`:
 
 ```scala
 @apply
 @delegated
-trait ApplyThenDelegated[A]:
+trait RichShow[A]:
   def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
 
 @delegated
 @apply
-trait DelegatedThenApply[A]:
+trait ReverseRichShow[A]:
   def show(a: A): String
+  def retain(a: A): A = a
+  type Item = A
 ```
 
-Both forms produce the contextual `apply` materializer and the delegated
-forwarder. Existing unrelated companion members survive. A direct existing
-`apply` suppresses only the generated materializer, while a direct existing
-forwarding name suppresses only that forwarder. This qualification is limited
-to this pair and their common one-invariant-unbounded-parameter,
-one-eligible-method family; it does not admit arbitrary handlers, other
-annotation stacks, broader target profiles, or overload-aware conflict
-semantics. In particular, the optional inherited tail is a standalone
-`@delegated` capability and is intentionally rejected when `@delegated` is
-stacked with `@apply`.
+Both forms produce only the contextual `apply` materializer and one delegated
+unary forwarder, conceptually `show[A](a: A)(using inst: RichShow[A])`.
+`Item`, `Value`, `duplicate`, and `retain` remain owned by and inherited
+from their traits; they are never copied into the companion. Missing and
+populated companions are supported. A direct existing `apply` suppresses only
+the generated materializer, while a direct existing forwarding name suppresses
+only that forwarder, in either source order.
+
+This qualification is limited to exactly the two annotation participants and
+their common unary-first envelope. Tail validation still uses the standalone
+delegated rules and normalized source body indices. Parameterless or binary
+delegated primaries, extra abstract roles, unrelated annotation stacks, broader
+target profiles, and overload-aware conflict semantics remain outside this
+composition slice. This is new bounded composition with inherited tails, not
+full historical Scala 2 parity or arbitrary annotation stacking.
 
 The common bounded `Add` family also compiles with `@apply` and `@aux` in
 either source order and exposes both the contextual materializer and the

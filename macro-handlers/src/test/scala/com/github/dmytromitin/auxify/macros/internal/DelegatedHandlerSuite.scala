@@ -380,18 +380,62 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     }
   }
 
-  test("rejects inherited tails when delegated is stacked with apply") {
+  test("admits the normalized unary inherited tail for both apply-delegated source orders") {
+    val apply = "com.github.dmytromitin.auxify.macros.apply"
+    val delegated = "com.github.dmytromitin.auxify.macros.delegated"
+
+    List(List(apply, delegated), List(delegated, apply)).foreach: sourceOrder =>
+      withExpansionInput(
+        """@current
+          |trait StackedTail[A]:
+          |  def show(a: A): String
+          |  type Item = A
+          |  def duplicate(a: A): A = a
+          |
+          |object StackedTail:
+          |  val retained = 19
+          |""".stripMargin,
+        "StackedTail",
+        sourceOrder
+      ) { (input, _, companion, context) =>
+        given Context = context
+        assertEquals(input.sourceOrderedHandledAnnotationNames, sourceOrder)
+        val body = input.targetBodyView.fold(
+          diagnostic => fail(diagnostic.message),
+          identity
+        )
+        assertEquals(
+          body.members.map(_.kind),
+          List(
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Method,
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Type,
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Method
+          )
+        )
+
+        val output = new DelegatedHandler().expand(input) match
+          case ExpansionOutcome.Structured(changes) =>
+            StructuredOutcomeTestSupport.materialize(input, changes)
+          case other => fail(s"expected structured stacked-tail expansion, found $other")
+
+        val merged = output.companion.getOrElse(fail("missing merged companion"))
+        assertEquals(
+          merged.impl.body.collect { case method: DefDef => method.name.toString },
+          companion.toList.flatMap(_.impl.body.collect {
+            case method: DefDef => method.name.toString
+          }) :+ "show"
+        )
+      }
+  }
+
+  test("keeps parameterless delegated tails outside the apply-delegated unary composition family") {
     withExpansionInput(
       """@current
-        |trait StackedTail[A]:
-        |  def show(a: A): String
+        |trait StackedEmpty[A]:
+        |  def empty: A
         |  type Item = A
-        |  def duplicate(a: A): A = a
-        |
-        |object StackedTail:
-        |  val retained = 19
         |""".stripMargin,
-      "StackedTail",
+      "StackedEmpty",
       List(
         "com.github.dmytromitin.auxify.macros.apply",
         "com.github.dmytromitin.auxify.macros.delegated"
@@ -399,18 +443,17 @@ class DelegatedHandlerSuite extends munit.FunSuite:
     ) { (input, primary, companion, context) =>
       given Context = context
       val originalTemplate = primary.rhs
-      val originalCompanionBody = companion.getOrElse(fail("missing companion")).impl.body
       new DelegatedHandler().expand(input) match
         case ExpansionOutcome.Rejected(diagnostics) =>
           assertEquals(
             diagnostics.map(_.message),
             List(
-              "unsupported @delegated composition shape for `StackedTail`: inherited concrete tails are not supported when stacked with @apply"
+              "unsupported @delegated composition shape for `StackedEmpty`: inherited concrete tails require the unary delegated primary family when stacked with @apply"
             )
           )
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
-          assert(companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody))
-        case other => fail(s"expected controlled stacked-tail rejection, found $other")
+          assertEquals(companion, None)
+        case other => fail(s"expected controlled parameterless composition rejection, found $other")
     }
   }
 
@@ -504,6 +547,96 @@ class DelegatedHandlerSuite extends munit.FunSuite:
             companion.getOrElse(fail("missing companion")).impl.body.eq(originalCompanionBody)
           )
         case other => fail(s"expected controlled bridge rejection, found $other")
+    }
+  }
+
+  test("rejects tail composition outside the exact apply-delegated participant cohort") {
+    withExpansionInput(
+      """@current
+        |trait ExtraParticipant[A]:
+        |  def show(a: A): String
+        |  type Item = A
+        |""".stripMargin,
+      "ExtraParticipant",
+      List(
+        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated",
+        "com.github.dmytromitin.auxify.macros.syntax"
+      )
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated composition shape for `ExtraParticipant`: inherited concrete tails require exactly the @apply and @delegated participant cohort"
+            )
+          )
+          assertEquals(diagnostics.map(_.pos), List(input.currentAnnotation.sourcePos))
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assertEquals(companion, None)
+        case other => fail(s"expected closed-cohort rejection, found $other")
+    }
+  }
+
+  test("rejects an invalid unary primary before considering its valid inherited tail") {
+    withExpansionInput(
+      """@current
+        |trait InvalidPrimary[A]:
+        |  def show(a: A): List[String]
+        |  type Item = A
+        |  def duplicate(a: A): A = a
+        |""".stripMargin,
+      "InvalidPrimary",
+      List(
+        "com.github.dmytromitin.auxify.macros.delegated",
+        "com.github.dmytromitin.auxify.macros.apply"
+      )
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated source shape for `InvalidPrimary`: direct method `show` result type must be one unqualified named type"
+            )
+          )
+          assert(diagnostics.head.pos.span.exists, clue(diagnostics))
+          assertEquals(diagnostics.head.pos.sourcePos.line, 2)
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assertEquals(companion, None)
+        case other => fail(s"expected invalid-primary rejection, found $other")
+    }
+  }
+
+  test("composition keeps delegated evidence collision-fresh against inherited term roles") {
+    withExpansionInput(
+      """@current
+        |trait FreshStacked[Element]:
+        |  def render(inst: Element): Text
+        |  type inst = Element
+        |  def inst1(inst2: Element): Element = inst2
+        |""".stripMargin,
+      "FreshStacked",
+      List(
+        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated"
+      )
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedMethod(StructuredOutcomeTestSupport.materialize(input, changes), "render")
+        case other => fail(s"expected fresh stacked expansion, found $other")
+
+      assertEquals(
+        method.trailingParamss.map(_.map(_.name.toString)),
+        List(List("inst"), List("inst3"))
+      )
     }
   }
 

@@ -60,3 +60,128 @@ trait RenamedComposition[Element]:
 object RenamedComposition:
   given RenamedComposition[Long] with
     def render(value: Long): Text = Text(s"rendered:$value")
+
+@apply
+@delegated
+trait RichShow[A]:
+  def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
+
+object RichShow:
+  val preserved = 97
+  given RichShow[Int] with
+    def show(a: Int): String = s"rich:$a"
+
+@delegated
+@apply
+trait ReverseRichRender[Element]:
+  def render(value: Element): Text
+  def retain(value: Element): Element = value
+  type Item = Element
+
+object ReverseRichRender:
+  val preserved = 98
+  given ReverseRichRender[Long] with
+    def render(value: Long): Text = Text(s"reverse-rich:$value")
+
+@delegated
+@apply
+trait GeneratedTail[A]:
+  def show(a: A): String
+  def duplicate(a: A): A = a
+
+@apply
+@delegated
+trait ApplyConflictForward[A]:
+  def show(a: A): String
+  type Item = A
+
+object ApplyConflictForward:
+  var applyCalls = 0
+  def apply[A](using instance: ApplyConflictForward[A]): ApplyConflictForward[A] =
+    applyCalls += 1
+    instance
+  given ApplyConflictForward[Int] with
+    def show(a: Int): String = s"apply-conflict-forward:$a"
+
+@delegated
+@apply
+trait ApplyConflictReverse[A]:
+  def show(a: A): String
+  def duplicate(a: A): A = a
+
+object ApplyConflictReverse:
+  var applyCalls = 0
+  def apply[A](using instance: ApplyConflictReverse[A]): ApplyConflictReverse[A] =
+    applyCalls += 1
+    instance
+  given ApplyConflictReverse[Int] with
+    def show(a: Int): String = s"apply-conflict-reverse:$a"
+
+@apply
+@delegated
+trait ShowConflictForward[A]:
+  def show(a: A): String
+  def unavailable: A = throw new NoSuchElementException("not evaluated")
+
+object ShowConflictForward:
+  var showCalls = 0
+  def show[A](a: A)(using ShowConflictForward[A]): String =
+    showCalls += 1
+    s"show-conflict-forward:$a"
+  given ShowConflictForward[Int] with
+    def show(a: Int): String = s"instance-forward:$a"
+
+@delegated
+@apply
+trait ShowConflictReverse[A]:
+  def show(a: A): String
+  def choose(first: A, second: A, third: A): A = second
+
+object ShowConflictReverse:
+  var showCalls = 0
+  def show[A](a: A)(using ShowConflictReverse[A]): String =
+    showCalls += 1
+    s"show-conflict-reverse:$a"
+  given ShowConflictReverse[Int] with
+    def show(a: Int): String = s"instance-reverse:$a"
+
+@apply
+@delegated
+trait BothConflictForward[A]:
+  def show(a: A): String
+  type Item = A
+  def duplicate(a: A): A = a
+
+object BothConflictForward:
+  var applyCalls = 0
+  var showCalls = 0
+  def apply[A](using instance: BothConflictForward[A]): BothConflictForward[A] =
+    applyCalls += 1
+    instance
+  def show[A](a: A)(using BothConflictForward[A]): String =
+    showCalls += 1
+    s"both-conflict-forward:$a"
+  given BothConflictForward[Int] with
+    def show(a: Int): String = s"instance-forward:$a"
+
+@delegated
+@apply
+trait BothConflictReverse[A]:
+  def show(a: A): String
+  def duplicate(a: A): A = a
+  type Item = A
+
+object BothConflictReverse:
+  var applyCalls = 0
+  var showCalls = 0
+  def apply[A](using instance: BothConflictReverse[A]): BothConflictReverse[A] =
+    applyCalls += 1
+    instance
+  def show[A](a: A)(using BothConflictReverse[A]): String =
+    showCalls += 1
+    s"both-conflict-reverse:$a"
+  given BothConflictReverse[Int] with
+    def show(a: Int): String = s"instance-reverse:$a"

@@ -621,10 +621,13 @@ cat "$composition_negative_log"
 [[ "$composition_negative_status" -ne 0 ]] ||
   fail "negativeCompositionLateRejection compiled successfully; the late delegated rejection was lost"
 
-grep -Fq \
-  'unsupported @delegated composition shape for `LateDelegatedRejection`: inherited concrete tails are not supported when stacked with @apply' \
-  "$composition_negative_log" ||
-  fail "late composition rejection omitted the deterministic delegated composition diagnostic"
+for source in LateDelegatedRejection ReverseLateDelegatedRejection; do
+  expected_diagnostic='unsupported @delegated source shape for `'"$source"'`: direct body member at index 3 must be a method; found val'
+  grep -Fq -- "$expected_diagnostic" "$composition_negative_log" ||
+    fail "late composition rejection omitted the deterministic delegated tail diagnostic for $source"
+  grep -Eq "$source[.]scala:11:[0-9]+" "$composition_negative_log" ||
+    fail "late composition rejection is not positioned at the invalid tail member for $source"
+done
 grep -Fq \
   'unsupported @syntax composition shape for `LateSyntaxRejection`: inherited concrete tails are not supported when stacked with @apply or @delegated' \
   "$composition_negative_log" ||
@@ -850,6 +853,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_HETEROGENEOUS_INHERITED_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_HETEROGENEOUS_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'

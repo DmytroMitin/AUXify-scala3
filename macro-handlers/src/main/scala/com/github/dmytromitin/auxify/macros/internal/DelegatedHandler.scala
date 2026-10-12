@@ -50,20 +50,6 @@ private[internal] object DelegatedHandler:
           "@delegated"
         )
         bodyView <- input.targetBodyView
-        _ <-
-          if
-            bodyView.members.sizeCompare(1) > 0 &&
-              input.sourceOrderedHandledAnnotationNames.contains(
-                "com.github.dmytromitin.auxify.macros.apply"
-              )
-          then
-            Left(
-              ExpansionDiagnostic(
-                s"unsupported @delegated composition shape for `${input.primary.name}`: inherited concrete tails are not supported when stacked with @apply",
-                input.currentAnnotation.sourcePos
-              )
-            )
-          else Right(())
         typeStructure <-
           if bodyView.members.exists(
               _.kind == ExpansionTargetBodyView.DirectMemberKind.Type
@@ -75,6 +61,40 @@ private[internal] object DelegatedHandler:
           bodyView,
           typeStructure
         )
+        _ <-
+          if
+            bodyView.members.sizeCompare(1) > 0 &&
+              input.sourceOrderedHandledAnnotationNames.contains(
+                "com.github.dmytromitin.auxify.macros.apply"
+              )
+          then
+            val applyName = "com.github.dmytromitin.auxify.macros.apply"
+            val delegatedName =
+              "com.github.dmytromitin.auxify.macros.delegated"
+            val admittedOrders = List(
+              List(applyName, delegatedName),
+              List(delegatedName, applyName)
+            )
+            if !admittedOrders.contains(input.sourceOrderedHandledAnnotationNames)
+            then
+              Left(
+                ExpansionDiagnostic(
+                  s"unsupported @delegated composition shape for `${input.primary.name}`: inherited concrete tails require exactly the @apply and @delegated participant cohort",
+                  input.currentAnnotation.sourcePos
+                )
+              )
+            else
+              shape.variant match
+                case DelegatedSourceShapeDecoder.Variant.Unary(_, _) =>
+                  AuxifyTargetAdmission.applyTarget(classView)
+                case DelegatedSourceShapeDecoder.Variant.Parameterless =>
+                  Left(
+                    ExpansionDiagnostic(
+                      s"unsupported @delegated composition shape for `${input.primary.name}`: inherited concrete tails require the unary delegated primary family when stacked with @apply",
+                      input.currentAnnotation.sourcePos
+                    )
+                  )
+          else Right(())
         lowered <- lower(shape, summon[Context]).left.map(failure =>
           ExpansionDiagnostic(
             s"${failure.code}: ${failure.detail}",
