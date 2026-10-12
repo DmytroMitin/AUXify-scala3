@@ -71,8 +71,8 @@ private[internal] object InstanceHandler:
             ) then input.targetTypeStructureView.map(Some(_))
           else Right(None)
         shape <- bodyView.members match
-          case List(member)
-              if member.kind == ExpansionTargetBodyView.DirectMemberKind.Type =>
+          case first :: _
+              if first.kind == ExpansionTargetBodyView.DirectMemberKind.Type =>
             typeStructure match
               case Some(view) =>
                 InstanceAbstractTypeMemberSourceShapeDecoder
@@ -82,7 +82,7 @@ private[internal] object InstanceHandler:
                 Left(
                   ExpansionDiagnostic(
                     s"unsupported @instance source shape for `${classView.className}`: direct body member at index 0 must provide normalized type-member evidence",
-                    member.pos
+                    first.pos
                   )
                 )
           case members

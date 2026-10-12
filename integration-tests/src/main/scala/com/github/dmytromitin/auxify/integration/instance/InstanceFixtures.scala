@@ -20,6 +20,37 @@ trait HasOut[A]:
   type Out
 
 @instance
+trait RichHasOut[A]:
+  type Out
+  type Item = A
+  def identity(a: A): A = a
+  type Value = A
+  def fortyTwo: A = 42.asInstanceOf[A]
+  def pick(a: A, b: A): A = a
+
+object RichHasOut:
+  val preserved = 342
+
+@instance
+trait FreshHasOut[A]:
+  type Out
+  type Out0 = A
+  type Out1 = A
+
+@instance
+trait ExistingRichHasOut[A]:
+  type Out
+  type Item = A
+  def identity(a: A): A = a
+
+object ExistingRichHasOut:
+  var instanceCalls = 0
+  def instance[A, Out0]: ExistingRichHasOut[A] { type Out = Out0 } =
+    instanceCalls += 1
+    new ExistingRichHasOut[A]:
+      type Out = Out0
+
+@instance
 trait Container[Element0]:
   type Element
 

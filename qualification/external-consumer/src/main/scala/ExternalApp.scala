@@ -99,6 +99,15 @@ trait HasOut[A]:
   type Out
 
 @instance
+trait RichHasOut[A]:
+  type Out
+  type Out0 = A
+  def identity(a: A): A = a
+  type Out1 = A
+  def fortyTwo: A = 42.asInstanceOf[A]
+  def pick(a: A, b: A): A = a
+
+@instance
 trait Curried[A]:
   def combine(a: A)(b: A): A
 
@@ -325,6 +334,17 @@ object ExternalApp:
       HasOut.instance[Int, String]
     val outputWitness: output.Out =:= String = summon[output.Out =:= String]
     assert(outputWitness("external-type-member") == "external-type-member")
+
+    val richOutput: RichHasOut[Int] { type Out = String } =
+      RichHasOut.instance[Int, String]
+    val richOut0: richOutput.Out0 = 42
+    val richOut1: richOutput.Out1 = 42
+    assert(summon[richOutput.Out =:= String]("external-rich-out") == "external-rich-out")
+    assert(summon[richOutput.Out0 =:= Int](richOut0) == 42)
+    assert(summon[richOutput.Out1 =:= Int](richOut1) == 42)
+    assert(richOutput.identity(42) == 42)
+    assert(richOutput.pick(42, 99) == 42)
+    assert(richOutput.fortyTwo == 42)
 
     import ExternalSyntaxMonoid.syntax.*
     given ExternalSyntaxMonoid[Int] with

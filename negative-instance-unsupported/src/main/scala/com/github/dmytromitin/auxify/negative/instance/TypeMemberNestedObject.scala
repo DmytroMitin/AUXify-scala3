@@ -4,4 +4,5 @@ import com.github.dmytromitin.auxify.macros.instance
 
 @instance
 trait TypeMemberNestedObject[A]:
+  type Out
   object Nested

@@ -438,13 +438,13 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `ProtectedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AnnotatedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `AliasFirst`: inherited method `combine` must be concrete' \
+  'unsupported @instance source shape for `AliasFirst`: direct type member `Item` must be abstract, not a concrete alias' \
   'unsupported @instance source shape for `AliasPlusUnsupported`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
   'unsupported @instance source shape for `MethodThenAlias`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
   'unsupported @instance source shape for `TwoAliases`: inherited concrete type alias `Value` must target enclosing type parameter `A`' \
   'found 0 type parameters' \
-  'unsupported @instance source shape for `TypeMemberAbstractVal`: requires exactly two direct body members; found 1' \
-  'unsupported @instance source shape for `TypeMemberAbstractVar`: requires exactly two direct body members; found 1' \
+  'unsupported @instance source shape for `TypeMemberAbstractVal`: direct body member at index 1 must be a method; found val' \
+  'unsupported @instance source shape for `TypeMemberAbstractVar`: direct body member at index 1 must be a method; found var' \
   'unsupported @instance source shape for `TypeMemberDirectMethod`: curried method `value` requires exactly two ordinary parameter clauses; found 0' \
   'unsupported @instance source shape for `TypeMemberAlias`: direct type member `Out` must be abstract, not a concrete alias' \
   'unsupported @instance source shape for `TypeMemberLowerBound`: abstract type member `Out` must be unbounded' \
@@ -455,13 +455,13 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `TypeMemberProtected`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `TypeMemberAnnotated`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `TypeMemberInfix`: abstract type member `Out` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `TypeMemberTwoMembers`: direct body member at index 0 must be a method; found type' \
-  'unsupported @instance source shape for `TypeMemberThenMethod`: direct body member at index 0 must be a method; found type' \
+  'unsupported @instance source shape for `TypeMemberTwoMembers`: inherited type member `OtherOut` must be a concrete alias' \
+  'unsupported @instance source shape for `TypeMemberThenMethod`: inherited method `value` must be concrete' \
   'unsupported @instance source shape for `TypeMemberMethodThenType`: direct body member at index 1 must be a method; found type' \
-  'unsupported @instance source shape for `TypeMemberThenAlias`: direct body member at index 0 must be a method; found type' \
-  'unsupported @instance source shape for `TypeMemberNestedTrait`: requires exactly two direct body members; found 1' \
-  'unsupported @instance source shape for `TypeMemberNestedClass`: requires exactly two direct body members; found 1' \
-  'unsupported @instance source shape for `TypeMemberNestedObject`: requires exactly two direct body members; found 1'; do
+  'unsupported @instance source shape for `TypeMemberThenAlias`: inherited concrete type alias `Alias` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `TypeMemberNestedTrait`: direct body member at index 1 must be a method; found nested trait' \
+  'unsupported @instance source shape for `TypeMemberNestedClass`: direct body member at index 1 must be a method; found nested class' \
+  'unsupported @instance source shape for `TypeMemberNestedObject`: direct body member at index 1 must be a method; found nested object'; do
   grep -Fq -- "$expected_diagnostic" "$instance_negative_log" ||
     fail "instance negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -838,6 +838,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_FULL_ADD_OUT_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_AUX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_ABSTRACT_TYPE_MEMBER_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_ABSTRACT_TYPE_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_BINARY_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_METHOD_PASS'

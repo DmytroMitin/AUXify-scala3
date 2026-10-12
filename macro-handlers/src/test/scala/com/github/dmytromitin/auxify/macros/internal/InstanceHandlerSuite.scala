@@ -70,6 +70,45 @@ class InstanceHandlerSuite extends munit.FunSuite:
     }
   }
 
+  test("routes an abstract type with inherited tail without copying tail members") {
+    withExpansionInput(
+      """@current
+        |trait RichHasOut[A]:
+        |  type Out
+        |  type Out0 = A
+        |  def identity(a: A): A = a
+        |  type Out1 = A
+        |  def pick(a: A, b: A): A = a
+        |""".stripMargin,
+      "RichHasOut"
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new InstanceHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          val output = StructuredOutcomeTestSupport.materialize(input, changes)
+          generatedInstance(output)
+        case other => fail(s"expected structured abstract-type tail factory, found $other")
+
+      assertEquals(
+        method.leadingTypeParams.map(_.name.toString),
+        List("A", "Out2")
+      )
+      assertEquals(method.trailingParamss, Nil)
+      method.rhs match
+        case New(template: Template) =>
+          val authoredTypes = template.body.collect {
+            case definition: TypeDef => definition.name.toString
+          }
+          val authoredMethods = template.body.collect {
+            case definition: DefDef if definition.name.toString != "<init>" =>
+              definition.name.toString
+          }
+          assertEquals(authoredTypes, List("Out"))
+          assertEquals(authoredMethods, Nil)
+        case other => fail(s"expected anonymous abstract-type implementation, found $other")
+    }
+  }
+
   test("dispatches an exact one-method curried source only to the curried family") {
     withExpansionInput(
       """@current
@@ -507,6 +546,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
         |  type Out
         |
         |object HasOut:
+        |  type Item = A
+        |  def identity(a: A): A = a
         |  val retained = 11
         |""".stripMargin,
       "HasOut"

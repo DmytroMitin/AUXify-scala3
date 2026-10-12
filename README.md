@@ -130,7 +130,7 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-alias tail, (2) exactly one public unbounded abstract type member, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by an optional validated heterogeneous inherited concrete method/direct-alias tail, generating the same strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-`A` alias tail, (2) one public unbounded abstract type member first, followed by an optional validated inherited concrete method/direct-`A` alias tail, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by the same optional validated heterogeneous tail, generating the strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | One public abstract primary method under one invariant unbounded type parameter—either unary `show(a: A): String` or parameterless `empty: A`—optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; exactly the primary method receives one companion forwarder |
 | Stacked `@apply` + `@delegated` | Supported bounded composition slice | Both source orders on the common one-invariant-unbounded-parameter, one-eligible-method family only; this is not arbitrary annotation composition |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
@@ -321,14 +321,32 @@ def instance[A, Out0]: HasOut[A] { type Out = Out0 } =
     type Out = Out0
 ```
 
+That required abstract type member may be followed by a heterogeneous inherited
+tail:
+
+```scala
+@instance
+trait RichHasOut[A]:
+  type Out
+  type Item = A
+  def identity(a: A): A = a
+  type Value = A
+  def pick(a: A, b: A): A = a
+```
+
 The trait has exactly one invariant, ordinary, unbounded enclosing type
-parameter and exactly one direct public, unannotated, monomorphic, unbounded
-abstract type member. Trait, enclosing-parameter, and member names are
-source-derived. The generated second type-parameter name uses a deterministic
-numeric suffix and skips occupied source names, while the return refinement and
-anonymous concrete alias retain the source member name. Existing direct
-`instance` members and unrelated companion content follow the same preservation
-policy as the method family.
+parameter. Its first direct member is exactly one public, unannotated,
+monomorphic, unbounded abstract type member. Any later entries must be concrete
+public methods returning direct `A` or public monomorphic direct aliases
+`type Name = A`; those entries may interleave.
+
+The generated second type-parameter name skips occupied source type names,
+including inherited alias names. Only the required abstract member's concrete
+implementation alias is authored in the anonymous factory; tail methods and
+aliases remain inherited. Extra abstract roles, arbitrary mixed abstract
+members, and multi-type factories remain unsupported. Existing direct
+`instance` members and unrelated companion content retain their preservation
+policy.
 
 Post-0.1.0 `0.2.0-SNAPSHOT` development also supports a third, disjoint
 curried-method factory family:

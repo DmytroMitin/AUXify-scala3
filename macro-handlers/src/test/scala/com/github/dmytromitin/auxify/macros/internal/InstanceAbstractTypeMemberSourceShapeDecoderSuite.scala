@@ -63,7 +63,163 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
+  test("admits a heterogeneous inherited tail and freshens past tail aliases") {
+    assertEquals(
+      decode(
+        """trait RichHasOut[A]:
+          |  type Out
+          |  type Out0 = A
+          |  def identity(a: A): A = a
+          |  type Out1 = A
+          |  def pick(a: A, b: A): A = a
+          |""".stripMargin,
+        "RichHasOut"
+      ),
+      InstanceAbstractTypeMemberSourceShapeDecoder.SourceShape(
+        traitName = "RichHasOut",
+        enclosingTypeParameterName = "A",
+        memberName = "Out",
+        generatedTypeParameterName = "Out2"
+      )
+    )
+  }
+
+  test("admits every supported inherited tail topology") {
+    val rows = List(
+      "AliasOnly" ->
+        """trait AliasOnly[A]:
+          |  type Out
+          |  type Item = A
+          |""".stripMargin,
+      "ZeroMethod" ->
+        """trait ZeroMethod[A]:
+          |  type Out
+          |  def zero: A = ???
+          |""".stripMargin,
+      "UnaryMethod" ->
+        """trait UnaryMethod[A]:
+          |  type Out
+          |  def identity(value: A): A = value
+          |""".stripMargin,
+      "LargerMethod" ->
+        """trait LargerMethod[A]:
+          |  type Out
+          |  def choose(a: A, b: A, c: A): A = a
+          |""".stripMargin,
+      "AliasThenMethod" ->
+        """trait AliasThenMethod[A]:
+          |  type Out
+          |  type Item = A
+          |  def identity(value: A): A = value
+          |""".stripMargin,
+      "MethodThenAlias" ->
+        """trait MethodThenAlias[A]:
+          |  type Out
+          |  def identity(value: A): A = value
+          |  type Item = A
+          |""".stripMargin,
+      "Interleaved" ->
+        """trait Interleaved[A]:
+          |  type Out
+          |  type Item = A
+          |  def zero: A = ???
+          |  type Value = A
+          |  def choose(a: A, b: A, c: A): A = a
+          |""".stripMargin
+    )
+
+    rows.foreach: (traitName, source) =>
+      assert(
+        decodeEither(source, traitName).isRight,
+        clues(traitName, decodeEither(source, traitName))
+      )
+  }
+
+  test("keeps term-only Out0 spellings out of the generated type namespace") {
+    assertEquals(
+      decode(
+        """trait TermOnlyCollision[A]:
+          |  type Out
+          |  def Out0(Out1: A): A = Out1
+          |""".stripMargin,
+        "TermOnlyCollision"
+      ).generatedTypeParameterName,
+      "Out0"
+    )
+  }
+
+  test("matches every inherited alias by its exact source body index") {
+    val source =
+      """trait IndexedAliases[A]:
+        |  type Out
+        |  type First = A
+        |  def identity(value: A): A = value
+        |  type Second = A
+        |  type Third = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) =
+      decodeAllViews(source, "IndexedAliases")
+    assertEquals(
+      typeStructureView.directTypeMembers.map(_.bodyIndex),
+      List(0, 1, 3, 4)
+    )
+
+    List(1, 3, 4).foreach: index =>
+      val records = typeStructureView.directTypeMembers
+      val atIndex = records.find(_.bodyIndex == index).getOrElse(
+        fail(s"missing fixture alias at $index")
+      )
+      val missing = typeStructureView.copy(
+        directTypeMembers = records.filterNot(_.bodyIndex == index)
+      )
+      assertRejected(
+        InstanceAbstractTypeMemberSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          missing
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+
+      val duplicate = typeStructureView.copy(
+        directTypeMembers = records :+ atIndex
+      )
+      assertRejected(
+        InstanceAbstractTypeMemberSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          duplicate
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide exactly one normalized direct type member; found 2"
+      )
+
+      val mismatched = typeStructureView.copy(
+        directTypeMembers = records.map(record =>
+          if record.bodyIndex == index then record.copy(bodyIndex = index + 10)
+          else record
+        )
+      )
+      assertRejected(
+        InstanceAbstractTypeMemberSourceShapeDecoder.decode(
+          classView,
+          bodyView,
+          mismatched
+        ),
+        "IndexedAliases",
+        s"direct body member at index $index must provide normalized type-member evidence"
+      )
+  }
+
   private val rejectedSources = List(
+    (
+      "zero direct body members",
+      """trait Empty[A]
+        |""".stripMargin,
+      "Empty",
+      "abstract-type-member family requires at least one direct body member; found 0"
+    ),
     (
       "zero enclosing type parameters",
       """trait Zero:
@@ -191,7 +347,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
         |  type Other
         |""".stripMargin,
       "TwoMembers",
-      "abstract-type-member family requires exactly one direct body member; found 2"
+      "inherited type member `Other` must be a concrete alias"
     ),
     (
       "abstract type member plus method",
@@ -200,7 +356,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
         |  def value: A
         |""".stripMargin,
       "TypeThenMethod",
-      "abstract-type-member family requires exactly one direct body member; found 2"
+      "inherited method `value` must be concrete"
     ),
     (
       "method plus abstract type member",
@@ -209,16 +365,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
         |  type Out
         |""".stripMargin,
       "MethodThenType",
-      "abstract-type-member family requires exactly one direct body member; found 2"
-    ),
-    (
-      "abstract type member plus concrete alias",
-      """trait AbstractAndAlias[A]:
-        |  type Out
-        |  type Other = A
-        |""".stripMargin,
-      "AbstractAndAlias",
-      "abstract-type-member family requires exactly one direct body member; found 2"
+      "direct body member at index 0 must be an abstract type member; found method"
     ),
     (
       "abstract val",
@@ -254,6 +401,134 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     )
   )
 
+  private val rejectedTailSources = List(
+    (
+      "wrong alias target",
+      "trait WrongAliasTail[A]:\n  type Out\n  type Item = String\n",
+      "WrongAliasTail",
+      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+    ),
+    (
+      "bounded alias",
+      "trait BoundedAliasTail[A]:\n  type Out\n  type Item <: A\n",
+      "BoundedAliasTail",
+      "inherited type member `Item` must be a concrete alias"
+    ),
+    (
+      "polymorphic alias",
+      "trait PolymorphicAliasTail[A]:\n  type Out\n  type Item[B] = A\n",
+      "PolymorphicAliasTail",
+      "inherited concrete type alias `Item` must not declare type parameters"
+    ),
+    (
+      "private alias",
+      "trait PrivateAliasTail[A]:\n  type Out\n  private type Item = A\n",
+      "PrivateAliasTail",
+      "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "annotated alias",
+      "trait AnnotatedAliasTail[A]:\n  type Out\n  @deprecated type Item = A\n",
+      "AnnotatedAliasTail",
+      "inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers"
+    ),
+    (
+      "abstract method",
+      "trait AbstractMethodTail[A]:\n  type Out\n  def other(a: A): A\n",
+      "AbstractMethodTail",
+      "inherited method `other` must be concrete"
+    ),
+    (
+      "concrete val",
+      "trait ValueTail[A]:\n  type Out\n  val other: A = ???\n",
+      "ValueTail",
+      "direct body member at index 1 must be a method; found val"
+    ),
+    (
+      "concrete var",
+      "trait VariableTail[A]:\n  type Out\n  var other: A = ???\n",
+      "VariableTail",
+      "direct body member at index 1 must be a method; found var"
+    ),
+    (
+      "lazy val",
+      "trait LazyValueTail[A]:\n  type Out\n  lazy val other: A = ???\n",
+      "LazyValueTail",
+      "direct body member at index 1 must be a method; found val"
+    ),
+    (
+      "nested class",
+      "trait NestedClassTail[A]:\n  type Out\n  class Other\n",
+      "NestedClassTail",
+      "direct body member at index 1 must be a method; found nested class"
+    ),
+    (
+      "nested trait",
+      "trait NestedTraitTail[A]:\n  type Out\n  trait Other\n",
+      "NestedTraitTail",
+      "direct body member at index 1 must be a method; found nested trait"
+    ),
+    (
+      "nested object",
+      "trait NestedObjectTail[A]:\n  type Out\n  object Other\n",
+      "NestedObjectTail",
+      "direct body member at index 1 must be a method; found nested object"
+    ),
+    (
+      "empty method clause",
+      "trait EmptyClauseTail[A]:\n  type Out\n  def other(): A = ???\n",
+      "EmptyClauseTail",
+      "inherited concrete method `other` requires one or more ordinary parameters in its single clause; found 0"
+    ),
+    (
+      "curried method",
+      "trait CurriedTail[A]:\n  type Out\n  def other(a: A)(b: A): A = a\n",
+      "CurriedTail",
+      "inherited concrete method `other` requires exactly one ordinary parameter clause; found 2"
+    ),
+    (
+      "contextual method",
+      "trait ContextualTail[A]:\n  type Out\n  def other(using a: A): A = a\n",
+      "ContextualTail",
+      "inherited concrete method `other` parameter clause must be ordinary and non-contextual"
+    ),
+    (
+      "defaulted method",
+      "trait DefaultedTail[A]:\n  type Out\n  def other(a: A = ???): A = a\n",
+      "DefaultedTail",
+      "inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified"
+    ),
+    (
+      "polymorphic method",
+      "trait PolymorphicTail[A]:\n  type Out\n  def other[B](a: A): A = a\n",
+      "PolymorphicTail",
+      "inherited concrete method `other` must not declare method type parameters"
+    ),
+    (
+      "wrong method parameter",
+      "trait WrongParameterTail[A]:\n  type Out\n  def other(a: String): A = ???\n",
+      "WrongParameterTail",
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A`"
+    ),
+    (
+      "wrong method result",
+      "trait WrongResultTail[A]:\n  type Out\n  def other(a: A): String = ???\n",
+      "WrongResultTail",
+      "inherited concrete method `other` result type must use enclosing type parameter `A`"
+    ),
+    (
+      "late invalid member",
+      "trait LateInvalidTail[A]:\n  type Out\n  type Item = A\n  def identity(a: A): A = a\n  type Value = A\n  val invalid: A = ???\n",
+      "LateInvalidTail",
+      "direct body member at index 4 must be a method; found val"
+    )
+  )
+
+  rejectedTailSources.foreach: (label, source, traitName, reason) =>
+    test(s"rejects inherited tail $label") {
+      assertRejected(decodeEither(source, traitName), traitName, reason)
+    }
+
   rejectedSources.foreach: (label, source, traitName, reason) =>
     test(s"rejects $label") {
       assertRejected(decodeEither(source, traitName), traitName, reason)
@@ -263,10 +538,10 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     val (classView, bodyView, typeView) = decodeAllViews(CanonicalSource, "HasOut")
     val member = typeView.directTypeMembers.head
     List(
-      typeView.copy(directTypeMembers = Nil),
-      typeView.copy(directTypeMembers = List(member, member)),
-      typeView.copy(directTypeMembers = List(member.copy(bodyIndex = 1)))
-    ).foreach: malformed =>
+      typeView.copy(directTypeMembers = Nil) -> 0,
+      typeView.copy(directTypeMembers = List(member, member)) -> 2,
+      typeView.copy(directTypeMembers = List(member.copy(bodyIndex = 1))) -> 0
+    ).foreach: (malformed, countAtIndexZero) =>
       assertRejected(
         InstanceAbstractTypeMemberSourceShapeDecoder.decode(
           classView,
@@ -274,7 +549,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
           malformed
         ),
         "HasOut",
-        s"direct body member at index 0 must provide exactly one normalized type-member record at body index 0; found ${malformed.directTypeMembers.size}"
+        s"direct body member at index 0 must provide exactly one normalized type-member record at body index 0; found $countAtIndexZero"
       )
   }
 

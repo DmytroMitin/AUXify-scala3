@@ -63,14 +63,15 @@ private[internal] object InstanceAbstractTypeMemberSourceShapeDecoder:
             s"enclosing type parameter `${enclosing.name}` must be invariant, ordinary, unbounded, non-higher-kinded, and free of context bounds",
             enclosing.pos
           )
-      direct <- bodyView.members match
-        case List(member) => Right(member)
-        case members =>
+      directAndTail <- bodyView.members match
+        case first :: tail => Right((first, tail))
+        case Nil =>
           unsupported(
             traitName,
-            s"abstract-type-member family requires exactly one direct body member; found ${members.size}",
+            "abstract-type-member family requires at least one direct body member; found 0",
             bodyView.pos
           )
+      (direct, tail) = directAndTail
       _ <-
         if direct.kind == DirectMemberKind.Type then Right(())
         else
@@ -79,8 +80,8 @@ private[internal] object InstanceAbstractTypeMemberSourceShapeDecoder:
             s"direct body member at index 0 must be an abstract type member; found ${memberKindLabel(direct.kind)}",
             direct.pos
           )
-      member <- typeStructureView.directTypeMembers match
-        case List(value) if value.bodyIndex == 0 => Right(value)
+      member <- typeStructureView.directTypeMembers.filter(_.bodyIndex == 0) match
+        case List(value) => Right(value)
         case members =>
           unsupported(
             traitName,
@@ -88,9 +89,26 @@ private[internal] object InstanceAbstractTypeMemberSourceShapeDecoder:
             members.headOption.map(_.pos).getOrElse(direct.pos)
           )
       _ <- eligibleMember(traitName, member)
+      _ <- InstanceInheritedConcreteTailValidator.validate(
+        traitName,
+        enclosing.name,
+        tail,
+        firstBodyIndex = 1,
+        typeStructureView = Some(typeStructureView),
+        diagnosticAnnotation = "@instance"
+      )
+      tailAliasIndices = tail.zipWithIndex.collect {
+        case (tailMember, offset) if tailMember.kind == DirectMemberKind.Type =>
+          1 + offset
+      }.toSet
+      tailAliasNames = typeStructureView.directTypeMembers.collect {
+        case value
+            if tailAliasIndices.contains(value.bodyIndex) &&
+              value.kind == DirectTypeMemberKind.Alias => value.name
+      }.toSet
       generated = freshTypeParameterName(
         member.name,
-        Set(traitName, enclosing.name, member.name)
+        Set(traitName, enclosing.name, member.name) ++ tailAliasNames
       )
     yield SourceShape(traitName, enclosing.name, member.name, generated)
 

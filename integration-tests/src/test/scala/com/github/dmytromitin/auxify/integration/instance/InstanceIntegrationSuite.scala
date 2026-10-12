@@ -42,6 +42,44 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(witness("typed"), "typed")
   }
 
+  test("inherits the abstract-type heterogeneous tail and exposes type witnesses") {
+    val value: RichHasOut[Int] { type Out = String } =
+      RichHasOut.instance[Int, String]
+    val out: value.Out = "typed"
+    val item: value.Item = 42
+    val result: value.Value = 42
+
+    assertEquals(summon[value.Out =:= String](out), "typed")
+    assertEquals(summon[value.Item =:= Int](item), 42)
+    assertEquals(summon[value.Value =:= Int](result), 42)
+    assertEquals(value.identity(42), 42)
+    assertEquals(value.pick(42, 99), 42)
+    assertEquals(value.fortyTwo, 42)
+    assertEquals(RichHasOut.preserved, 342)
+  }
+
+  test("freshens the generated abstract-type carrier past inherited aliases") {
+    val value: FreshHasOut[Int] { type Out = String } =
+      FreshHasOut.instance[Int, String]
+    val out0: value.Out0 = 42
+    val out1: value.Out1 = 42
+
+    assertEquals(summon[value.Out0 =:= Int](out0), 42)
+    assertEquals(summon[value.Out1 =:= Int](out1), 42)
+    assertEquals(summon[value.Out =:= String]("fresh"), "fresh")
+  }
+
+  test("preserves an existing abstract-type heterogeneous-tail factory") {
+    val value: ExistingRichHasOut[Int] { type Out = String } =
+      ExistingRichHasOut.instance[Int, String]
+    val item: value.Item = 42
+
+    assertEquals(summon[value.Out =:= String]("existing"), "existing")
+    assertEquals(summon[value.Item =:= Int](item), 42)
+    assertEquals(value.identity(42), 42)
+    assertEquals(ExistingRichHasOut.instanceCalls, 1)
+  }
+
   test("constructs renamed abstract-type roles with collision-free freshness") {
     val value: Container[Int] { type Element = String } =
       Container.instance[Int, String]
