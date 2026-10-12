@@ -621,7 +621,7 @@ cat "$composition_negative_log"
 [[ "$composition_negative_status" -ne 0 ]] ||
   fail "negativeCompositionLateRejection compiled successfully; the late delegated rejection was lost"
 
-for source in LateDelegatedRejection ReverseLateDelegatedRejection; do
+for source in LateDelegatedRejection ReverseLateDelegatedRejection LateParameterlessDelegatedRejection ReverseLateParameterlessDelegatedRejection; do
   expected_diagnostic='unsupported @delegated source shape for `'"$source"'`: direct body member at index 3 must be a method; found val'
   grep -Fq -- "$expected_diagnostic" "$composition_negative_log" ||
     fail "late composition rejection omitted the deterministic delegated tail diagnostic for $source"
@@ -854,6 +854,7 @@ printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_HETEROGENEOUS_INHERITED_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_HETEROGENEOUS_TAIL_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_PARAMETERLESS_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'

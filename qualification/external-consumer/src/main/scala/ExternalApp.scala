@@ -351,6 +351,30 @@ object ExternalReverseRichShow:
   given ExternalReverseRichShow[String] with
     def render(value: String): String = s"external-reverse:$value"
 
+@apply
+@delegated
+trait ExternalRichEmpty[A]:
+  def empty: A
+  type Item = A
+  def duplicate(value: A): A = value
+  type Value = A
+  def choose(first: A, second: A): A = first
+
+object ExternalRichEmpty:
+  given ExternalRichEmpty[Int] with
+    def empty: Int = 42
+
+@delegated
+@apply
+trait ExternalReverseRichEmpty[Element]:
+  def fallback: Element
+  def repeat(value: Element): Element = value
+  type Item = Element
+
+object ExternalReverseRichEmpty:
+  given ExternalReverseRichEmpty[String] with
+    def fallback: String = "external-empty"
+
 object ExternalApp:
   def main(args: Array[String]): Unit =
     val output: HasOut[Int] { type Out = String } =
@@ -659,4 +683,22 @@ object ExternalApp:
     assert(ExternalReverseRichShow.render("value") == "external-reverse:value")
     assert(externalReverse.retain("retained") == "retained")
     assert(summon[externalReverse.Item =:= String](externalReverseItem) == "typed")
+    val externalEmpty = ExternalRichEmpty[Int]
+    val externalEmptyItem: externalEmpty.Item = 42
+    val externalEmptyValue: externalEmpty.Value = 43
+    assert(ExternalRichEmpty[Int].eq(externalEmpty))
+    assert(ExternalRichEmpty.empty[Int] == 42)
+    assert(externalEmpty.duplicate(42) == 42)
+    assert(externalEmpty.choose(42, 43) == 42)
+    assert(summon[externalEmpty.Item =:= Int](externalEmptyItem) == 42)
+    assert(summon[externalEmpty.Value =:= Int](externalEmptyValue) == 43)
+
+    val externalReverseEmpty = ExternalReverseRichEmpty[String]
+    val externalReverseEmptyItem: externalReverseEmpty.Item = "typed"
+    assert(ExternalReverseRichEmpty[String].eq(externalReverseEmpty))
+    assert(ExternalReverseRichEmpty.fallback[String] == "external-empty")
+    assert(externalReverseEmpty.repeat("retained") == "retained")
+    assert(
+      summon[externalReverseEmpty.Item =:= String](externalReverseEmptyItem) == "typed"
+    )
     println("AUXIFY_SCALA3_EXTERNAL_RUNTIME_PASS")

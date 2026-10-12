@@ -88,12 +88,7 @@ private[internal] object DelegatedHandler:
                 case DelegatedSourceShapeDecoder.Variant.Unary(_, _) =>
                   AuxifyTargetAdmission.applyTarget(classView)
                 case DelegatedSourceShapeDecoder.Variant.Parameterless =>
-                  Left(
-                    ExpansionDiagnostic(
-                      s"unsupported @delegated composition shape for `${input.primary.name}`: inherited concrete tails require the unary delegated primary family when stacked with @apply",
-                      input.currentAnnotation.sourcePos
-                    )
-                  )
+                  AuxifyTargetAdmission.applyTarget(classView)
           else Right(())
         lowered <- lower(shape, summon[Context]).left.map(failure =>
           ExpansionDiagnostic(

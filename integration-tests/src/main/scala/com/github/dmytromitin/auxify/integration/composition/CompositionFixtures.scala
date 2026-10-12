@@ -26,6 +26,49 @@ object DelegatedThenApply:
 
 @apply
 @delegated
+trait ParameterlessNoTail[A]:
+  def empty: A
+
+object ParameterlessNoTail:
+  given ParameterlessNoTail[Int] with
+    def empty: Int = 42
+
+@delegated
+@apply
+trait ReverseParameterlessNoTail[Element]:
+  def fallback: Element
+
+object ReverseParameterlessNoTail:
+  given ReverseParameterlessNoTail[String] with
+    def fallback: String = "fallback"
+
+@apply
+@delegated
+trait RichEmpty[A]:
+  def empty: A
+  type Item = A
+  def duplicate(a: A): A = a
+  type Value = A
+  def choose(a: A, b: A): A = a
+  def current: A = empty
+
+object RichEmpty:
+  given RichEmpty[Int] with
+    def empty: Int = 42
+
+@delegated
+@apply
+trait ReverseRichEmpty[Element]:
+  def fallback: Element
+  def repeat(value: Element): Element = value
+  type Item = Element
+
+object ReverseRichEmpty:
+  given ReverseRichEmpty[String] with
+    def fallback: String = "reverse"
+
+@apply
+@delegated
 trait ExistingApplyThenDelegated[A]:
   def show(a: A): String
 
@@ -185,3 +228,56 @@ object BothConflictReverse:
     s"both-conflict-reverse:$a"
   given BothConflictReverse[Int] with
     def show(a: Int): String = s"instance-reverse:$a"
+
+@delegated
+@apply
+trait GeneratedParameterlessTail[A]:
+  def empty: A
+  def zero: A = empty
+  type Item = A
+
+@apply
+@delegated
+trait ParameterlessApplyConflict[A]:
+  def empty: A
+  type Item = A
+
+object ParameterlessApplyConflict:
+  var applyCalls = 0
+  def apply[A](using instance: ParameterlessApplyConflict[A]): ParameterlessApplyConflict[A] =
+    applyCalls += 1
+    instance
+  given ParameterlessApplyConflict[Int] with
+    def empty: Int = 42
+
+@delegated
+@apply
+trait ParameterlessEmptyConflict[A]:
+  def empty: A
+  def duplicate(value: A): A = value
+
+object ParameterlessEmptyConflict:
+  var emptyCalls = 0
+  def empty[A](using instance: ParameterlessEmptyConflict[A]): A =
+    emptyCalls += 1
+    instance.empty
+  given ParameterlessEmptyConflict[Int] with
+    def empty: Int = 43
+
+@apply
+@delegated
+trait ParameterlessBothConflict[A]:
+  def empty: A
+  type Value = A
+
+object ParameterlessBothConflict:
+  var applyCalls = 0
+  var emptyCalls = 0
+  def apply[A](using instance: ParameterlessBothConflict[A]): ParameterlessBothConflict[A] =
+    applyCalls += 1
+    instance
+  def empty[A](using instance: ParameterlessBothConflict[A]): A =
+    emptyCalls += 1
+    instance.empty
+  given ParameterlessBothConflict[Int] with
+    def empty: Int = 44

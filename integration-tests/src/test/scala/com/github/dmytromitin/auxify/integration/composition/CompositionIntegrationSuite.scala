@@ -19,6 +19,36 @@ class CompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(DelegatedThenApply.preservedAfter, 85)
   }
 
+  test("both source orders already support parameterless composition without a tail") {
+    val forward = ParameterlessNoTail[Int]
+    val reverse = ReverseParameterlessNoTail[String]
+
+    assertEquals(forward.empty, 42)
+    assertEquals(ParameterlessNoTail.empty[Int], 42)
+    assertEquals(reverse.fallback, "fallback")
+    assertEquals(ReverseParameterlessNoTail.fallback[String], "fallback")
+  }
+
+  test("both source orders compose parameterless forwarding with inherited tails") {
+    val forward = RichEmpty[Int]
+    val forwardItem: forward.Item = 42
+    val forwardValue: forward.Value = 43
+    val reverse = ReverseRichEmpty[String]
+    val reverseItem: reverse.Item = "reverse"
+
+    assertEquals(forward.empty, 42)
+    assertEquals(RichEmpty.empty[Int], 42)
+    assertEquals(forward.duplicate(42), 42)
+    assertEquals(forward.choose(42, 43), 42)
+    assertEquals(forward.current, 42)
+    assertEquals(summon[forward.Item =:= Int](forwardItem), 42)
+    assertEquals(summon[forward.Value =:= Int](forwardValue), 43)
+    assertEquals(reverse.fallback, "reverse")
+    assertEquals(ReverseRichEmpty.fallback[String], "reverse")
+    assertEquals(reverse.repeat("value"), "value")
+    assertEquals(summon[reverse.Item =:= String](reverseItem), "reverse")
+  }
+
   test("an existing apply is preserved while delegated forwarding is generated") {
     val instance = ExistingApplyThenDelegated[Int]
 
@@ -130,4 +160,50 @@ class CompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(summon[reverse.Item =:= Int](reverseItem), 26)
     assertEquals(BothConflictReverse.applyCalls, 1)
     assertEquals(BothConflictReverse.showCalls, 1)
+  }
+
+  test("a fresh parameterless companion contains only apply and empty") {
+    given GeneratedParameterlessTail[Int] with
+      def empty: Int = 42
+
+    val instance = GeneratedParameterlessTail[Int]
+    val generatedNames =
+      GeneratedParameterlessTail.getClass.getDeclaredMethods.toList.map(_.getName)
+
+    assertEquals(instance.empty, 42)
+    assertEquals(GeneratedParameterlessTail.empty[Int], 42)
+    assertEquals(instance.zero, 42)
+    assertEquals(generatedNames.count(_ == "apply"), 1)
+    assertEquals(generatedNames.count(_ == "empty"), 1)
+    assert(!generatedNames.contains("zero"), clue(generatedNames))
+  }
+
+  test("an existing apply suppresses only apply for parameterless composition") {
+    val instance = ParameterlessApplyConflict[Int]
+    val item: instance.Item = 42
+
+    assertEquals(instance.empty, 42)
+    assertEquals(ParameterlessApplyConflict.empty[Int], 42)
+    assertEquals(summon[instance.Item =:= Int](item), 42)
+    assertEquals(ParameterlessApplyConflict.applyCalls, 1)
+  }
+
+  test("an existing parameterless forwarder suppresses only the forwarder") {
+    val instance = ParameterlessEmptyConflict[Int]
+
+    assertEquals(instance.empty, 43)
+    assertEquals(ParameterlessEmptyConflict.empty[Int], 43)
+    assertEquals(instance.duplicate(43), 43)
+    assertEquals(ParameterlessEmptyConflict.emptyCalls, 1)
+  }
+
+  test("existing apply and parameterless forwarder remain independent") {
+    val instance = ParameterlessBothConflict[Int]
+    val value: instance.Value = 44
+
+    assertEquals(instance.empty, 44)
+    assertEquals(ParameterlessBothConflict.empty[Int], 44)
+    assertEquals(summon[instance.Value =:= Int](value), 44)
+    assertEquals(ParameterlessBothConflict.applyCalls, 1)
+    assertEquals(ParameterlessBothConflict.emptyCalls, 1)
   }

@@ -428,33 +428,51 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       }
   }
 
-  test("keeps parameterless delegated tails outside the apply-delegated unary composition family") {
-    withExpansionInput(
-      """@current
-        |trait StackedEmpty[A]:
-        |  def empty: A
-        |  type Item = A
-        |""".stripMargin,
-      "StackedEmpty",
-      List(
-        "com.github.dmytromitin.auxify.macros.apply",
-        "com.github.dmytromitin.auxify.macros.delegated"
-      )
-    ) { (input, primary, companion, context) =>
-      given Context = context
-      val originalTemplate = primary.rhs
-      new DelegatedHandler().expand(input) match
-        case ExpansionOutcome.Rejected(diagnostics) =>
-          assertEquals(
-            diagnostics.map(_.message),
-            List(
-              "unsupported @delegated composition shape for `StackedEmpty`: inherited concrete tails require the unary delegated primary family when stacked with @apply"
-            )
-          )
-          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
-          assertEquals(companion, None)
-        case other => fail(s"expected controlled parameterless composition rejection, found $other")
-    }
+  test("admits parameterless inherited tails in both exact apply-delegated source orders") {
+    val apply = "com.github.dmytromitin.auxify.macros.apply"
+    val delegated = "com.github.dmytromitin.auxify.macros.delegated"
+
+    List(List(apply, delegated), List(delegated, apply)).foreach: sourceOrder =>
+      withExpansionInput(
+        """@current
+          |trait StackedEmpty[A]:
+          |  def empty: A
+          |  type inst = A
+          |  def inst(inst1: A): A = inst1
+          |  type Value = A
+          |""".stripMargin,
+        "StackedEmpty",
+        sourceOrder
+      ) { (input, _, companion, context) =>
+        given Context = context
+        assertEquals(companion, None)
+        val output = new DelegatedHandler().expand(input) match
+          case ExpansionOutcome.Structured(changes) =>
+            StructuredOutcomeTestSupport.materialize(input, changes)
+          case other => fail(s"expected structured parameterless composition, found $other")
+
+        val methods = output.companion.toList.flatMap(_.impl.body).collect {
+          case method: DefDef => method
+        }
+        assertEquals(methods.map(_.name.toString), List("empty"))
+        val method = methods.head
+        assertEquals(method.leadingTypeParams.map(_.name.toString), List("A"))
+        assertEquals(
+          method.trailingParamss.map(_.map(_.name.toString)),
+          List(List("inst2"))
+        )
+        method.rhs match
+          case Select(Ident(receiver), selected) =>
+            assertEquals(receiver.toString, "inst2")
+            assertEquals(selected.toString, "empty")
+          case other => fail(s"expected parameterless stable select, found $other")
+        assertEquals(
+          output.primary.rhs.asInstanceOf[Template].body.collect {
+            case member: MemberDef => member.name.toString
+          },
+          List("empty", "inst", "inst", "Value")
+        )
+      }
   }
 
   test("missing primary member remains a controlled delegated rejection") {
@@ -478,16 +496,22 @@ class DelegatedHandlerSuite extends munit.FunSuite:
   }
 
 
-  test("parameterless bridge failure rolls back without a partial companion edit") {
+  test("parameterless tail bridge failure rolls back the exact composition cohort") {
     withExpansionInput(
       """@current
         |trait Empty[A]:
         |  def empty: A
+        |  type Item = A
+        |  def duplicate(value: A): A = value
         |
         |object Empty:
         |  val retained = 13
         |""".stripMargin,
-      "Empty"
+      "Empty",
+      List(
+        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated"
+      )
     ) { (input, primary, companion, context) =>
       given Context = context
       val originalTemplate = primary.rhs
@@ -636,6 +660,63 @@ class DelegatedHandlerSuite extends munit.FunSuite:
       assertEquals(
         method.trailingParamss.map(_.map(_.name.toString)),
         List(List("inst"), List("inst3"))
+      )
+    }
+  }
+
+  test("rejects parameterless tails outside the exact apply-delegated participant cohort") {
+    withExpansionInput(
+      """@current
+        |trait ExtraParameterlessParticipant[A]:
+        |  def empty: A
+        |  type Item = A
+        |""".stripMargin,
+      "ExtraParameterlessParticipant",
+      List(
+        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated",
+        "com.github.dmytromitin.auxify.macros.syntax"
+      )
+    ) { (input, primary, companion, context) =>
+      given Context = context
+      val originalTemplate = primary.rhs
+      new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Rejected(diagnostics) =>
+          assertEquals(
+            diagnostics.map(_.message),
+            List(
+              "unsupported @delegated composition shape for `ExtraParameterlessParticipant`: inherited concrete tails require exactly the @apply and @delegated participant cohort"
+            )
+          )
+          assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
+          assertEquals(companion, None)
+        case other => fail(s"expected parameterless closed-cohort rejection, found $other")
+    }
+  }
+
+  test("parameterless composition freshens evidence against a primary named inst") {
+    withExpansionInput(
+      """@current
+        |trait FreshParameterless[Element]:
+        |  def inst: Element
+        |  type inst = Element
+        |  def inst1(inst1: Element): Element = inst1
+        |""".stripMargin,
+      "FreshParameterless",
+      List(
+        "com.github.dmytromitin.auxify.macros.delegated",
+        "com.github.dmytromitin.auxify.macros.apply"
+      )
+    ) { (input, _, _, context) =>
+      given Context = context
+      val method = new DelegatedHandler().expand(input) match
+        case ExpansionOutcome.Structured(changes) =>
+          generatedMethod(StructuredOutcomeTestSupport.materialize(input, changes), "inst")
+        case other => fail(s"expected fresh parameterless expansion, found $other")
+
+      assertEquals(
+        method.trailingParamss.map(_.map(_.name.toString)),
+        List(List("inst2"))
       )
     }
   }
