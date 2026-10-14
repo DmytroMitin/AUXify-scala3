@@ -628,10 +628,19 @@ for source in LateDelegatedRejection ReverseLateDelegatedRejection LateParameter
   grep -Eq "$source[.]scala:11:[0-9]+" "$composition_negative_log" ||
     fail "late composition rejection is not positioned at the invalid tail member for $source"
 done
-grep -Fq \
-  'unsupported @syntax composition shape for `LateSyntaxRejection`: inherited concrete tails are not supported when stacked with @apply or @delegated' \
-  "$composition_negative_log" ||
-  fail "late composition rejection omitted the deterministic syntax composition diagnostic"
+for source in LateSyntaxRejection ReverseLateSyntaxRejection; do
+  expected_diagnostic='unsupported @syntax source shape for `'$source'`: direct body member at index 4 must be a method; found val'
+  grep -Fq -- "$expected_diagnostic" "$composition_negative_log" ||
+    fail "late composition rejection omitted the deterministic syntax tail diagnostic for $source"
+  grep -Eq "$source[.]scala:12:[0-9]+" "$composition_negative_log" ||
+    fail "late composition rejection is not positioned at the invalid syntax tail member for $source"
+done
+
+for source in ApplySyntaxThirdParticipantRejection SyntaxDelegatedRejection; do
+  expected_diagnostic='unsupported @syntax composition shape for `'$source'`: inherited concrete tails require exactly the @apply and @syntax participant cohort'
+  grep -Fq -- "$expected_diagnostic" "$composition_negative_log" ||
+    fail "closed apply-syntax cohort rejection omitted the deterministic diagnostic for $source"
+done
 
 if grep -Eiq \
   'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
@@ -852,6 +861,7 @@ printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_METHOD_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_INSTANCE_CURRIED_HETEROGENEOUS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_FIRST_SLICE_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SYNTAX_HETEROGENEOUS_INHERITED_TAIL_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_SYNTAX_HETEROGENEOUS_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_HETEROGENEOUS_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_PARAMETERLESS_TAIL_COMPOSITION_PASS'

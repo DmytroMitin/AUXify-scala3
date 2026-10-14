@@ -377,6 +377,8 @@ object ExternalReverseRichEmpty:
 
 object ExternalApp:
   def main(args: Array[String]): Unit =
+    ApplySyntaxExternalProof.verify()
+
     val output: HasOut[Int] { type Out = String } =
       HasOut.instance[Int, String]
     val outputWitness: output.Out =:= String = summon[output.Out =:= String]

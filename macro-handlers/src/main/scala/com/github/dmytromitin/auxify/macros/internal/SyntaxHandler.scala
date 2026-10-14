@@ -44,6 +44,13 @@ private[internal] object SyntaxHandler:
     ExtensionModulePeerBridge.Lowered
   ]
 
+  private val applyName = "com.github.dmytromitin.auxify.macros.apply"
+  private val syntaxName = "com.github.dmytromitin.auxify.macros.syntax"
+  private val admittedTailOrders = List(
+    List(applyName, syntaxName),
+    List(syntaxName, applyName)
+  )
+
   def expandWithLowering(
       input: ExpansionInput
   )(
@@ -53,21 +60,6 @@ private[internal] object SyntaxHandler:
       for
         targetView <- input.targetView
         bodyView <- input.targetBodyView
-        _ <-
-          if
-            bodyView.members.sizeCompare(1) > 0 &&
-              input.sourceOrderedHandledAnnotationNames.exists(name =>
-                name == "com.github.dmytromitin.auxify.macros.apply" ||
-                  name == "com.github.dmytromitin.auxify.macros.delegated"
-              )
-          then
-            Left(
-              ExpansionDiagnostic(
-                s"unsupported @syntax composition shape for `${input.primary.name}`: inherited concrete tails are not supported when stacked with @apply or @delegated",
-                input.currentAnnotation.sourcePos
-              )
-            )
-          else Right(())
         typeStructure <-
           if bodyView.members.exists(
               _.kind == ExpansionTargetBodyView.DirectMemberKind.Type
@@ -78,6 +70,21 @@ private[internal] object SyntaxHandler:
           bodyView,
           typeStructure
         )
+        _ <-
+          if
+            bodyView.members.sizeCompare(1) > 0 &&
+              input.sourceOrderedHandledAnnotationNames.exists(_ != syntaxName)
+          then
+            if admittedTailOrders.contains(input.sourceOrderedHandledAnnotationNames)
+            then AuxifyTargetAdmission.applyTarget(targetView)
+            else
+              Left(
+                ExpansionDiagnostic(
+                  s"unsupported @syntax composition shape for `${input.primary.name}`: inherited concrete tails require exactly the @apply and @syntax participant cohort",
+                  input.currentAnnotation.sourcePos
+                )
+              )
+          else Right(())
         lowered <- lower(
           SyntaxDefinitionBuilder.module(shape),
           s"AuxifyGenerated${shape.traitName}Syntax.scala",

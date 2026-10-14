@@ -135,6 +135,7 @@ current project READMEs for the latest development APIs.
 | Stacked `@apply` + `@delegated` | Two closed supported composition families with optional inherited tails | Both source orders on the exact shared one-invariant-unbounded-parameter envelope: either unary `show(a: A): String` or parameterless `empty: A`, optionally followed by the validated heterogeneous inherited concrete method/direct-`A` alias tail; binary delegated stacks remain outside this composition claim |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
 | Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including heterogeneous tails of supported inherited concrete methods and direct concrete aliases to the enclosing type parameter |
+| Stacked `@apply` + `@syntax` | Supported bounded composition slice with optional inherited tail | Both source orders on the exact common one-invariant-unbounded-parameter / one-abstract-binary-method family; the companion receives the existing contextual `apply` accessor and exactly one nested `syntax` extension for the primary method, while validated concrete methods and direct aliases remain inherited |
 | `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly, optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; generates exactly one native Scala 3 extension for the primary method and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
 | `@poly` | Postponed / not parity-blocking | Wait for a Scala 3 ad-hoc polymorphic-function abstraction adequate for the planned Shapeless `PolyN` / `Case.Aux` adapter |
@@ -160,8 +161,9 @@ ordinary-method `@instance` widenings, the disjoint one-abstract-type-member
 `@instance` factory, the disjoint one-curried-abstract-method `@instance`
 factory, normalized modifier-admission hardening, the parameterless
 `@delegated` family, and the bounded native extension-method
-`@syntax` slice with its validated heterogeneous inherited tail. Ordinary development uses coherently
-source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
+`@syntax` slice with its validated heterogeneous inherited tail, including
+the closed `@apply` + `@syntax` composition pair. Ordinary development uses
+coherently source-built Macro-Paradise compiler/API 0.2.0-SNAPSHOT and Quasiquotes
 0.4.0-SNAPSHOT graphs at their pinned accepted commits.
 
 ### Development module coordinates
@@ -653,11 +655,50 @@ Classes, objects, variance or bounds, a missing or nonconforming primary
 method, additional abstract methods or types, vals, vars, lazy vals, nested
 definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic
 or modifier-bearing tail methods, non-`A` tail parameter or result types, and
-nonconforming aliases remain rejected. The inherited tail is intentionally
-rejected when `@syntax` is stacked with `@apply` or `@delegated`; this is
-not arbitrary annotation composition or a claim of recovered Scala 2 parity.
-The slice is not part of released AUXify 0.1.0 or the public Giter8 starter,
-which continue to use only released 0.1.0 behavior.
+nonconforming aliases remain rejected.
+
+Simple `@apply` and this first `@syntax` slice may be stacked in either source
+order on their exact common source family, with or without the validated
+inherited concrete tail:
+
+```scala
+@apply
+@syntax
+trait RichMonoid[A]:
+  def combine(a: A, b: A): A
+  type Item = A
+  def twice(a: A): A = combine(a, a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+
+@syntax
+@apply
+trait ReverseRichMonoid[Element]:
+  def merge(left: Element, right: Element): Element
+  def duplicate(value: Element): Element = merge(value, value)
+  type Item = Element
+```
+
+Each companion contains the existing contextual `apply` accessor and one
+nested `syntax` object with exactly one extension for the abstract binary
+primary method. Concrete methods and aliases remain inherited from the trait;
+they are not copied into either generated structure. A direct existing
+`apply` suppresses only the generated accessor, while a direct term-level
+`syntax` conflict preserves that member and suppresses only the nested module.
+Both conflicts may coexist. A direct `type syntax` occupies the type namespace
+and does not suppress the generated term-level module; nested same-name
+definitions are likewise unrelated.
+
+The admitted participant cohort is exactly `@apply` plus `@syntax`. A third
+handled annotation, `@syntax` plus `@delegated`, a malformed primary or tail,
+an unsuitable target, or any broader stack remains rejected with atomic
+source-ordered rollback. This is a closed first-slice composition contract,
+not arbitrary annotation stacking or a claim of recovered Scala 2 parity.
+
+Standalone `@syntax` and this composition pair are post-0.1.0
+`0.2.0-SNAPSHOT` development behavior. They do not alter released AUXify
+0.1.0 or the public Giter8 starter, which continue to use released 0.1.0
+behavior only.
 
 For a plain zero-parameter trait, the first supported `@self` slice is:
 

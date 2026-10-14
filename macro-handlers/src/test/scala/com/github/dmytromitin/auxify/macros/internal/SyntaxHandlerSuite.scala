@@ -217,7 +217,7 @@ class SyntaxHandlerSuite extends munit.FunSuite:
         case other => fail(s"expected controlled late-tail rejection, found $other")
     }
   }
-  test("rejects inherited tails when syntax is stacked with apply") {
+  test("rejects inherited tails when syntax is stacked with delegated") {
     withExpansionInput(
       """@current
         |trait StackedSyntax[A]:
@@ -230,7 +230,7 @@ class SyntaxHandlerSuite extends munit.FunSuite:
         |""".stripMargin,
       "StackedSyntax",
       List(
-        "com.github.dmytromitin.auxify.macros.apply",
+        "com.github.dmytromitin.auxify.macros.delegated",
         "com.github.dmytromitin.auxify.macros.syntax"
       )
     ) { (input, primary, companion, context) =>
@@ -242,7 +242,7 @@ class SyntaxHandlerSuite extends munit.FunSuite:
           assertEquals(
             diagnostics.map(_.message),
             List(
-              "unsupported @syntax composition shape for `StackedSyntax`: inherited concrete tails are not supported when stacked with @apply or @delegated"
+              "unsupported @syntax composition shape for `StackedSyntax`: inherited concrete tails require exactly the @apply and @syntax participant cohort"
             )
           )
           assert(primary.rhs.eq(originalTemplate), clue(primary.rhs))
