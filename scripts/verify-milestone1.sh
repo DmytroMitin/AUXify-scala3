@@ -678,6 +678,16 @@ grep -Fq \
   "$apply_instance_composition_negative_log" ||
   fail "apply-instance late rejection omitted the deterministic instance decoder diagnostic"
 
+for expected_diagnostic in \
+  'unsupported @instance composition shape for `AbstractTypeThirdParticipant`: abstract-type-member composition requires exactly the @apply and @instance participant cohort' \
+  'unsupported @instance source shape for `AbstractTypeSecondMember`: inherited type member `Other` must be a concrete alias' \
+  'unsupported @instance source shape for `AbstractTypeExtraMethod`: inherited method `missing` must be concrete' \
+  'unsupported @instance source shape for `AbstractTypeAbstractVal`: direct body member at index 1 must be a method; found val' \
+  'unsupported @instance source shape for `AbstractTypeBoundedAlias`: inherited type member `Item` must be a concrete alias'; do
+  grep -Fq -- "$expected_diagnostic" "$apply_instance_composition_negative_log" ||
+    fail "apply-instance abstract-type composition negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
 if grep -Eiq \
   'Exception in thread|(^|[[:space:]])([[:alpha:]_$][[:alnum:]_$]*\.)+[[:alpha:]_$][[:alnum:]_$]*(Exception|Error)(:|[[:space:]]|$)|LinkageError|NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|AssertionError|assertion failed|compiler (assertion|crash)|uncaught (Java|Scala|exception)|StackOverflowError|FatalError' \
   "$apply_instance_composition_negative_log"; then
@@ -876,6 +886,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_ARITY_NEUTRAL_MET
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_HETEROGENEOUS_INHERITED_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_ABSTRACT_TYPE_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \

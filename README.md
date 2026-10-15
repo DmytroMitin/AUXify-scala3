@@ -134,7 +134,7 @@ current project READMEs for the latest development APIs.
 | `@delegated` | Two disjoint bounded development families | One public abstract primary method under one invariant unbounded type parameter—either unary `show(a: A): String` or parameterless `empty: A`—optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; exactly the primary method receives one companion forwarder |
 | Stacked `@apply` + `@delegated` | Two closed supported composition families with optional inherited tails | Both source orders on the exact shared one-invariant-unbounded-parameter envelope: either unary `show(a: A): String` or parameterless `empty: A`, optionally followed by the validated heterogeneous inherited concrete method/direct-`A` alias tail; binary delegated stacks remain outside this composition claim |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
-| Stacked `@apply` + `@instance` | Supported bounded composition slice | Both source orders and independent direct `apply` / `instance` conflicts pass on the common one-invariant-unbounded-parameter `@instance` family, including heterogeneous tails of supported inherited concrete methods and direct concrete aliases to the enclosing type parameter |
+| Stacked `@apply` + `@instance` | Supported bounded composition slices | Both source orders and independent direct `apply` / `instance` conflicts pass for the historical abstract-method family and for the one-abstract-type-member-first family, each with its own validated optional heterogeneous inherited tail; the abstract-type composition is an exact two-participant cohort |
 | Stacked `@apply` + `@syntax` | Supported bounded composition slice with optional inherited tail | Both source orders on the exact common one-invariant-unbounded-parameter / one-abstract-binary-method family; the companion receives the existing contextual `apply` accessor and exactly one nested `syntax` extension for the primary method, while validated concrete methods and direct aliases remain inherited |
 | `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly, optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; generates exactly one native Scala 3 extension for the primary method and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@self` for a plain zero-parameter trait with default semantics | Supported first development slice | Class/object/generic targets and `lowerBound` / `fBound` options are not yet supported |
@@ -466,6 +466,43 @@ Both forms expose the contextual `apply` materializer and the `instance`
 factory. Existing unrelated companion members and the factory's by-name carrier
 semantics are preserved. A direct companion `apply` suppresses only generated
 `apply`; a direct companion `instance` suppresses only generated `instance`.
+
+The post-0.1.0 abstract-type-member factory family is also qualified with
+simple `@apply` in both source orders. Its no-tail and inherited-tail core
+generation already composed before this qualification; current coverage makes
+that existing behavior explicit and closes the claimed family to exactly the
+two handled participants:
+
+```scala
+@apply
+@instance
+trait RichHasOut[A]:
+  type Out
+  type Item = A
+  def identity(value: A): A = value
+  type Value = A
+  def pick(first: A, second: A): A = first
+
+val constructed: RichHasOut[Int] { type Out = String } =
+  RichHasOut.instance[Int, String]
+val proof: constructed.Out =:= String = summon
+given RichHasOut[Int] = constructed
+val selected: RichHasOut[Int] = RichHasOut[Int]
+assert(selected.eq(constructed))
+assert(selected.identity(42) == 42)
+val item: selected.Item = 42
+summon[selected.Item =:= Int]
+```
+
+The factory retains its refined static result and authors exactly the required
+`type Out = Out0` implementation in one anonymous child; optional concrete
+methods and direct-`A` aliases remain inherited. The independent simple
+`apply[A]` accessor still returns `RichHasOut[A]`, so `selected.Out` remains
+abstract at that plain result type. Stacking does not widen `apply` to preserve
+the factory refinement. Generated type-binder freshness skips occupied source
+type names but correctly ignores same-spelling term members in Scala's separate
+term namespace.
+
 An unsupported `@instance` body remains a controlled rejection even though the
 same enclosing trait is admissible to simple `@apply`; the source-ordered
 transaction leaves no partial class or TASTy output. This is qualification of

@@ -94,6 +94,7 @@ private[internal] object InstanceHandler:
             InstanceSourceShapeDecoder
               .decode(classView, bodyView, typeStructure)
               .map(SourceShape.Methods.apply)
+        _ <- abstractTypeCompositionAdmission(input, classView.className, shape)
         lowered <- lower(shape, summon[Context]).left.map(failure =>
           ExpansionDiagnostic(
             s"${failure.code}: ${failure.detail}",
@@ -110,6 +111,32 @@ private[internal] object InstanceHandler:
           MemberConflictPolicy.PreserveExisting
         )(edit)
       yield placed
+
+  private val applyName = "com.github.dmytromitin.auxify.macros.apply"
+  private val instanceName = "com.github.dmytromitin.auxify.macros.instance"
+  private val admittedAbstractTypeCompositionOrders = List(
+    List(applyName, instanceName),
+    List(instanceName, applyName)
+  )
+
+  private def abstractTypeCompositionAdmission(
+      input: ExpansionInput,
+      className: String,
+      shape: SourceShape
+  )(using Context): Either[ExpansionDiagnostic, Unit] =
+    shape match
+      case SourceShape.AbstractTypeMember(_)
+          if input.sourceOrderedHandledAnnotationNames.contains(applyName) &&
+            !admittedAbstractTypeCompositionOrders.contains(
+              input.sourceOrderedHandledAnnotationNames
+            ) =>
+        Left(
+          ExpansionDiagnostic(
+            s"unsupported @instance composition shape for `$className`: abstract-type-member composition requires exactly the @apply and @instance participant cohort",
+            input.currentAnnotation.sourcePos
+          )
+        )
+      case _ => Right(())
 
   private def curriedFirstCandidate(
       members: List[ExpansionTargetBodyView.DirectMember]
