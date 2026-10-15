@@ -509,6 +509,47 @@ transaction leaves no partial class or TASTy output. This is qualification of
 this pair and closed source envelope only. It does not imply composition with
 `@aux`, `@self`, `@delegated`, `@syntax`, or arbitrary annotation stacks.
 
+The post-0.1.0 curried-method factory family is likewise qualified with simple
+`@apply` in both annotation orders. Its no-tail and heterogeneous inherited-tail
+generation already composed before this qualification; the claimed stacked
+family is now explicitly closed to the two handled participants:
+
+```scala
+@apply
+@instance
+trait CurriedMonoid[A]:
+  def combine(a: A)(b: A): A
+  type Item = A
+  def twice(a: A): A = combine(a)(a)
+  type Value = A
+  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+
+val constructed = CurriedMonoid.instance[Int](a => b => a + b)
+given CurriedMonoid[Int] = constructed
+val selected: CurriedMonoid[Int] = CurriedMonoid[Int]
+assert(selected.eq(constructed))
+assert(selected.combine(20)(22) == 42)
+assert(selected.twice(21) == 42)
+assert(selected.fold3(10, 12, 20) == 42)
+```
+
+Reversing the annotations to `@instance` followed by `@apply` has the same
+bounded behavior. The factory retains exactly one strict `A => A => A` carrier,
+one anonymous child, one curried override with two unary parameter clauses, and
+successive carrier applications. The contextual accessor remains independent
+and returns the identical given instance. Optional validated concrete methods
+and direct-`A` aliases remain inherited and are not copied into either generated
+definition.
+
+Carrier names are freshened in the term namespace against the required method
+and parameter names plus inherited concrete method and parameter names. A
+same-spelling type alias alone does not consume a term name. Existing direct
+companion `apply` and `instance` members independently suppress only their
+matching generator while unrelated companion members retain source order. This
+qualification does not flatten the curried method to `(A, A) => A`, admit
+curried tail methods, widen either standalone family, or establish arbitrary
+three-handler composition.
+
 The two supported `@delegated` families are disjoint and deliberately bounded. The existing unary family is:
 
 ```scala

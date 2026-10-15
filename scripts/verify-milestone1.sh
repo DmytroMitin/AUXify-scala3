@@ -683,9 +683,23 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `AbstractTypeSecondMember`: inherited type member `Other` must be a concrete alias' \
   'unsupported @instance source shape for `AbstractTypeExtraMethod`: inherited method `missing` must be concrete' \
   'unsupported @instance source shape for `AbstractTypeAbstractVal`: direct body member at index 1 must be a method; found val' \
-  'unsupported @instance source shape for `AbstractTypeBoundedAlias`: inherited type member `Item` must be a concrete alias'; do
+  'unsupported @instance source shape for `AbstractTypeBoundedAlias`: inherited type member `Item` must be a concrete alias' \
+  'unsupported @instance composition shape for `CurriedThirdParticipant`: curried-method composition requires exactly the @apply and @instance participant cohort' \
+  'unsupported @instance source shape for `CurriedApplyThenInstanceLateInvalid`: direct body member at index 2 must be a method; found nested trait' \
+  'unsupported @instance source shape for `CurriedInstanceThenApplyLateInvalid`: inherited concrete method `invalid` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @instance source shape for `CurriedExtraAbstractMethod`: inherited method `missing` must be concrete' \
+  'unsupported @instance source shape for `CurriedAbstractVal`: direct body member at index 1 must be a method; found val' \
+  'unsupported @instance source shape for `CurriedBoundedAlias`: inherited type member `Item` must be a concrete alias'; do
   grep -Fq -- "$expected_diagnostic" "$apply_instance_composition_negative_log" ||
-    fail "apply-instance abstract-type composition negative compile omitted expected diagnostic: $expected_diagnostic"
+    fail "apply-instance composition negative compile omitted expected diagnostic: $expected_diagnostic"
+done
+
+for source in \
+  CurriedThirdParticipant CurriedApplyThenInstanceLateInvalid \
+  CurriedInstanceThenApplyLateInvalid CurriedExtraAbstractMethod \
+  CurriedAbstractVal CurriedBoundedAlias; do
+  grep -Eq "$source[.]scala:[0-9]+:[0-9]+" "$apply_instance_composition_negative_log" ||
+    fail "apply-instance curried composition diagnostic is not source-positioned: $source"
 done
 
 if grep -Eiq \
@@ -887,6 +901,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_MULTIPLE_INHERITED_CONCRETE_METHODS_
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_HETEROGENEOUS_INHERITED_TAIL_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_METHOD_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_ABSTRACT_TYPE_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_CURRIED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
