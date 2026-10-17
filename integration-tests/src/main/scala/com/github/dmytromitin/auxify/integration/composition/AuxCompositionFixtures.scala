@@ -32,6 +32,34 @@ object AuxThenApply:
 
 @apply
 @aux
+trait RichApplyThenAux[N <: AuxNat, M <: AuxNat]:
+  type Out <: AuxNat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichApplyThenAux:
+  val preserved = 121
+  given RichApplyThenAux[AuxZero, AuxOne] with
+    type Out = AuxOne
+    def apply(n: AuxZero, m: AuxOne): AuxOne = m
+
+@aux
+@apply
+trait RichAuxThenApply[N <: AuxNat, M <: AuxNat]:
+  type Out <: AuxNat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichAuxThenApply:
+  val preserved = 242
+  given RichAuxThenApply[AuxZero, AuxOne] with
+    type Out = AuxOne
+    def apply(n: AuxZero, m: AuxOne): AuxOne = m
+
+@apply
+@aux
 trait ExistingApplyThenAux[N <: AuxNat, M <: AuxNat]:
   type Out <: AuxNat
 

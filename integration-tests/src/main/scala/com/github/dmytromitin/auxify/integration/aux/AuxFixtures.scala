@@ -19,6 +19,18 @@ object Add:
     def apply(n: Zero, m: One): One = m
     def description: String = "zero-plus-one"
 
+@aux
+trait RichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichAdd:
+  given RichAdd[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
 trait Natural
 final class LeftValue extends Natural
 final class RightValue extends Natural

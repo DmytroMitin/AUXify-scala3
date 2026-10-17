@@ -34,9 +34,10 @@ final class ApplyHandler extends ExpansionHandler:
                 ApplyDefinitionBuilder.lower(input.primary.name, typeParameter.name)
               )
             case List(_, _) =>
-              input.targetTypeStructureView.flatMap: structure =>
-                ApplyFullShapeDecoder.decode(input.primary.name, structure).flatMap: shape =>
-                  lowerAndPlace(input, ApplyDefinitionBuilder.lowerFull(shape))
+              input.targetBodyView.flatMap: body =>
+                input.targetTypeStructureView.flatMap: structure =>
+                  ApplyFullShapeDecoder.decode(input.primary.name, body, structure).flatMap:
+                    shape => lowerAndPlace(input, ApplyDefinitionBuilder.lowerFull(shape))
             case _ =>
               Left(
                 ExpansionDiagnostic(

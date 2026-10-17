@@ -5,7 +5,7 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.ExpansionTargetTypeStructureView
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetTypeStructureView}
 
 class ApplyFullShapeDecoderSuite extends munit.FunSuite:
   test("decodes independently renamed full apply semantic names") {
@@ -116,7 +116,7 @@ class ApplyFullShapeDecoderSuite extends munit.FunSuite:
         |  type Extra <: Nat
         |""".stripMargin,
       "MultipleResults",
-      "requires exactly one direct type member; found 2"
+      "additional direct type member `Extra` must be a concrete alias, found abstract bounds"
     )
   }
 
@@ -186,4 +186,7 @@ class ApplyFullShapeDecoderSuite extends munit.FunSuite:
     val structure = ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    ApplyFullShapeDecoder.decode(typeClassName, structure)
+    val body = ExpansionTargetBodyView
+      .decode(primary)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    ApplyFullShapeDecoder.decode(typeClassName, body, structure)

@@ -128,12 +128,12 @@ current project READMEs for the latest development APIs.
 | Annotation | Current-main status | Current boundary |
 | --- | --- | --- |
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| Full `@apply` for the path-dependent/refined `Add.Out` form | Supported first development slice | Exactly two invariant parameters with the same simple named upper bound and one compatible abstract result type member; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@aux` | Supported first development slice | Exactly two invariant parameters with the same unqualified named upper bound and one compatible abstract result type member; generates a companion `Aux` alias and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| Full `@apply` for the path-dependent/refined `Add.Out` form | Supported bounded development slice | Exactly two invariant parameters with the same simple named upper bound, one compatible abstract result type member, and optional later concrete aliases to either enclosing parameter; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@aux` | Supported bounded development slice | The same one-result bounded family, optionally followed by concrete aliases to either enclosing parameter; generates one companion `Aux` result refinement and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/direct-`A` alias tail, (2) one public unbounded abstract type member first, followed by an optional validated inherited concrete method/direct-`A` alias tail, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by the same optional validated heterogeneous tail, generating the strict `A => A => A` carrier; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | One public abstract primary method under one invariant unbounded type parameter—either unary `show(a: A): String` or parameterless `empty: A`—optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; exactly the primary method receives one companion forwarder |
 | Stacked `@apply` + `@delegated` | Two closed supported composition families with optional inherited tails | Both source orders on the exact shared one-invariant-unbounded-parameter envelope: either unary `show(a: A): String` or parameterless `empty: A`, optionally followed by the validated heterogeneous inherited concrete method/direct-`A` alias tail; binary delegated stacks remain outside this composition claim |
-| Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the exact common `Add`-style first-slice family; both handlers consume one shared source decoder, making a first-success/second-source-decoder-rejection state structurally unreachable within that envelope |
+| Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the same one-abstract-result family with optional concrete enclosing-parameter aliases; both handlers consume one shared source decoder |
 | Stacked `@apply` + `@instance` | Supported bounded composition slices | Both source orders and independent direct `apply` / `instance` conflicts pass for the historical abstract-method family and for the one-abstract-type-member-first family, each with its own validated optional heterogeneous inherited tail; the abstract-type composition is an exact two-participant cohort |
 | Stacked `@apply` + `@syntax` | Supported bounded composition slice with optional inherited tail | Both source orders on the exact common one-invariant-unbounded-parameter / one-abstract-binary-method family; the companion receives the existing contextual `apply` accessor and exactly one nested `syntax` extension for the primary method, while validated concrete methods and direct aliases remain inherited |
 | `@syntax` | Supported bounded current-main development slice | One invariant unbounded trait parameter and one public abstract binary method whose two parameters and result use that parameter directly, optionally followed by validated inherited concrete methods and direct `type Member = A` aliases; generates exactly one native Scala 3 extension for the primary method and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
@@ -239,9 +239,25 @@ unqualified named upper bound and no lower or context bounds. The trait must
 have exactly one direct, public, unannotated, non-polymorphic abstract type
 member with no lower bound and that same named upper bound. Its source name is
 preserved, so a renamed `Combine[L <: Natural, R <: Natural]` with abstract
-`Result <: Natural` is supported too. Ordinary type-class methods are allowed;
-multiple result members, aliases, modifiers, and differing or complex bounds
-remain outside this first slice. The exact compiler-valid `infix type Out <: Nat`
+`Result <: Natural` is supported too. Ordinary type-class methods are allowed.
+After the abstract result, the trait may also contain public, unannotated,
+non-polymorphic, bound-free concrete aliases whose right-hand side is exactly
+one enclosing parameter:
+
+```scala
+@apply
+trait RichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+```
+
+These aliases remain inherited members of `RichAdd`; the generated contextual
+method still contains only `type Out = inst.Out`. An alias before `Out`, an
+alias of `Out` or another type, and a second abstract result member remain
+unsupported. In particular, the two-abstract-result family still waits on the
+separate Quasiquotes lowering capability. The exact compiler-valid `infix type Out <: Nat`
 form is rejected through normalized modifier evidence on Scala 3.3.8, 3.8.4,
 and 3.9.0 with the pinned Macro-Paradise 0.2.0-SNAPSHOT development graph.
 `@aux` and both supported `@apply` + `@aux` source orders enforce the same
@@ -268,12 +284,14 @@ type Aux[N <: Nat, M <: Nat, Out0 <: Nat] =
 
 Trait, parameter, bound, and result-member names are source-derived. The added
 result parameter is selected deterministically from the result-member stem to
-avoid direct source-name collisions, but its exact spelling is not a public
+avoid direct source type-name collisions, including concrete aliases, but its exact spelling is not a public
 compatibility guarantee. An existing direct companion type `Aux` is preserved;
-a same-spelling term is in a separate namespace. Multiple result members,
-aliases, any explicitly declared lower bounds, differing or compound bounds,
-polymorphic result members, inherited discovery, and semantic alias expansion are outside
-this first slice.
+a same-spelling term is in a separate namespace. Concrete enclosing-parameter
+aliases are inherited and are never copied into the generated refinement or
+given extra `Out0`-like parameters. Multiple abstract result members, aliases
+to other shapes, explicitly declared lower bounds, differing or compound
+bounds, polymorphic result members, inherited discovery, and semantic alias
+expansion remain outside this bounded slice.
 
 The first public `@instance` slice is:
 

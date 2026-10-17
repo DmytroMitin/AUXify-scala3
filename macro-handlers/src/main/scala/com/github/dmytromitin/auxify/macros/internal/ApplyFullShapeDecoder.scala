@@ -1,6 +1,7 @@
 package com.github.dmytromitin.auxify.macros.internal
 
 import paradise3.api.{
+  ExpansionTargetBodyView,
   ExpansionTargetTypeStructureView,
   ExpansionDiagnostic
 }
@@ -8,10 +9,11 @@ import paradise3.api.{
 private[internal] object ApplyFullShapeDecoder:
   def decode(
       typeClassName: String,
+      bodyView: ExpansionTargetBodyView,
       view: ExpansionTargetTypeStructureView
   ): Either[ExpansionDiagnostic, ApplyDefinitionBuilder.FullShape] =
     BoundedResultTypeClassShapeDecoder
-      .decode(typeClassName, view)
+      .decode(typeClassName, bodyView, view)
       .left
       .map: rejection =>
         ExpansionDiagnostic(

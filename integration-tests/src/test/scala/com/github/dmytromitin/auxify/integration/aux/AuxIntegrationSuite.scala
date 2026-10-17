@@ -17,6 +17,19 @@ class AuxIntegrationSuite extends munit.FunSuite:
     assert(instance.isInstanceOf[Combine[?, ?]])
   }
 
+  test("concrete enclosing-parameter aliases stay inherited beside one Aux result refinement") {
+    val instance: RichAdd.Aux[Zero, One, One] = summon[RichAdd[Zero, One]]
+    val left: instance.Left =:= Zero = summon
+    val right: instance.Right =:= One = summon
+    val out: instance.Out =:= One = summon
+    val result: One = instance(new Zero, new One)
+
+    assert(left ne null)
+    assert(right ne null)
+    assert(out ne null)
+    assert(result.isInstanceOf[One])
+  }
+
   test("unrelated existing companion members survive public aux expansion") {
     val instance: ExistingCompanion.Aux[Zero, One, One] =
       summon[ExistingCompanion[Zero, One]]

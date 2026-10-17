@@ -25,6 +25,18 @@ def refinedAdd[N <: Nat, M <: Nat](using inst: Add[N, M]):
     Add[N, M] { type Out = inst.Out } =
   Add[N, M]
 
+@apply
+trait RichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichAdd:
+  given RichAdd[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
 trait Natural
 final class LeftNatural extends Natural
 final class RightNatural extends Natural

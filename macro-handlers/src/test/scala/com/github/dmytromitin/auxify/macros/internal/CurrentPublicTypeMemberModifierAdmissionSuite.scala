@@ -11,7 +11,7 @@ import java.io.File
 import java.nio.file.Files
 import scala.jdk.CollectionConverters.*
 
-import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionTargetView, ExpansionInput, ExpansionOutcome}
+import paradise3.api.{ExpansionTargetBodyView, ExpansionTargetTypeStructureView, ExpansionTargetView, ExpansionInput, ExpansionOutcome}
 import paradise3.api.ExpansionTargetBodyView.{DirectTypeShape, DirectVisibility}
 import paradise3.api.ExpansionTargetTypeStructureView.{Bound, DirectTypeMemberKind}
 
@@ -81,6 +81,8 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
       val companion = stats.collectFirst { case value: ModuleDef => value }.get
       val view = ExpansionTargetTypeStructureView.decode(primary)
         .fold(diagnostic => fail(diagnostic.message), identity)
+      val bodyView = ExpansionTargetBodyView.decode(primary)
+        .fold(diagnostic => fail(diagnostic.message), identity)
       assertEquals(view.typeParameters.map(_.name), List("N", "M"))
       view.typeParameters.foreach: parameter =>
         assertEquals(parameter.variance, ExpansionTargetView.Variance.Invariant)
@@ -115,8 +117,8 @@ class CurrentPublicTypeMemberModifierAdmissionSuite extends munit.FunSuite:
       val reason =
         if infix && !row.alias && row.parameters.isEmpty then Some(modifierReason)
         else row.reason
-      val applyResult = ApplyFullShapeDecoder.decode(name, view)
-      val auxResult = AuxSourceShapeDecoder.decode(name, view)
+      val applyResult = ApplyFullShapeDecoder.decode(name, bodyView, view)
+      val auxResult = AuxSourceShapeDecoder.decode(name, bodyView, view)
       val template = primary.rhs
       val companionBody = companion.impl.body
       val current = Trees.mods(primary).annotations.head

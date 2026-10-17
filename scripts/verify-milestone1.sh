@@ -152,7 +152,7 @@ for expected_diagnostic in \
   'unsupported full @apply source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias' \
   'unsupported full @apply source shape for `LowerBoundedResult`: result type member `Out` must not define a lower bound' \
   'unsupported full @apply source shape for `MismatchedResult`: result type member `Out` upper bound must match enclosing bound `Nat`' \
-  'unsupported full @apply source shape for `MultipleResults`: requires exactly one direct type member; found 2' \
+  'unsupported full @apply source shape for `MultipleResults`: additional direct type member `Extra` must be a concrete alias, found abstract bounds' \
   'unsupported full @apply source shape for `PolymorphicResult`: result type member `Out` must not declare type parameters' \
   'unsupported full @apply source shape for `ProtectedResult`: result type member `Out` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported full @apply source shape for `AppliedBounds`: enclosing type-parameter upper bounds must be unqualified named types'; do
@@ -305,7 +305,7 @@ for expected_diagnostic in \
   'unsupported @aux source shape for `AliasResult`: result type member `Out` must be abstract bounds, found alias' \
   'unsupported @aux source shape for `LowerBoundedResult`: result type member `Out` must not define a lower bound' \
   'unsupported @aux source shape for `MismatchedResult`: result type member `Out` upper bound must match enclosing bound `Nat`' \
-  'unsupported @aux source shape for `MultipleResults`: requires exactly one direct type member; found 2' \
+  'unsupported @aux source shape for `MultipleResults`: additional direct type member `Extra` must be a concrete alias, found abstract bounds' \
   'unsupported @aux source shape for `PolymorphicResult`: result type member `Out` must not declare type parameters'; do
   grep -Fq -- "$expected_diagnostic" "$aux_negative_log" ||
     fail "aux negative compile omitted expected diagnostic: $expected_diagnostic"
@@ -834,6 +834,15 @@ for mode in Apply Aux ApplyAux AuxApply; do
     type_member_diagnostics+=("unsupported $handler source shape for \`$mode$shape\`: result type member \`Out\` $reason")
   done
 done
+for mode in Apply Aux ApplyAux AuxApply; do
+  case "$mode" in
+    Apply|ApplyAux) handler='full @apply' ;;
+    Aux|AuxApply) handler='@aux' ;;
+  esac
+  type_member_diagnostics+=(
+    "unsupported $handler source shape for \`${mode}AliasTail\`: concrete enclosing-parameter alias \`Copy\` must target one of the enclosing type parameters \`M\` or \`N\`"
+  )
+done
 verify_modifier_negative \
   negativeTypeMemberModifiers \
   'full-apply/aux and both composition orders' \
@@ -892,6 +901,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_DELEGATED_PARAMETERLESS_TAIL_COMPOSITION_PASS
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_CONCRETE_ALIAS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'

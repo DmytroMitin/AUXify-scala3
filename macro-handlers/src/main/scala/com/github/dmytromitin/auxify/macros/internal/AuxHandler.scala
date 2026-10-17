@@ -45,8 +45,9 @@ private[internal] object AuxHandler:
       for
         view <- input.targetView
         _ <- AuxifyTargetAdmission.auxTarget(view)
+        body <- input.targetBodyView
         structure <- input.targetTypeStructureView
-        shape <- AuxSourceShapeDecoder.decode(input.primary.name, structure)
+        shape <- AuxSourceShapeDecoder.decode(input.primary.name, body, structure)
         lowered <- lower(shape, summon[Context]).left.map(failure =>
           ExpansionDiagnostic(
             s"${failure.code}: ${failure.detail}",

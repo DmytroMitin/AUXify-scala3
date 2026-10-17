@@ -18,6 +18,22 @@ class FullApplyIntegrationSuite extends munit.FunSuite:
     assertEquals(Add.preservedAfter, 73)
   }
 
+  test("full apply keeps concrete aliases inherited and refines only the abstract result") {
+    val selected = summon[RichAdd[Zero, One]]
+    val materialized: RichAdd[Zero, One] { type Out = selected.Out } =
+      RichAdd[Zero, One]
+    val left: materialized.Left =:= Zero = summon
+    val right: materialized.Right =:= One = summon
+    val out: materialized.Out =:= One = summon
+    val result: One = materialized(new Zero, new One)
+
+    assert(materialized eq selected)
+    assert(left ne null)
+    assert(right ne null)
+    assert(out ne null)
+    assert(result.isInstanceOf[One])
+  }
+
   test("renamed Combine.Result materializer derives every semantic name") {
     val selected = summon[Combine[LeftNatural, RightNatural]]
     val materialized: Combine[LeftNatural, RightNatural] {

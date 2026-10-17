@@ -5,7 +5,11 @@ import dotty.tools.dotc.ast.untpd.*
 import dotty.tools.dotc.core.Contexts.{Context, ContextBase}
 import dotty.tools.dotc.parsing.Parsers
 
-import paradise3.api.{ExpansionTargetTypeStructureView, ExpansionDiagnostic}
+import paradise3.api.{
+  ExpansionDiagnostic,
+  ExpansionTargetBodyView,
+  ExpansionTargetTypeStructureView
+}
 
 class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
   private final case class CommonFacts(
@@ -128,7 +132,9 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
         |  type Out <: Nat
         |  type Extra <: Nat
         |""".stripMargin,
-      expectedReason = Some("requires exactly one direct type member; found 2")
+      expectedReason = Some(
+        "additional direct type member `Extra` must be a concrete alias, found abstract bounds"
+      )
     ),
     Row(
       "alias member kind and alias target",
@@ -191,9 +197,9 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
 
   rows.foreach: row =>
     test(s"current decoders are equivalent for ${row.name}") {
-      val (typeClassName, structure) = decodeStructure(row.source)
-      val applyResult = ApplyFullShapeDecoder.decode(typeClassName, structure)
-      val auxResult = AuxSourceShapeDecoder.decode(typeClassName, structure)
+      val (typeClassName, body, structure) = decodeStructure(row.source)
+      val applyResult = ApplyFullShapeDecoder.decode(typeClassName, body, structure)
+      val auxResult = AuxSourceShapeDecoder.decode(typeClassName, body, structure)
 
       (applyResult, auxResult) match
         case (Right(applyShape), Right(auxShape)) =>
@@ -233,14 +239,14 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
     }
 
   test("shared recognition exposes only common source facts") {
-    val (typeClassName, structure) = decodeStructure(
+    val (typeClassName, body, structure) = decodeStructure(
       """trait Weird[Out0 <: Nat, M <: Nat]:
         |  type Out <: Nat
         |""".stripMargin
     )
 
     assertEquals(
-      BoundedResultTypeClassShapeDecoder.decode(typeClassName, structure),
+      BoundedResultTypeClassShapeDecoder.decode(typeClassName, body, structure),
       Right(
         BoundedResultTypeClassShape(
           typeClassName = "Weird",
@@ -255,7 +261,7 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
 
   private def decodeStructure(
       source: String
-  ): (String, ExpansionTargetTypeStructureView) =
+  ): (String, ExpansionTargetBodyView, ExpansionTargetTypeStructureView) =
     val unit = CompilationUnit("ApplyAuxShapeEquivalenceFixture.scala", source)
     given Context = ContextBase().initialCtx.fresh.setCompilationUnit(unit)
     val parsed = new Parsers.Parser(unit.source).parse()
@@ -266,4 +272,7 @@ class ApplyAuxSourceShapeEquivalenceSuite extends munit.FunSuite:
     val structure = ExpansionTargetTypeStructureView
       .decode(primary)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    (primary.name.show, structure)
+    val body = ExpansionTargetBodyView
+      .decode(primary)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    (primary.name.show, body, structure)

@@ -42,6 +42,56 @@ object AddReverse:
     type Out = One
     def apply(n: Zero, m: One): One = m
 
+@apply
+trait FullRichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object FullRichAdd:
+  given FullRichAdd[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
+@aux
+trait AuxRichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object AuxRichAdd:
+  given AuxRichAdd[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
+@apply
+@aux
+trait RichAdd[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichAdd:
+  given RichAdd[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
+@aux
+@apply
+trait RichAddReverse[N <: Nat, M <: Nat]:
+  type Out <: Nat
+  type Left = N
+  def apply(n: N, m: M): Out
+  type Right = M
+
+object RichAddReverse:
+  given RichAddReverse[Zero, One] with
+    type Out = One
+    def apply(n: Zero, m: One): One = m
+
 @self
 trait SelfQualified
 
@@ -423,6 +473,43 @@ object ExternalApp:
     val reversed: AddReverse.Aux[Zero, One, One] = AddReverse[Zero, One]
     val reverseResult: One = reversed(new Zero, new One)
     assert(reverseResult.isInstanceOf[One])
+
+    val fullRich = FullRichAdd[Zero, One]
+    val fullLeft: fullRich.Left =:= Zero = summon
+    val fullRight: fullRich.Right =:= One = summon
+    val fullOut: fullRich.Out =:= One = summon
+    assert(fullRich(new Zero, new One).isInstanceOf[One])
+    assert(fullLeft ne null)
+    assert(fullRight ne null)
+    assert(fullOut ne null)
+
+    val auxRich: AuxRichAdd.Aux[Zero, One, One] = summon[AuxRichAdd[Zero, One]]
+    val auxLeft: auxRich.Left =:= Zero = summon
+    val auxRight: auxRich.Right =:= One = summon
+    val auxOut: auxRich.Out =:= One = summon
+    assert(auxRich(new Zero, new One).isInstanceOf[One])
+    assert(auxLeft ne null)
+    assert(auxRight ne null)
+    assert(auxOut ne null)
+
+    val rich: RichAdd.Aux[Zero, One, One] = RichAdd[Zero, One]
+    val richLeft: rich.Left =:= Zero = summon
+    val richRight: rich.Right =:= One = summon
+    val richOut: rich.Out =:= One = summon
+    assert(rich(new Zero, new One).isInstanceOf[One])
+    assert(richLeft ne null)
+    assert(richRight ne null)
+    assert(richOut ne null)
+
+    val richAddReverse: RichAddReverse.Aux[Zero, One, One] =
+      RichAddReverse[Zero, One]
+    val richAddReverseLeft: richAddReverse.Left =:= Zero = summon
+    val richAddReverseRight: richAddReverse.Right =:= One = summon
+    val richAddReverseOut: richAddReverse.Out =:= One = summon
+    assert(richAddReverse(new Zero, new One).isInstanceOf[One])
+    assert(richAddReverseLeft ne null)
+    assert(richAddReverseRight ne null)
+    assert(richAddReverseOut ne null)
 
     val selfQualified = new SelfQualified {}
     val generatedSelf: selfQualified.Self = selfQualified
