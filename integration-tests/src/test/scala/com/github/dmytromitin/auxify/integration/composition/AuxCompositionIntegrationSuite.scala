@@ -25,11 +25,15 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     val left: instance.Left =:= AuxZero = summon
     val right: instance.Right =:= AuxOne = summon
     val out: instance.Out =:= AuxOne = summon
+    val copyOut: instance.Copy =:= instance.Out = summon
+    val copyResult: instance.Copy =:= AuxOne = summon
     val result: AuxOne = instance(new AuxZero, new AuxOne)
 
     assert(left ne null)
     assert(right ne null)
     assert(out ne null)
+    assert(copyOut ne null)
+    assert(copyResult ne null)
     assert(result.isInstanceOf[AuxOne])
     assertEquals(RichApplyThenAux.preserved, 121)
   }
@@ -40,11 +44,15 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     val left: instance.Left =:= AuxZero = summon
     val right: instance.Right =:= AuxOne = summon
     val out: instance.Out =:= AuxOne = summon
+    val copyOut: instance.Copy =:= instance.Out = summon
+    val copyResult: instance.Copy =:= AuxOne = summon
     val result: AuxOne = instance(new AuxZero, new AuxOne)
 
     assert(left ne null)
     assert(right ne null)
     assert(out ne null)
+    assert(copyOut ne null)
+    assert(copyResult ne null)
     assert(result.isInstanceOf[AuxOne])
     assertEquals(RichAuxThenApply.preserved, 242)
   }

@@ -45,8 +45,10 @@ object AddReverse:
 @apply
 trait FullRichAdd[N <: Nat, M <: Nat]:
   type Out <: Nat
+  type Copy = Out
   type Left = N
   def apply(n: N, m: M): Out
+  type OtherCopy = Out
   type Right = M
 
 object FullRichAdd:
@@ -57,8 +59,10 @@ object FullRichAdd:
 @aux
 trait AuxRichAdd[N <: Nat, M <: Nat]:
   type Out <: Nat
+  type Copy = Out
   type Left = N
   def apply(n: N, m: M): Out
+  type OtherCopy = Out
   type Right = M
 
 object AuxRichAdd:
@@ -70,8 +74,10 @@ object AuxRichAdd:
 @aux
 trait RichAdd[N <: Nat, M <: Nat]:
   type Out <: Nat
+  type Copy = Out
   type Left = N
   def apply(n: N, m: M): Out
+  type OtherCopy = Out
   type Right = M
 
 object RichAdd:
@@ -83,8 +89,10 @@ object RichAdd:
 @apply
 trait RichAddReverse[N <: Nat, M <: Nat]:
   type Out <: Nat
+  type Copy = Out
   type Left = N
   def apply(n: N, m: M): Out
+  type OtherCopy = Out
   type Right = M
 
 object RichAddReverse:
@@ -478,38 +486,62 @@ object ExternalApp:
     val fullLeft: fullRich.Left =:= Zero = summon
     val fullRight: fullRich.Right =:= One = summon
     val fullOut: fullRich.Out =:= One = summon
+    val fullCopyOut: fullRich.Copy =:= fullRich.Out = summon
+    val fullCopyResult: fullRich.Copy =:= One = summon
+    val fullOtherCopy: fullRich.OtherCopy =:= One = summon
     assert(fullRich(new Zero, new One).isInstanceOf[One])
     assert(fullLeft ne null)
     assert(fullRight ne null)
     assert(fullOut ne null)
+    assert(fullCopyOut ne null)
+    assert(fullCopyResult ne null)
+    assert(fullOtherCopy ne null)
 
     val auxRich: AuxRichAdd.Aux[Zero, One, One] = summon[AuxRichAdd[Zero, One]]
     val auxLeft: auxRich.Left =:= Zero = summon
     val auxRight: auxRich.Right =:= One = summon
     val auxOut: auxRich.Out =:= One = summon
+    val auxCopyOut: auxRich.Copy =:= auxRich.Out = summon
+    val auxCopyResult: auxRich.Copy =:= One = summon
+    val auxOtherCopy: auxRich.OtherCopy =:= One = summon
     assert(auxRich(new Zero, new One).isInstanceOf[One])
     assert(auxLeft ne null)
     assert(auxRight ne null)
     assert(auxOut ne null)
+    assert(auxCopyOut ne null)
+    assert(auxCopyResult ne null)
+    assert(auxOtherCopy ne null)
 
     val rich: RichAdd.Aux[Zero, One, One] = RichAdd[Zero, One]
     val richLeft: rich.Left =:= Zero = summon
     val richRight: rich.Right =:= One = summon
     val richOut: rich.Out =:= One = summon
+    val richCopyOut: rich.Copy =:= rich.Out = summon
+    val richCopyResult: rich.Copy =:= One = summon
+    val richOtherCopy: rich.OtherCopy =:= One = summon
     assert(rich(new Zero, new One).isInstanceOf[One])
     assert(richLeft ne null)
     assert(richRight ne null)
     assert(richOut ne null)
+    assert(richCopyOut ne null)
+    assert(richCopyResult ne null)
+    assert(richOtherCopy ne null)
 
     val richAddReverse: RichAddReverse.Aux[Zero, One, One] =
       RichAddReverse[Zero, One]
     val richAddReverseLeft: richAddReverse.Left =:= Zero = summon
     val richAddReverseRight: richAddReverse.Right =:= One = summon
     val richAddReverseOut: richAddReverse.Out =:= One = summon
+    val richAddReverseCopyOut: richAddReverse.Copy =:= richAddReverse.Out = summon
+    val richAddReverseCopyResult: richAddReverse.Copy =:= One = summon
+    val richAddReverseOtherCopy: richAddReverse.OtherCopy =:= One = summon
     assert(richAddReverse(new Zero, new One).isInstanceOf[One])
     assert(richAddReverseLeft ne null)
     assert(richAddReverseRight ne null)
     assert(richAddReverseOut ne null)
+    assert(richAddReverseCopyOut ne null)
+    assert(richAddReverseCopyResult ne null)
+    assert(richAddReverseOtherCopy ne null)
 
     val selfQualified = new SelfQualified {}
     val generatedSelf: selfQualified.Self = selfQualified

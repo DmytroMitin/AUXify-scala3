@@ -34,12 +34,14 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
       assertEquals(output.primary.name.toString, "Add")
     }
 
-    test(s"$label admits concrete enclosing-parameter aliases after the result") {
+    test(s"$label admits direct result aliases with enclosing-parameter aliases") {
       val (output, context) = expandWithContext(
         """trait RichAdd[N <: Nat, M <: Nat]:
           |  type Out <: Nat
+          |  type Copy = Out
           |  type Left = N
           |  def apply(n: N, m: M): Out
+          |  type OtherCopy = Out
           |  type Right = M
           |""".stripMargin,
         order
@@ -54,9 +56,11 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
       val (output, context) = expandWithContext(
         """trait Fresh[N <: Nat, M <: Nat]:
           |  type Out <: Nat
-          |  type Out0 = N
+          |  type Out0 = Out
           |  def apply(n: N, m: M): Out
-          |  type Out1 = M
+          |  type Out1 = N
+          |  type Copy = Out
+          |  type Right = M
           |""".stripMargin,
         order
       )
@@ -98,6 +102,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
       val (output, context) = expandWithContext(
         """trait Existing[N <: Nat, M <: Nat]:
           |  type Out <: Nat
+          |  type Copy = Out
           |  type Left = N
           |  type Right = M
           |
@@ -136,6 +141,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
           |@current
           |trait AtomicRichAdd[N <: Nat, M <: Nat]:
           |  type Out <: Nat
+          |  type Copy = Out
           |  type Left = N
           |  type Right = M
           |
@@ -175,7 +181,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
               AuxHandler.expandWithLowering(input): (_, _) =>
                 Left(
                   AuxTypeAliasPeerBridge.Failure(
-                    "PROMPT102_CONTROLLED_LOWERING_FAILURE",
+                    "PROMPT103_CONTROLLED_LOWERING_FAILURE",
                     "no partial apply or Aux edit may survive"
                   )
                 )
@@ -194,7 +200,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
       assertEquals(
         diagnostics,
         List(
-          "PROMPT102_CONTROLLED_LOWERING_FAILURE: no partial apply or Aux edit may survive"
+          "PROMPT103_CONTROLLED_LOWERING_FAILURE: no partial apply or Aux edit may survive"
         ),
         clue(order)
       )

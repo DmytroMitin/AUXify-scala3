@@ -24,6 +24,8 @@ trait RichAdd[N <: Nat, M <: Nat]:
   type Out <: Nat
   type Left = N
   def apply(n: N, m: M): Out
+  type Copy = Out
+  type OtherCopy = Out
   type Right = M
 
 object RichAdd:

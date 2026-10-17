@@ -36,6 +36,7 @@ trait RichApplyThenAux[N <: AuxNat, M <: AuxNat]:
   type Out <: AuxNat
   type Left = N
   def apply(n: N, m: M): Out
+  type Copy = Out
   type Right = M
 
 object RichApplyThenAux:
@@ -51,6 +52,7 @@ trait RichAuxThenApply[N <: AuxNat, M <: AuxNat]:
   type Left = N
   def apply(n: N, m: M): Out
   type Right = M
+  type Copy = Out
 
 object RichAuxThenApply:
   val preserved = 242

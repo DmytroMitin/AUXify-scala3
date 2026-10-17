@@ -67,45 +67,41 @@ class BoundedResultConcreteAliasTailDecoderSuite extends munit.FunSuite:
       "type Left = N\n  type Out <: Nat",
       "result type member `Left` must be abstract bounds, found alias"
     ),
-    "alias of the result member" -> (
-      "type Copy = Out",
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
-    ),
     "alias of an unrelated named type" -> (
       "type Copy = Nat",
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
     ),
     "qualified alias" -> (
       "type Copy = domain.Value",
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
     ),
     "applied alias" -> (
       "type Copy = Box[N]",
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
     ),
     "function alias" -> (
       "type Copy = N => M",
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
     ),
     "polymorphic alias" -> (
       "type Copy[X] = N",
-      "concrete enclosing-parameter alias `Copy` must not declare type parameters"
+      "concrete bounded-result alias `Copy` must not declare type parameters"
     ),
     "private alias" -> (
       "private type Copy = N",
-      "concrete enclosing-parameter alias `Copy` must be public, unannotated, and free of unsupported modifiers"
+      "concrete bounded-result alias `Copy` must be public, unannotated, and free of unsupported modifiers"
     ),
     "protected alias" -> (
       "protected type Copy = N",
-      "concrete enclosing-parameter alias `Copy` must be public, unannotated, and free of unsupported modifiers"
+      "concrete bounded-result alias `Copy` must be public, unannotated, and free of unsupported modifiers"
     ),
     "annotated alias" -> (
       "@deprecated type Copy = N",
-      "concrete enclosing-parameter alias `Copy` must be public, unannotated, and free of unsupported modifiers"
+      "concrete bounded-result alias `Copy` must be public, unannotated, and free of unsupported modifiers"
     ),
     "infix alias" -> (
       "infix type Copy = N",
-      "concrete enclosing-parameter alias `Copy` must be public, unannotated, and free of unsupported modifiers"
+      "concrete bounded-result alias `Copy` must be public, unannotated, and free of unsupported modifiers"
     )
   )
 
@@ -138,12 +134,12 @@ class BoundedResultConcreteAliasTailDecoderSuite extends munit.FunSuite:
     assertSharedRejection(
       body,
       structure.copy(directTypeMembers = List(structure.directTypeMembers.head, alias.copy(lowerBound = paradise3.api.ExpansionTargetTypeStructureView.Bound.Present(alias.aliasTarget.get)))),
-      "concrete enclosing-parameter alias `Copy` must not declare lower or upper bounds"
+      "concrete bounded-result alias `Copy` must not declare lower or upper bounds"
     )
     assertSharedRejection(
       body,
       structure.copy(directTypeMembers = List(structure.directTypeMembers.head, alias.copy(aliasTarget = Some(DirectTypeShape.EnclosingTypeParameter("Missing", alias.pos))))),
-      "concrete enclosing-parameter alias `Copy` must target one of the enclosing type parameters `M` or `N`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
     )
   }
 

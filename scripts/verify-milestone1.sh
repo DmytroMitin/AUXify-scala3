@@ -840,7 +840,7 @@ for mode in Apply Aux ApplyAux AuxApply; do
     Aux|AuxApply) handler='@aux' ;;
   esac
   type_member_diagnostics+=(
-    "unsupported $handler source shape for \`${mode}AliasTail\`: concrete enclosing-parameter alias \`Copy\` must target one of the enclosing type parameters \`M\` or \`N\`"
+    "unsupported $handler source shape for \`${mode}AliasTail\`: concrete bounded-result alias \`Copy\` must target one of the enclosing type parameters \`M\` or \`N\` or the abstract result member \`Out\`"
   )
 done
 verify_modifier_negative \
@@ -902,6 +902,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_POSITIVE_ROWS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALLY_UNREACHABLE'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_CONCRETE_ALIAS_TAIL_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_DIRECT_OUT_ALIAS_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'

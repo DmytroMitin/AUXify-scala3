@@ -7,7 +7,7 @@ import com.github.dmytromitin.auxify.macros.{apply, aux}
 trait ApplyAuxAliasTail[N <: Nat, M <: Nat]:
   type Out <: Nat
   type Left = N
-  type Copy = Out
+  type Copy = Nat
 
 object ApplyAuxAliasTail:
   val retained = 41

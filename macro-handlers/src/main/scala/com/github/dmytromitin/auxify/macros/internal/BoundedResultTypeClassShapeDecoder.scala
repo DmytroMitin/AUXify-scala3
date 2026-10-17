@@ -59,9 +59,10 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
           _ <- aliases.foldLeft[Either[Rejection, Unit]](Right(())):
             (validated, alias) =>
               validated.flatMap: _ =>
-                concreteEnclosingParameterAlias(
+                concreteBoundedAlias(
                   alias,
-                  Set(first.name, second.name)
+                  Set(first.name, second.name),
+                  result.name
                 )
         yield BoundedResultTypeClassShape(
           typeClassName = typeClassName,
@@ -151,6 +152,15 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
             s"normalized direct type-member records must preserve source body order; expected ${bodyTypeIndices.mkString("[", ", ", "]")}, found ${recordIndices.mkString("[", ", ", "]")}",
             members.headOption.map(_.pos).getOrElse(bodyView.pos)
           )
+      _ <- members.foldLeft[Either[Rejection, Unit]](Right(())):
+        (validated, member) =>
+          validated.flatMap: _ =>
+            if bodyView.members(member.bodyIndex).name == member.name then Right(())
+            else
+              reject(
+                s"normalized direct type member `${member.name}` at body index ${member.bodyIndex} must match actual direct type member `${bodyView.members(member.bodyIndex).name}`",
+                member.pos
+              )
       resultAndAliases <- members match
         case result :: aliases => Right((result, aliases))
         case Nil =>
@@ -160,13 +170,14 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
           )
     yield resultAndAliases
 
-  private def concreteEnclosingParameterAlias(
+  private def concreteBoundedAlias(
       alias: DirectTypeMember,
-      enclosingParameterNames: Set[String]
+      enclosingParameterNames: Set[String],
+      resultMemberName: String
   ): Either[Rejection, Unit] =
     if alias.name == null || alias.name.isEmpty || alias.name == "<error>" || alias.name == "<unknown>" then
       reject(
-        "concrete enclosing-parameter alias must have an available normalized name",
+        "concrete bounded-result alias must have an available normalized name",
         alias.pos
       )
     else if alias.kind != DirectTypeMemberKind.Alias then
@@ -180,12 +191,12 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
       )
     else if alias.typeParameters.nonEmpty then
       reject(
-        s"concrete enclosing-parameter alias `${alias.name}` must not declare type parameters",
+        s"concrete bounded-result alias `${alias.name}` must not declare type parameters",
         alias.pos
       )
     else if alias.lowerBound != Bound.Absent || alias.upperBound != Bound.Absent then
       reject(
-        s"concrete enclosing-parameter alias `${alias.name}` must not declare lower or upper bounds",
+        s"concrete bounded-result alias `${alias.name}` must not declare lower or upper bounds",
         alias.pos
       )
     else if
@@ -195,16 +206,18 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
         alias.modifiers.unsupportedFlags.nonEmpty
     then
       reject(
-        s"concrete enclosing-parameter alias `${alias.name}` must be public, unannotated, and free of unsupported modifiers",
+        s"concrete bounded-result alias `${alias.name}` must be public, unannotated, and free of unsupported modifiers",
         alias.pos
       )
     else
       alias.aliasTarget match
         case Some(DirectTypeShape.EnclosingTypeParameter(name, _))
             if enclosingParameterNames.contains(name) => Right(())
+        case Some(DirectTypeShape.NamedType(name, _)) if name == resultMemberName =>
+          Right(())
         case _ =>
           reject(
-            s"concrete enclosing-parameter alias `${alias.name}` must target one of the enclosing type parameters ${enclosingParameterNames.toList.sorted.mkString("`", "` or `", "`")}",
+            s"concrete bounded-result alias `${alias.name}` must target one of the enclosing type parameters ${enclosingParameterNames.toList.sorted.mkString("`", "` or `", "`")} or the abstract result member `$resultMemberName`",
             alias.pos
           )
 
