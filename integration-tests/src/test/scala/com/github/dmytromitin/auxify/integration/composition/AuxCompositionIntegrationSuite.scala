@@ -27,6 +27,9 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     val out: instance.Out =:= AuxOne = summon
     val copyOut: instance.Copy =:= instance.Out = summon
     val copyResult: instance.Copy =:= AuxOne = summon
+    val copyAgain: instance.CopyAgain =:= AuxOne = summon
+    val leftAgain: instance.LeftAgain =:= AuxZero = summon
+    val rightAgain: instance.RightAgain =:= AuxOne = summon
     val result: AuxOne = instance(new AuxZero, new AuxOne)
 
     assert(left ne null)
@@ -34,6 +37,9 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     assert(out ne null)
     assert(copyOut ne null)
     assert(copyResult ne null)
+    assert(copyAgain ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
     assert(result.isInstanceOf[AuxOne])
     assertEquals(RichApplyThenAux.preserved, 121)
   }
@@ -46,6 +52,9 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     val out: instance.Out =:= AuxOne = summon
     val copyOut: instance.Copy =:= instance.Out = summon
     val copyResult: instance.Copy =:= AuxOne = summon
+    val finalCopy: instance.FinalCopy =:= AuxOne = summon
+    val leftAgain: instance.LeftAgain =:= AuxZero = summon
+    val rightAgain: instance.RightAgain =:= AuxOne = summon
     val result: AuxOne = instance(new AuxZero, new AuxOne)
 
     assert(left ne null)
@@ -53,6 +62,9 @@ class AuxCompositionIntegrationSuite extends munit.FunSuite:
     assert(out ne null)
     assert(copyOut ne null)
     assert(copyResult ne null)
+    assert(finalCopy ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
     assert(result.isInstanceOf[AuxOne])
     assertEquals(RichAuxThenApply.preserved, 242)
   }

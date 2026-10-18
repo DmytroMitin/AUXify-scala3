@@ -54,19 +54,58 @@ class BoundedResultDirectOutAliasDecoderSuite extends munit.FunSuite:
     assertEquals(full.resultTypeMemberName, "Result")
   }
 
+  test("admits source-ordered alias chains rooted independently in both parameters and the result") {
+    val (body, structure) = decoded(
+      """trait RichAdd[N <: Nat, M <: Nat]:
+        |  type Out <: Nat
+        |  type Left = N
+        |  type Copy = Out
+        |  type CopyAgain = Copy
+        |  type CopyBranch = Copy
+        |  def apply(n: N, m: M): Out
+        |  type LeftAgain = Left
+        |  type FinalCopy = CopyAgain
+        |  type Right = M
+        |  type RightAgain = Right
+        |""".stripMargin
+    )
+
+    assertEquals(
+      structure.directTypeMembers.map(member => member.name -> member.bodyIndex),
+      List(
+        "Out" -> 0,
+        "Left" -> 1,
+        "Copy" -> 2,
+        "CopyAgain" -> 3,
+        "CopyBranch" -> 4,
+        "LeftAgain" -> 6,
+        "FinalCopy" -> 7,
+        "Right" -> 8,
+        "RightAgain" -> 9
+      )
+    )
+    val aux = AuxSourceShapeDecoder.decode("RichAdd", body, structure)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    val full = ApplyFullShapeDecoder.decode("RichAdd", body, structure)
+      .fold(diagnostic => fail(diagnostic.message), identity)
+    assertEquals(aux.resultTypeMemberName, "Out")
+    assertEquals(full.resultTypeMemberName, "Out")
+  }
+
   test("freshens the Aux result binder around a direct result-alias name") {
     val (body, structure) = decoded(
       """trait Fresh[N <: Nat, M <: Nat]:
         |  type Out <: Nat
         |  type Out0 = Out
-        |  type Copy = Out
+        |  type Out1 = Out0
+        |  type Copy = Out1
         |  type Left = N
         |""".stripMargin
     )
 
     val aux = AuxSourceShapeDecoder.decode("Fresh", body, structure)
       .fold(diagnostic => fail(diagnostic.message), identity)
-    assertEquals(aux.generatedResultParameterName, "Out1")
+    assertEquals(aux.generatedResultParameterName, "Out2")
   }
 
   test("rejects a normalized type record whose name disagrees with its body member") {
@@ -105,32 +144,57 @@ class BoundedResultDirectOutAliasDecoderSuite extends munit.FunSuite:
   }
 
   List(
-    "unrelated named type" -> "Nat",
-    "missing named type" -> "Missing",
-    "alias chain" -> "Copy",
-    "qualified type" -> "Other.Out",
-    "applied type" -> "F[N]",
-    "function type" -> "N => M"
-  ).foreach: (label, target) =>
-    test(s"rejects a direct result alias target that is a $label") {
-      val declarations =
-        if label == "alias chain" then
-          "type Copy = Out\n  type Another = Copy"
-        else s"type Copy = $target"
+    ("unrelated named type", "type Copy = Nat", "Copy"),
+    ("missing named type", "type Copy = Missing", "Copy"),
+    ("self cycle", "type Copy = Copy", "Copy"),
+    ("forward reference", "type Before = After\n  type After = Out", "Before"),
+    ("mutual cycle", "type First = Second\n  type Second = First", "First"),
+    (
+      "invalid root after valid chains",
+      "type Copy = Out\n  type CopyAgain = Copy\n  type Broken = Missing",
+      "Broken"
+    ),
+    ("qualified type", "type Copy = Other.Out", "Copy"),
+    ("applied type", "type Copy = F[N]", "Copy"),
+    ("function type", "type Copy = N => M", "Copy")
+  ).foreach: (label, declarations, rejectedName) =>
+    test(s"rejects a direct result alias target that is $label") {
       val (body, structure) = decoded(
         s"""trait Rejected[N <: Nat, M <: Nat]:
            |  type Out <: Nat
            |  $declarations
            |""".stripMargin
       )
-      val rejectedName = if label == "alias chain" then "Another" else "Copy"
 
-      assertSharedRejection(
+      val rejected = structure.directTypeMembers
+        .find(_.name == rejectedName)
+        .getOrElse(fail(s"missing normalized record for $rejectedName"))
+
+      assertSharedRejectionAt(
         body,
         structure,
-        s"concrete bounded-result alias `$rejectedName` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+        s"concrete bounded-result alias `$rejectedName` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias",
+        rejected.pos
       )
     }
+
+  test("rejects a duplicate direct type name at the later alias") {
+    val (body, structure) = decoded(
+      """trait Rejected[N <: Nat, M <: Nat]:
+        |  type Out <: Nat
+        |  type Copy = Out
+        |  type Copy = Out
+        |""".stripMargin
+    )
+    val duplicate = structure.directTypeMembers.last
+
+    assertSharedRejectionAt(
+      body,
+      structure,
+      "direct type member name `Copy` must be unique across enclosing parameters and direct type members",
+      duplicate.pos
+    )
+  }
 
   test("keeps a second abstract result member rejected") {
     val (body, structure) = decoded(
@@ -175,6 +239,21 @@ class BoundedResultDirectOutAliasDecoderSuite extends munit.FunSuite:
       .left.toOption.getOrElse(fail("full apply unexpectedly admitted the shape"))
     assertEquals(aux.message, s"unsupported @aux source shape for `Rejected`: $reason")
     assertEquals(full.message, s"unsupported full @apply source shape for `Rejected`: $reason")
+
+  private def assertSharedRejectionAt(
+      body: ExpansionTargetBodyView,
+      structure: ExpansionTargetTypeStructureView,
+      reason: String,
+      expectedPosition: dotty.tools.dotc.util.SrcPos
+  ): Unit =
+    val aux = AuxSourceShapeDecoder.decode("Rejected", body, structure)
+      .left.toOption.getOrElse(fail("aux unexpectedly admitted the shape"))
+    val full = ApplyFullShapeDecoder.decode("Rejected", body, structure)
+      .left.toOption.getOrElse(fail("full apply unexpectedly admitted the shape"))
+    assertEquals(aux.message, s"unsupported @aux source shape for `Rejected`: $reason")
+    assertEquals(full.message, s"unsupported full @apply source shape for `Rejected`: $reason")
+    assertEquals(aux.pos, expectedPosition)
+    assertEquals(full.pos, expectedPosition)
 
   private def decoded(
       source: String

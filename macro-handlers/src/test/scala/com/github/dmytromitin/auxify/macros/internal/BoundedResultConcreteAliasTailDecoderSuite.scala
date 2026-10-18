@@ -69,19 +69,19 @@ class BoundedResultConcreteAliasTailDecoderSuite extends munit.FunSuite:
     ),
     "alias of an unrelated named type" -> (
       "type Copy = Nat",
-      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias"
     ),
     "qualified alias" -> (
       "type Copy = domain.Value",
-      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias"
     ),
     "applied alias" -> (
       "type Copy = Box[N]",
-      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias"
     ),
     "function alias" -> (
       "type Copy = N => M",
-      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias"
     ),
     "polymorphic alias" -> (
       "type Copy[X] = N",
@@ -139,7 +139,7 @@ class BoundedResultConcreteAliasTailDecoderSuite extends munit.FunSuite:
     assertSharedRejection(
       body,
       structure.copy(directTypeMembers = List(structure.directTypeMembers.head, alias.copy(aliasTarget = Some(DirectTypeShape.EnclosingTypeParameter("Missing", alias.pos))))),
-      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N` or the abstract result member `Out`"
+      "concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias"
     )
   }
 

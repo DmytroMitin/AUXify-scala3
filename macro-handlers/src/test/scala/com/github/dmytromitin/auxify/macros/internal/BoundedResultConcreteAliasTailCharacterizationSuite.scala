@@ -39,10 +39,13 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
         """trait RichAdd[N <: Nat, M <: Nat]:
           |  type Out <: Nat
           |  type Copy = Out
+          |  type CopyAgain = Copy
           |  type Left = N
           |  def apply(n: N, m: M): Out
-          |  type OtherCopy = Out
+          |  type OtherCopy = Copy
+          |  type LeftAgain = Left
           |  type Right = M
+          |  type RightAgain = Right
           |""".stripMargin,
         order
       )
@@ -58,8 +61,8 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
           |  type Out <: Nat
           |  type Out0 = Out
           |  def apply(n: N, m: M): Out
-          |  type Out1 = N
-          |  type Copy = Out
+          |  type Out1 = Out0
+          |  type Copy = Out1
           |  type Right = M
           |""".stripMargin,
         order
@@ -103,8 +106,11 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
         """trait Existing[N <: Nat, M <: Nat]:
           |  type Out <: Nat
           |  type Copy = Out
+          |  type CopyAgain = Copy
           |  type Left = N
+          |  type LeftAgain = Left
           |  type Right = M
+          |  type RightAgain = Right
           |
           |object Existing:
           |  type Aux = String
@@ -142,8 +148,11 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
           |trait AtomicRichAdd[N <: Nat, M <: Nat]:
           |  type Out <: Nat
           |  type Copy = Out
+          |  type CopyAgain = Copy
           |  type Left = N
+          |  type LeftAgain = Left
           |  type Right = M
+          |  type RightAgain = Right
           |
           |object AtomicRichAdd:
           |  val retained = 17
@@ -181,7 +190,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
               AuxHandler.expandWithLowering(input): (_, _) =>
                 Left(
                   AuxTypeAliasPeerBridge.Failure(
-                    "PROMPT103_CONTROLLED_LOWERING_FAILURE",
+                    "PROMPT104_CONTROLLED_LOWERING_FAILURE",
                     "no partial apply or Aux edit may survive"
                   )
                 )
@@ -200,7 +209,7 @@ class BoundedResultConcreteAliasTailCharacterizationSuite extends munit.FunSuite
       assertEquals(
         diagnostics,
         List(
-          "PROMPT103_CONTROLLED_LOWERING_FAILURE: no partial apply or Aux edit may survive"
+          "PROMPT104_CONTROLLED_LOWERING_FAILURE: no partial apply or Aux edit may survive"
         ),
         clue(order)
       )

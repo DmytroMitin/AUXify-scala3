@@ -31,8 +31,12 @@ trait RichAdd[N <: Nat, M <: Nat]:
   type Left = N
   def apply(n: N, m: M): Out
   type Copy = Out
-  type OtherCopy = Out
+  type CopyAgain = Copy
+  type OtherCopy = Copy
+  type FinalCopy = CopyAgain
+  type LeftAgain = Left
   type Right = M
+  type RightAgain = Right
 
 object RichAdd:
   given RichAdd[Zero, One] with
@@ -47,6 +51,12 @@ final class RightNatural extends Natural
 trait Combine[Left <: Natural, Right <: Natural]:
   type Result <: Natural
   def combine(left: Left, right: Right): Result
+  type ResultCopy = Result
+  type ResultAgain = ResultCopy
+  type LeftAlias = Left
+  type LeftAgain = LeftAlias
+  type RightAlias = Right
+  type RightAgain = RightAlias
 
 object Combine:
   given leftRight: Combine[LeftNatural, RightNatural] with

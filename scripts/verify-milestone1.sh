@@ -840,9 +840,15 @@ for mode in Apply Aux ApplyAux AuxApply; do
     Aux|AuxApply) handler='@aux' ;;
   esac
   type_member_diagnostics+=(
-    "unsupported $handler source shape for \`${mode}AliasTail\`: concrete bounded-result alias \`Copy\` must target one of the enclosing type parameters \`M\` or \`N\` or the abstract result member \`Out\`"
+    "unsupported $handler source shape for \`${mode}AliasTail\`: concrete bounded-result alias \`Copy\` must target one of the enclosing type parameters \`M\` or \`N\`, the abstract result member \`Out\`, or an earlier validated concrete alias"
   )
 done
+type_member_diagnostics+=(
+  'unsupported full @apply source shape for `ApplyAliasForwardChain`: concrete bounded-result alias `Before` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias'
+  'unsupported @aux source shape for `AuxAliasSelfChain`: concrete bounded-result alias `Copy` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias'
+  'unsupported full @apply source shape for `ApplyAuxAliasMutualChain`: concrete bounded-result alias `First` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias'
+  'unsupported @aux source shape for `AuxApplyAliasMissingAfterValidChain`: concrete bounded-result alias `Broken` must target one of the enclosing type parameters `M` or `N`, the abstract result member `Out`, or an earlier validated concrete alias'
+)
 verify_modifier_negative \
   negativeTypeMemberModifiers \
   'full-apply/aux and both composition orders' \
@@ -858,6 +864,14 @@ for mode in Apply Aux ApplyAux AuxApply; do
       fail "missing type-member diagnostic position for $mode$shape"
   done
 done
+grep -Eq 'ApplyAliasForwardChain\.scala:9:[0-9]+' "$type_member_modifier_negative_log" ||
+  fail "missing type-member diagnostic position for ApplyAliasForwardChain"
+grep -Eq 'AuxAliasSelfChain\.scala:8:[0-9]+' "$type_member_modifier_negative_log" ||
+  fail "missing type-member diagnostic position for AuxAliasSelfChain"
+grep -Eq 'ApplyAuxAliasMutualChain\.scala:10:[0-9]+' "$type_member_modifier_negative_log" ||
+  fail "missing type-member diagnostic position for ApplyAuxAliasMutualChain"
+grep -Eq 'AuxApplyAliasMissingAfterValidChain\.scala:11:[0-9]+' "$type_member_modifier_negative_log" ||
+  fail "missing type-member diagnostic position for AuxApplyAliasMissingAfterValidChain"
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_TYPE_MEMBER_MODIFIER_HARDENING_PASS'
 
 external_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-external-consumer.XXXXXX")"
@@ -903,6 +917,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_SOURCE_DECODER_LATE_REJECTION_STRUCTURALL
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_AUX_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_CONCRETE_ALIAS_TAIL_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_DIRECT_OUT_ALIAS_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_BOUNDED_RESULT_ROOTED_ALIAS_CHAIN_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_LATE_REJECTION_ROLLBACK_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_BOUNDED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_METHOD_COMPOSITION_PASS'

@@ -56,14 +56,28 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
                 s"result type member `${result.name}` upper bound must match enclosing bound `$firstBound`",
                 result.pos
               )
-          _ <- aliases.foldLeft[Either[Rejection, Unit]](Right(())):
+          _ <- aliases.foldLeft[Either[Rejection, Set[String]]](Right(Set.empty)):
             (validated, alias) =>
-              validated.flatMap: _ =>
-                concreteBoundedAlias(
-                  alias,
-                  Set(first.name, second.name),
-                  result.name
-                )
+              validated.flatMap: acceptedAliasNames =>
+                for
+                  _ <- concreteBoundedAlias(
+                    alias,
+                    Set(first.name, second.name),
+                    result.name,
+                    acceptedAliasNames
+                  )
+                  _ <-
+                    if
+                      Set(first.name, second.name, result.name)
+                        .union(acceptedAliasNames)
+                        .contains(alias.name)
+                    then
+                      reject(
+                        s"direct type member name `${alias.name}` must be unique across enclosing parameters and direct type members",
+                        alias.pos
+                      )
+                    else Right(())
+                yield acceptedAliasNames + alias.name
         yield BoundedResultTypeClassShape(
           typeClassName = typeClassName,
           firstTypeParameterName = first.name,
@@ -173,7 +187,8 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
   private def concreteBoundedAlias(
       alias: DirectTypeMember,
       enclosingParameterNames: Set[String],
-      resultMemberName: String
+      resultMemberName: String,
+      acceptedAliasNames: Set[String]
   ): Either[Rejection, Unit] =
     if alias.name == null || alias.name.isEmpty || alias.name == "<error>" || alias.name == "<unknown>" then
       reject(
@@ -215,9 +230,12 @@ private[internal] object BoundedResultTypeClassShapeDecoder:
             if enclosingParameterNames.contains(name) => Right(())
         case Some(DirectTypeShape.NamedType(name, _)) if name == resultMemberName =>
           Right(())
+        case Some(DirectTypeShape.NamedType(name, _))
+            if acceptedAliasNames.contains(name) =>
+          Right(())
         case _ =>
           reject(
-            s"concrete bounded-result alias `${alias.name}` must target one of the enclosing type parameters ${enclosingParameterNames.toList.sorted.mkString("`", "` or `", "`")} or the abstract result member `$resultMemberName`",
+            s"concrete bounded-result alias `${alias.name}` must target one of the enclosing type parameters ${enclosingParameterNames.toList.sorted.mkString("`", "` or `", "`")}, the abstract result member `$resultMemberName`, or an earlier validated concrete alias",
             alias.pos
           )
 

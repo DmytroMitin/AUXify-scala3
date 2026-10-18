@@ -13,8 +13,14 @@ class AuxIntegrationSuite extends munit.FunSuite:
   test("renamed source names generate one coherent public alias") {
     val instance: Combine.Aux[LeftValue, RightValue, ResultValue] =
       summon[Combine[LeftValue, RightValue]]
+    val resultAgain: instance.ResultAgain =:= ResultValue = summon
+    val leftAgain: instance.LeftAgain =:= LeftValue = summon
+    val rightAgain: instance.RightAgain =:= RightValue = summon
 
     assert(instance.isInstanceOf[Combine[?, ?]])
+    assert(resultAgain ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
   }
 
   test("concrete enclosing-parameter and result aliases stay inherited beside one Aux result refinement") {
@@ -24,7 +30,11 @@ class AuxIntegrationSuite extends munit.FunSuite:
     val out: instance.Out =:= One = summon
     val copyOut: instance.Copy =:= instance.Out = summon
     val copyResult: instance.Copy =:= One = summon
+    val copyAgain: instance.CopyAgain =:= One = summon
     val otherCopy: instance.OtherCopy =:= One = summon
+    val finalCopy: instance.FinalCopy =:= One = summon
+    val leftAgain: instance.LeftAgain =:= Zero = summon
+    val rightAgain: instance.RightAgain =:= One = summon
     val result: One = instance(new Zero, new One)
 
     assert(left ne null)
@@ -32,7 +42,11 @@ class AuxIntegrationSuite extends munit.FunSuite:
     assert(out ne null)
     assert(copyOut ne null)
     assert(copyResult ne null)
+    assert(copyAgain ne null)
     assert(otherCopy ne null)
+    assert(finalCopy ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
     assert(result.isInstanceOf[One])
   }
 

@@ -27,7 +27,11 @@ class FullApplyIntegrationSuite extends munit.FunSuite:
     val out: materialized.Out =:= One = summon
     val copyOut: materialized.Copy =:= materialized.Out = summon
     val copyResult: materialized.Copy =:= One = summon
+    val copyAgain: materialized.CopyAgain =:= One = summon
     val otherCopy: materialized.OtherCopy =:= One = summon
+    val finalCopy: materialized.FinalCopy =:= One = summon
+    val leftAgain: materialized.LeftAgain =:= Zero = summon
+    val rightAgain: materialized.RightAgain =:= One = summon
     val result: One = materialized(new Zero, new One)
 
     assert(materialized eq selected)
@@ -36,7 +40,11 @@ class FullApplyIntegrationSuite extends munit.FunSuite:
     assert(out ne null)
     assert(copyOut ne null)
     assert(copyResult ne null)
+    assert(copyAgain ne null)
     assert(otherCopy ne null)
+    assert(finalCopy ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
     assert(result.isInstanceOf[One])
   }
 
@@ -47,9 +55,15 @@ class FullApplyIntegrationSuite extends munit.FunSuite:
     } = refinedCombine[LeftNatural, RightNatural](using selected)
     val result: selected.Result =
       materialized.combine(new LeftNatural, new RightNatural)
+    val resultAgain: materialized.ResultAgain =:= RightNatural = summon
+    val leftAgain: materialized.LeftAgain =:= LeftNatural = summon
+    val rightAgain: materialized.RightAgain =:= RightNatural = summon
 
     assert(materialized eq selected)
     assert(result.isInstanceOf[RightNatural])
+    assert(resultAgain ne null)
+    assert(leftAgain ne null)
+    assert(rightAgain ne null)
   }
 
   test("full branch preserves an existing direct apply method") {
