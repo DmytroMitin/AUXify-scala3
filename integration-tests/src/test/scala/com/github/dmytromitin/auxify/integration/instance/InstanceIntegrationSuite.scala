@@ -47,11 +47,15 @@ class InstanceIntegrationSuite extends munit.FunSuite:
       RichHasOut.instance[Int, String]
     val out: value.Out = "typed"
     val item: value.Item = 42
+    val copy: value.Copy = 42
     val result: value.Value = 42
+    val branch: value.Branch = 42
 
     assertEquals(summon[value.Out =:= String](out), "typed")
     assertEquals(summon[value.Item =:= Int](item), 42)
+    assertEquals(summon[value.Copy =:= Int](copy), 42)
     assertEquals(summon[value.Value =:= Int](result), 42)
+    assertEquals(summon[value.Branch =:= Int](branch), 42)
     assertEquals(value.identity(42), 42)
     assertEquals(value.pick(42, 99), 42)
     assertEquals(value.fortyTwo, 42)
@@ -114,13 +118,17 @@ class InstanceIntegrationSuite extends munit.FunSuite:
       )
 
     val item: value.combineFunction = 42
+    val copy: value.Copy = 42
     val result: value.Value = 42
+    val branch: value.Branch = 42
     val itemEquality: value.combineFunction =:= Int =
       summon[value.combineFunction =:= Int]
     val resultEquality: value.Value =:= Int = summon[value.Value =:= Int]
 
     assertEquals(itemEquality(item), 42)
+    assertEquals(summon[value.Copy =:= Int](copy), 42)
     assertEquals(resultEquality(result), 42)
+    assertEquals(summon[value.Branch =:= Int](branch), 42)
     assertEquals(value.combine(20)(22), 42)
     assertEquals(combineCalls, 1)
     assertEquals(value.twice(21), 42)
@@ -231,11 +239,15 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     )
 
     val item: derived.Item = 42
+    val copy: derived.Copy = 42
     val value: derived.Value = 42
+    val branch: derived.Branch = 42
     val itemEquality: derived.Item =:= Int = summon[derived.Item =:= Int]
     val valueEquality: derived.Value =:= Int = summon[derived.Value =:= Int]
     assertEquals(itemEquality(item), 42)
+    assertEquals(summon[derived.Copy =:= Int](copy), 42)
     assertEquals(valueEquality(value), 42)
+    assertEquals(summon[derived.Branch =:= Int](branch), 42)
     assertEquals(derived.twice(21), 42)
     assertEquals(derived.fold3(10, 12, 20), 42)
     assertEquals(combineCalls, 3)

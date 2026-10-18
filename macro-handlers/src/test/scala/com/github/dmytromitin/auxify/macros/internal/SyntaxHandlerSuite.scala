@@ -159,8 +159,10 @@ class SyntaxHandlerSuite extends munit.FunSuite:
         |trait RichMonoid[A]:
         |  def combine(left: A, right: A): A
         |  type inst = A
+        |  type Copy = inst
         |  def inst(inst1: A): A = inst1
-        |  type Value = A
+        |  type Value = Copy
+        |  type Branch = inst
         |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
         |""".stripMargin,
       "RichMonoid"

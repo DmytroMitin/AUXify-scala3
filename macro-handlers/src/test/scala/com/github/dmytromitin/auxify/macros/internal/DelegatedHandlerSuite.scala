@@ -99,8 +99,10 @@ class DelegatedHandlerSuite extends munit.FunSuite:
         |trait RichEmpty[A]:
         |  def empty: A
         |  type inst = A
+        |  type Copy = inst
         |  def inst(inst1: A): A = inst1
-        |  type Value = A
+        |  type Value = Copy
+        |  type Branch = inst
         |""".stripMargin,
       "RichEmpty"
     ) { (input, _, companion, context) =>
@@ -390,7 +392,10 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           |trait StackedTail[A]:
           |  def show(a: A): String
           |  type Item = A
+          |  type Copy = Item
           |  def duplicate(a: A): A = a
+          |  type More = Copy
+          |  type Branch = Item
           |
           |object StackedTail:
           |  val retained = 19
@@ -409,7 +414,10 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           List(
             paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Method,
             paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Type,
-            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Method
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Type,
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Method,
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Type,
+            paradise3.api.ExpansionTargetBodyView.DirectMemberKind.Type
           )
         )
 
@@ -438,8 +446,10 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           |trait StackedEmpty[A]:
           |  def empty: A
           |  type inst = A
+          |  type Copy = inst
           |  def inst(inst1: A): A = inst1
-          |  type Value = A
+          |  type Value = Copy
+          |  type Branch = inst
           |""".stripMargin,
         "StackedEmpty",
         sourceOrder
@@ -470,7 +480,7 @@ class DelegatedHandlerSuite extends munit.FunSuite:
           output.primary.rhs.asInstanceOf[Template].body.collect {
             case member: MemberDef => member.name.toString
           },
-          List("empty", "inst", "inst", "Value")
+          List("empty", "inst", "Copy", "inst", "Value", "Branch")
         )
       }
   }

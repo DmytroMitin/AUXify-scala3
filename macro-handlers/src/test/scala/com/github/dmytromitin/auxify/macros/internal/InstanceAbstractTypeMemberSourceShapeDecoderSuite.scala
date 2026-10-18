@@ -70,7 +70,8 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
           |  type Out
           |  type Out0 = A
           |  def identity(a: A): A = a
-          |  type Out1 = A
+          |  type Out1 = Out0
+          |  type Copy = Out1
           |  def pick(a: A, b: A): A = a
           |""".stripMargin,
         "RichHasOut"
@@ -82,6 +83,23 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
         generatedTypeParameterName = "Out2"
       )
     )
+  }
+
+  test("admits alias chains rooted in the enclosing parameter but not the abstract result") {
+    val decoded = decode(
+      """trait AbstractTypeAliasChain[Element]:
+        |  type Result
+        |  type Item = Element
+        |  type Copy = Item
+        |  def retain(value: Element): Element = value
+        |  type More = Copy
+        |  type Branch = Item
+        |""".stripMargin,
+      "AbstractTypeAliasChain"
+    )
+
+    assertEquals(decoded.memberName, "Result")
+    assertEquals(decoded.generatedTypeParameterName, "Result0")
   }
 
   test("admits every supported inherited tail topology") {
@@ -403,10 +421,16 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
 
   private val rejectedTailSources = List(
     (
+      "abstract result as alias root",
+      "trait AbstractResultRoot[A]:\n  type Out\n  type Item = Out\n",
+      "AbstractResultRoot",
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
+    ),
+    (
       "wrong alias target",
       "trait WrongAliasTail[A]:\n  type Out\n  type Item = String\n",
       "WrongAliasTail",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "bounded alias",

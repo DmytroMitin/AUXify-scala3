@@ -47,8 +47,10 @@ object ReverseParameterlessNoTail:
 trait RichEmpty[A]:
   def empty: A
   type Item = A
+  type Copy = Item
   def duplicate(a: A): A = a
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def choose(a: A, b: A): A = a
   def current: A = empty
 
@@ -62,6 +64,9 @@ trait ReverseRichEmpty[Element]:
   def fallback: Element
   def repeat(value: Element): Element = value
   type Item = Element
+  type Copy = Item
+  type More = Copy
+  type Branch = Item
 
 object ReverseRichEmpty:
   given ReverseRichEmpty[String] with
@@ -109,8 +114,10 @@ object RenamedComposition:
 trait RichShow[A]:
   def show(a: A): String
   type Item = A
+  type Copy = Item
   def duplicate(a: A): A = a
-  type Value = A
+  type Value = Copy
+  type Branch = Item
 
 object RichShow:
   val preserved = 97
@@ -123,6 +130,9 @@ trait ReverseRichRender[Element]:
   def render(value: Element): Text
   def retain(value: Element): Element = value
   type Item = Element
+  type Copy = Item
+  type More = Copy
+  type Branch = Item
 
 object ReverseRichRender:
   val preserved = 98

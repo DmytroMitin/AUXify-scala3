@@ -77,7 +77,8 @@ class InstanceHandlerSuite extends munit.FunSuite:
         |  type Out
         |  type Out0 = A
         |  def identity(a: A): A = a
-        |  type Out1 = A
+        |  type Out1 = Out0
+        |  type Copy = Out1
         |  def pick(a: A, b: A): A = a
         |""".stripMargin,
       "RichHasOut"
@@ -268,8 +269,10 @@ class InstanceHandlerSuite extends munit.FunSuite:
         |trait RichCurried[A]:
         |  def combine(a: A)(b: A): A
         |  type combineFunction = A
+        |  type Copy = combineFunction
         |  def twice(a: A): A = combine(a)(a)
-        |  type Value = A
+        |  type Value = Copy
+        |  type Branch = combineFunction
         |  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
         |""".stripMargin,
       "RichCurried"
@@ -768,8 +771,10 @@ class InstanceHandlerSuite extends munit.FunSuite:
         |  def empty: A
         |  def combine(a: A, a1: A): A
         |  type Item = A
+        |  type Copy = Item
         |  def twice(a: A): A = combine(a, a)
-        |  type Value = A
+        |  type Value = Copy
+        |  type Branch = Item
         |  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
         |""".stripMargin,
       "RichTypedMonoid"

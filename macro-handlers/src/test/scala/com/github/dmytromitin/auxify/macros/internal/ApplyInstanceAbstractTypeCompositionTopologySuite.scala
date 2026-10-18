@@ -284,8 +284,10 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
        |  type Out
        |  type Item = A
        |  def identity(value: A): A = value
-       |  type Value = A
+       |  type Copy = Item
+       |  type Value = Copy
        |  def pick(first: A, second: A): A = first
+       |  type Branch = Item
        |""".stripMargin
 
   private def conflictSource(

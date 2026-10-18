@@ -23,8 +23,10 @@ trait HasOut[A]:
 trait RichHasOut[A]:
   type Out
   type Item = A
+  type Copy = Item
   def identity(a: A): A = a
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def fortyTwo: A = 42.asInstanceOf[A]
   def pick(a: A, b: A): A = a
 
@@ -35,7 +37,7 @@ object RichHasOut:
 trait FreshHasOut[A]:
   type Out
   type Out0 = A
-  type Out1 = A
+  type Out1 = Out0
 
 @instance
 trait ExistingRichHasOut[A]:
@@ -72,8 +74,10 @@ trait CurriedCollision[Element]:
 trait RichCurried[A]:
   def combine(a: A)(b: A): A
   type combineFunction = A
+  type Copy = combineFunction
   def twice(a: A): A = combine(a)(a)
-  type Value = A
+  type Value = Copy
+  type Branch = combineFunction
   def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
 
 object RichCurried:
@@ -161,8 +165,10 @@ trait HeterogeneousDerivedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
+  type Copy = Item
   def twice(a: A): A = combine(a, a)
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
 
 object HeterogeneousDerivedMonoid:

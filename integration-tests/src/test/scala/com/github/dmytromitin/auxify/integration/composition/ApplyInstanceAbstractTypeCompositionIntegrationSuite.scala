@@ -33,12 +33,17 @@ class ApplyInstanceAbstractTypeCompositionIntegrationSuite extends munit.FunSuit
 
     val selected: RichHasOut[Int] = RichHasOut[Int]
     val alias: selected.Item = 42
+    val copy: selected.Copy = 42
+    val value: selected.Value = 42
+    val branch: selected.Branch = 42
     assert(selected.eq(constructed))
     assert(proof("typed") == "typed")
     assert(selected.identity(42) == 42)
     assert(selected.pick(42, 99) == 42)
     assert(summon[selected.Item =:= Int](alias) == 42)
-    summon[selected.Value =:= Int]
+    assert(summon[selected.Copy =:= Int](copy) == 42)
+    assert(summon[selected.Value =:= Int](value) == 42)
+    assert(summon[selected.Branch =:= Int](branch) == 42)
   }
 
   test("instance then apply already composes for a renamed inherited tail") {
@@ -49,10 +54,16 @@ class ApplyInstanceAbstractTypeCompositionIntegrationSuite extends munit.FunSuit
 
     val selected: ReverseHasOut[Int] = ReverseHasOut[Int]
     val alias: selected.Item = 42
+    val copy: selected.Copy = 42
+    val more: selected.More = 42
+    val branch: selected.Branch = 42
     assert(selected.eq(constructed))
     assert(proof("typed") == "typed")
     assert(selected.keep(42) == 42)
     assert(summon[selected.Item =:= Int](alias) == 42)
+    assert(summon[selected.Copy =:= Int](copy) == 42)
+    assert(summon[selected.More =:= Int](more) == 42)
+    assert(summon[selected.Branch =:= Int](branch) == 42)
   }
 
   test("both orders inherit alias-only tails") {

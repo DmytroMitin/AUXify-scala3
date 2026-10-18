@@ -272,8 +272,10 @@ class ApplyInstanceCurriedCompositionTopologySuite extends munit.FunSuite:
        |  def combine(a: A)(b: A): A
        |  type Item = A
        |  def twice(a: A): A = combine(a)(a)
-       |  type Value = A
+       |  type Copy = Item
+       |  type Value = Copy
        |  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+       |  type Branch = Item
        |""".stripMargin
 
   private def conflictSource(

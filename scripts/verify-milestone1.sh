@@ -265,7 +265,7 @@ for expected_diagnostic in \
   'unsupported @delegated source shape for `AbstractAliasTailDelegated`: inherited type member `Item` must be a concrete alias' \
   'unsupported @delegated source shape for `PolymorphicAliasTailDelegated`: inherited concrete type alias `Item` must not declare type parameters' \
   'unsupported @delegated source shape for `PrivateAliasTailDelegated`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @delegated source shape for `WrongAliasTailDelegated`: inherited concrete type alias `Item` must target enclosing type parameter `A`'; do
+  'unsupported @delegated source shape for `WrongAliasTailDelegated`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias'; do
   grep -Fq -- "$expected_diagnostic" "$delegated_negative_log" ||
     fail "delegated negative compile omitted expected diagnostic: $expected_diagnostic"
 done
@@ -396,7 +396,7 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `CurriedPrivate`: curried method `combine` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `CurriedExtraVal`: direct body member at index 1 must be a method; found val' \
   'unsupported @instance source shape for `CurriedTailAliasThenEmptyClause`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
-  'unsupported @instance source shape for `CurriedTailMethodThenWrongAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedTailMethodThenWrongAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `CurriedTailLateInvalid`: inherited concrete method `invalid` requires exactly one ordinary parameter clause; found 2' \
   'unsupported @instance source shape for `CurriedTailContextual`: inherited concrete method `invalid` parameter clause must be ordinary and non-contextual' \
   'unsupported @instance source shape for `CurriedTailPolymorphic`: inherited concrete method `invalid` must not declare method type parameters' \
@@ -430,18 +430,22 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `ZeroFirst`: inherited method `combine` must be concrete' \
   'unsupported @instance source shape for `ConcretePlusUnsupported`: direct body member at index 3 must be a method; found nested trait' \
   'unsupported @instance source shape for `ZeroPlusUnsupported`: direct body member at index 2 must be a method; found nested trait' \
-  'unsupported @instance source shape for `NamedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
-  'unsupported @instance source shape for `AppliedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
-  'unsupported @instance source shape for `QualifiedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `NamedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `AppliedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `QualifiedAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `PolymorphicAlias`: inherited concrete type alias `Item` must not declare type parameters' \
   'unsupported @instance source shape for `PrivateAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `ProtectedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AnnotatedAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InfixAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `AliasFirst`: direct type member `Item` must be abstract, not a concrete alias' \
+  'unsupported @instance source shape for `AliasForwardChain`: inherited concrete type alias `Before` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `AliasSelfChain`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `AliasMutualChain`: inherited concrete type alias `Left` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `AliasMissingAfterValidChain`: inherited concrete type alias `Broken` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `AliasPlusUnsupported`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
   'unsupported @instance source shape for `MethodThenAlias`: inherited concrete method `invalid` requires one or more ordinary parameters in its single clause; found 0' \
-  'unsupported @instance source shape for `TwoAliases`: inherited concrete type alias `Value` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `TwoAliases`: inherited concrete type alias `Value` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'found 0 type parameters' \
   'unsupported @instance source shape for `TypeMemberAbstractVal`: direct body member at index 1 must be a method; found val' \
   'unsupported @instance source shape for `TypeMemberAbstractVar`: direct body member at index 1 must be a method; found var' \
@@ -458,7 +462,8 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `TypeMemberTwoMembers`: inherited type member `OtherOut` must be a concrete alias' \
   'unsupported @instance source shape for `TypeMemberThenMethod`: inherited method `value` must be concrete' \
   'unsupported @instance source shape for `TypeMemberMethodThenType`: direct body member at index 1 must be a method; found type' \
-  'unsupported @instance source shape for `TypeMemberThenAlias`: inherited concrete type alias `Alias` must target enclosing type parameter `A`' \
+  'unsupported @instance source shape for `TypeMemberThenAlias`: inherited concrete type alias `Alias` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `TypeMemberOutRootAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `TypeMemberNestedTrait`: direct body member at index 1 must be a method; found nested trait' \
   'unsupported @instance source shape for `TypeMemberNestedClass`: direct body member at index 1 must be a method; found nested class' \
   'unsupported @instance source shape for `TypeMemberNestedObject`: direct body member at index 1 must be a method; found nested object'; do
@@ -485,6 +490,7 @@ for source in \
   CurriedTailAnnotatedMethod CurriedTailWrongParameter CurriedTailWrongResult \
   CurriedTailAbstractAlias CurriedTailPrivateAlias CurriedTailNestedTrait \
   CurriedTailAdditionalAbstractMethod \
+  AliasForwardChain AliasSelfChain AliasMutualChain AliasMissingAfterValidChain \
   TypeMemberNoParameter TypeMemberTwoParameters TypeMemberVariant \
   TypeMemberBoundedParameter TypeMemberHigherKinded TypeMemberContextBound \
   TypeMemberAlias TypeMemberLowerBound TypeMemberUpperBound \
@@ -492,7 +498,8 @@ for source in \
   TypeMemberProtected TypeMemberAnnotated TypeMemberInfix TypeMemberTwoMembers \
   TypeMemberThenMethod TypeMemberMethodThenType TypeMemberThenAlias \
   TypeMemberAbstractVal TypeMemberAbstractVar TypeMemberDirectMethod \
-  TypeMemberNestedTrait TypeMemberNestedClass TypeMemberNestedObject; do
+  TypeMemberNestedTrait TypeMemberNestedClass TypeMemberNestedObject \
+  TypeMemberOutRootAlias; do
   grep -Eq "$source[.]scala:[0-9]+:[0-9]+" "$instance_negative_log" ||
     fail "instance negative diagnostic is not source-positioned: $source"
 done
@@ -543,7 +550,7 @@ for expected_diagnostic in \
   'unsupported @syntax source shape for `SyntaxNestedClassTail`: direct body member at index 1 must be a method; found nested class' \
   'unsupported @syntax source shape for `SyntaxNestedTraitTail`: direct body member at index 1 must be a method; found nested trait' \
   'unsupported @syntax source shape for `SyntaxNestedObjectTail`: direct body member at index 1 must be a method; found nested object' \
-  'unsupported @syntax source shape for `SyntaxWrongAliasTail`: inherited concrete type alias `Item` must target enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxWrongAliasTail`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @syntax source shape for `SyntaxBoundedAliasTail`: inherited type member `Item` must be a concrete alias' \
   'unsupported @syntax source shape for `SyntaxPolymorphicAliasTail`: inherited concrete type alias `Item` must not declare type parameters' \
   'unsupported @syntax source shape for `SyntaxPrivateAliasTail`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
@@ -929,6 +936,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_INHERITED_CONCRETE_PARAMETERLESS_MET
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_ABSTRACT_TYPE_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_CURRIED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_SHARED_INHERITED_ALIAS_CHAIN_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

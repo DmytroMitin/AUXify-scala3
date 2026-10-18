@@ -17,8 +17,10 @@ trait AbstractTypeInstanceThenApply[Element]:
 trait RichHasOut[A]:
   type Out
   type Item = A
+  type Copy = Item
   def identity(value: A): A = value
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def pick(first: A, second: A): A = first
 
 @instance
@@ -27,6 +29,9 @@ trait ReverseHasOut[Element]:
   type Result
   def keep(value: Element): Element = value
   type Item = Element
+  type Copy = Item
+  type More = Copy
+  type Branch = Item
 
 @apply
 @instance
@@ -57,7 +62,7 @@ trait ReverseMethodOnlyHasOut[Element]:
 trait CollisionHasOut[Element]:
   type Result
   type Result0 = Element
-  type Result1 = Element
+  type Result1 = Result0
   def Result2(value: Element): Element = value
 
 @apply

@@ -225,6 +225,8 @@ class ApplySyntaxCompositionAdmissionSuite extends munit.FunSuite:
        |  def combine(left: A, right: A): A
        |  type Item = A
        |  def twice(value: A): A = combine(value, value)
+       |  type Copy = Item
+       |  type Branch = Item
        |""".stripMargin
 
   private def withExpansionInput[A](

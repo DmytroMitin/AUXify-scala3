@@ -136,6 +136,28 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
       )
   }
 
+  test("admits source-ordered alias chains for both delegated primary families") {
+    val primaryRows = List(
+      ("UnaryAliasChain", "def render(value: Element): Text"),
+      ("ParameterlessAliasChain", "def fallback: Element")
+    )
+
+    primaryRows.foreach: (traitName, primary) =>
+      val decoded = decodeEitherWithTypeStructure(
+        s"""trait $traitName[Element]:
+           |  $primary
+           |  type Item = Element
+           |  type Copy = Item
+           |  def retain(value: Element): Element = value
+           |  type More = Copy
+           |  type Branch = Item
+           |""".stripMargin,
+        traitName
+      ).fold(diagnostic => fail(diagnostic.message), identity)
+
+      assertEquals(decoded.occupiedTermNames, Set("retain", "value"))
+  }
+
   test("freshens across inherited method roles while aliases stay outside the term namespace") {
     val decoded = decodeEitherWithTypeStructure(
       """trait FreshDelegated[Element]:
@@ -378,7 +400,7 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
         |  type Item = String
         |""".stripMargin,
       "WrongAliasTail",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "late invalid member",

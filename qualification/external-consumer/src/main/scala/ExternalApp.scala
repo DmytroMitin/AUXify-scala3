@@ -139,8 +139,10 @@ object EmptyDelegated:
 trait RichRender[A]:
   def render(a: A): String
   type Item = A
+  type Copy = Item
   def duplicate(a: A): A = a
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def pick(a: A, b: A): A = b
 
 object RichRender:
@@ -152,7 +154,9 @@ trait RichEmptyDelegated[A]:
   def empty: A
   def inst(inst1: A): A = inst1
   type inst = A
-  type Value = A
+  type Copy = inst
+  type Value = Copy
+  type Branch = inst
 
 object RichEmptyDelegated:
   given RichEmptyDelegated[Int] with
@@ -176,8 +180,10 @@ trait HasOut[A]:
 trait RichHasOut[A]:
   type Out
   type Out0 = A
+  type Copy = Out0
   def identity(a: A): A = a
-  type Out1 = A
+  type Out1 = Copy
+  type Branch = Out0
   def fortyTwo: A = 42.asInstanceOf[A]
   def pick(a: A, b: A): A = a
 
@@ -189,8 +195,10 @@ trait Curried[A]:
 trait RichCurried[A]:
   def combine(a: A)(b: A): A
   type combineFunction = A
+  type Copy = combineFunction
   def twice(a: A): A = combine(a)(a)
-  type Value = A
+  type Value = Copy
+  type Branch = combineFunction
   def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
 
 @instance
@@ -231,8 +239,10 @@ trait HeterogeneousDerivedMonoid[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
+  type Copy = Item
   def twice(a: A): A = combine(a, a)
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
 
 @instance
@@ -331,8 +341,10 @@ trait HeterogeneousApplyThenInstance[A]:
   def combine(a: A, a1: A): A
   type Item = A
   def twice(a: A): A = combine(a, a)
-  type Value = A
+  type Copy = Item
+  type Value = Copy
   def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  type Branch = Item
 
 @instance
 @apply
@@ -341,9 +353,11 @@ trait HeterogeneousInstanceThenApply[Element]:
   def select(left: Element, right: Element): Element
   type Value = Element
   def duplicate(value: Element): Element = select(value, value)
-  type Output = Element
+  type Copy = Value
+  type Output = Copy
   def fold3(first: Element, second: Element, third: Element): Element =
     select(select(first, second), third)
+  type Branch = Value
 
 @apply
 @instance
@@ -392,8 +406,10 @@ trait DelegatedThenApply[A]:
 trait ExternalSyntaxMonoid[A]:
   def combine(left: A, right: A): A
   type Item = A
+  type Copy = Item
   def twice(value: A): A = combine(value, value)
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def fold3(first: A, second: A, third: A): A =
     combine(combine(first, second), third)
 
@@ -408,7 +424,9 @@ trait ExternalRichShow[A]:
   def show(a: A): String
   type Item = A
   def duplicate(a: A): A = a
-  type Value = A
+  type Copy = Item
+  type Value = Copy
+  type Branch = Item
 
 object ExternalRichShow:
   given ExternalRichShow[Int] with
@@ -420,6 +438,8 @@ trait ExternalReverseRichShow[Element]:
   def render(value: Element): String
   def retain(value: Element): Element = value
   type Item = Element
+  type Copy = Item
+  type Branch = Item
 
 object ExternalReverseRichShow:
   given ExternalReverseRichShow[String] with
@@ -431,8 +451,10 @@ trait ExternalRichEmpty[A]:
   def empty: A
   type Item = A
   def duplicate(value: A): A = value
-  type Value = A
+  type Copy = Item
+  type Value = Copy
   def choose(first: A, second: A): A = first
+  type Branch = Item
 
 object ExternalRichEmpty:
   given ExternalRichEmpty[Int] with
@@ -444,6 +466,8 @@ trait ExternalReverseRichEmpty[Element]:
   def fallback: Element
   def repeat(value: Element): Element = value
   type Item = Element
+  type Copy = Item
+  type Branch = Item
 
 object ExternalReverseRichEmpty:
   given ExternalReverseRichEmpty[String] with
@@ -463,10 +487,14 @@ object ExternalApp:
     val richOutput: RichHasOut[Int] { type Out = String } =
       RichHasOut.instance[Int, String]
     val richOut0: richOutput.Out0 = 42
+    val richCopy: richOutput.Copy = 42
     val richOut1: richOutput.Out1 = 42
+    val richBranch: richOutput.Branch = 42
     assert(summon[richOutput.Out =:= String]("external-rich-out") == "external-rich-out")
     assert(summon[richOutput.Out0 =:= Int](richOut0) == 42)
+    assert(summon[richOutput.Copy =:= Int](richCopy) == 42)
     assert(summon[richOutput.Out1 =:= Int](richOut1) == 42)
+    assert(summon[richOutput.Branch =:= Int](richBranch) == 42)
     assert(richOutput.identity(42) == 42)
     assert(richOutput.pick(42, 99) == 42)
     assert(richOutput.fortyTwo == 42)
@@ -478,11 +506,15 @@ object ExternalApp:
     assert(20.combine(22) == 42)
     val syntaxInstance = summon[ExternalSyntaxMonoid[Int]]
     val syntaxItem: syntaxInstance.Item = 42
+    val syntaxCopy: syntaxInstance.Copy = 42
     val syntaxValue: syntaxInstance.Value = 42
+    val syntaxBranch: syntaxInstance.Branch = 42
     assert(syntaxInstance.twice(21) == 42)
     assert(syntaxInstance.fold3(10, 12, 20) == 42)
     assert(summon[syntaxInstance.Item =:= Int](syntaxItem) == 42)
+    assert(summon[syntaxInstance.Copy =:= Int](syntaxCopy) == 42)
     assert(summon[syntaxInstance.Value =:= Int](syntaxValue) == 42)
+    assert(summon[syntaxInstance.Branch =:= Int](syntaxBranch) == 42)
 
     assert(Show[String].show("external") == "external")
 
@@ -599,20 +631,28 @@ object ExternalApp:
 
     val richRender = summon[RichRender[Int]]
     val richRenderItem: richRender.Item = 42
+    val richRenderCopy: richRender.Copy = 42
     val richRenderValue: richRender.Value = 42
+    val richRenderBranch: richRender.Branch = 42
     assert(RichRender.render(42) == "42")
     assert(richRender.duplicate(42) == 42)
     assert(richRender.pick(41, 42) == 42)
     assert(summon[richRender.Item =:= Int](richRenderItem) == 42)
+    assert(summon[richRender.Copy =:= Int](richRenderCopy) == 42)
     assert(summon[richRender.Value =:= Int](richRenderValue) == 42)
+    assert(summon[richRender.Branch =:= Int](richRenderBranch) == 42)
 
     val richEmptyDelegated = summon[RichEmptyDelegated[Int]]
     val richEmptyInst: richEmptyDelegated.inst = 42
+    val richEmptyCopy: richEmptyDelegated.Copy = 42
     val richEmptyValue: richEmptyDelegated.Value = 42
+    val richEmptyBranch: richEmptyDelegated.Branch = 42
     assert(RichEmptyDelegated.empty[Int] == 42)
     assert(richEmptyDelegated.inst(42) == 42)
     assert(summon[richEmptyDelegated.inst =:= Int](richEmptyInst) == 42)
+    assert(summon[richEmptyDelegated.Copy =:= Int](richEmptyCopy) == 42)
     assert(summon[richEmptyDelegated.Value =:= Int](richEmptyValue) == 42)
+    assert(summon[richEmptyDelegated.Branch =:= Int](richEmptyBranch) == 42)
 
     var emptyEvaluations = 0
     val intAddition: Monoid[Int] = Monoid.instance(
@@ -643,9 +683,13 @@ object ExternalApp:
           a + b
       )
     val richCurriedItem: richCurried.combineFunction = 42
+    val richCurriedCopy: richCurried.Copy = 42
     val richCurriedValue: richCurried.Value = 42
+    val richCurriedBranch: richCurried.Branch = 42
     assert(summon[richCurried.combineFunction =:= Int](richCurriedItem) == 42)
+    assert(summon[richCurried.Copy =:= Int](richCurriedCopy) == 42)
     assert(summon[richCurried.Value =:= Int](richCurriedValue) == 42)
+    assert(summon[richCurried.Branch =:= Int](richCurriedBranch) == 42)
     assert(richCurried.combine(20)(22) == 42)
     assert(richCurried.twice(21) == 42)
     assert(richCurried.fold3(10, 12, 20) == 42)
@@ -685,9 +729,13 @@ object ExternalApp:
 
     val heterogeneous = HeterogeneousDerivedMonoid.instance[Int](0, _ + _)
     val heterogeneousItem: heterogeneous.Item = 42
+    val heterogeneousCopy: heterogeneous.Copy = 42
     val heterogeneousValue: heterogeneous.Value = 42
+    val heterogeneousBranch: heterogeneous.Branch = 42
     assert(summon[heterogeneous.Item =:= Int](heterogeneousItem) == 42)
+    assert(summon[heterogeneous.Copy =:= Int](heterogeneousCopy) == 42)
     assert(summon[heterogeneous.Value =:= Int](heterogeneousValue) == 42)
+    assert(summon[heterogeneous.Branch =:= Int](heterogeneousBranch) == 42)
     assert(heterogeneous.twice(21) == 42)
     assert(heterogeneous.fold3(10, 12, 20) == 42)
 
@@ -784,10 +832,14 @@ object ExternalApp:
     val heterogeneousComposed = HeterogeneousApplyThenInstance.instance[Int](0, _ + _)
     given HeterogeneousApplyThenInstance[Int] = heterogeneousComposed
     val composedItem: heterogeneousComposed.Item = 42
+    val composedCopy: heterogeneousComposed.Copy = 42
     val composedValue: heterogeneousComposed.Value = 42
+    val composedBranch: heterogeneousComposed.Branch = 42
     assert(HeterogeneousApplyThenInstance[Int].eq(heterogeneousComposed))
     assert(summon[heterogeneousComposed.Item =:= Int](composedItem) == 42)
+    assert(summon[heterogeneousComposed.Copy =:= Int](composedCopy) == 42)
     assert(summon[heterogeneousComposed.Value =:= Int](composedValue) == 42)
+    assert(summon[heterogeneousComposed.Branch =:= Int](composedBranch) == 42)
     assert(heterogeneousComposed.twice(21) == 42)
     assert(heterogeneousComposed.fold3(10, 12, 20) == 42)
 
@@ -797,10 +849,14 @@ object ExternalApp:
     )
     given HeterogeneousInstanceThenApply[String] = heterogeneousReverse
     val reverseValue: heterogeneousReverse.Value = "typed"
+    val reverseCopy: heterogeneousReverse.Copy = "copy"
     val reverseOutput: heterogeneousReverse.Output = "output"
+    val reverseBranch: heterogeneousReverse.Branch = "branch"
     assert(HeterogeneousInstanceThenApply[String].eq(heterogeneousReverse))
     assert(summon[heterogeneousReverse.Value =:= String](reverseValue) == "typed")
+    assert(summon[heterogeneousReverse.Copy =:= String](reverseCopy) == "copy")
     assert(summon[heterogeneousReverse.Output =:= String](reverseOutput) == "output")
+    assert(summon[heterogeneousReverse.Branch =:= String](reverseBranch) == "branch")
     assert(heterogeneousReverse.duplicate("same") == "same/same")
     assert(heterogeneousReverse.fold3("a", "b", "c") == "a/b/c")
 
@@ -841,35 +897,55 @@ object ExternalApp:
     assert(EmptyDelegated.empty[Int] == 42)
     val externalRich = ExternalRichShow[Int]
     val externalItem: externalRich.Item = 42
+    val externalCopy: externalRich.Copy = 42
     val externalValue: externalRich.Value = 43
+    val externalBranch: externalRich.Branch = 44
     assert(ExternalRichShow[Int].eq(externalRich))
     assert(ExternalRichShow.show(42) == "external-rich:42")
     assert(externalRich.duplicate(42) == 42)
     assert(summon[externalRich.Item =:= Int](externalItem) == 42)
+    assert(summon[externalRich.Copy =:= Int](externalCopy) == 42)
     assert(summon[externalRich.Value =:= Int](externalValue) == 43)
+    assert(summon[externalRich.Branch =:= Int](externalBranch) == 44)
 
     val externalReverse = ExternalReverseRichShow[String]
     val externalReverseItem: externalReverse.Item = "typed"
+    val externalReverseCopy: externalReverse.Copy = "copy"
+    val externalReverseBranch: externalReverse.Branch = "branch"
     assert(ExternalReverseRichShow[String].eq(externalReverse))
     assert(ExternalReverseRichShow.render("value") == "external-reverse:value")
     assert(externalReverse.retain("retained") == "retained")
     assert(summon[externalReverse.Item =:= String](externalReverseItem) == "typed")
+    assert(summon[externalReverse.Copy =:= String](externalReverseCopy) == "copy")
+    assert(summon[externalReverse.Branch =:= String](externalReverseBranch) == "branch")
     val externalEmpty = ExternalRichEmpty[Int]
     val externalEmptyItem: externalEmpty.Item = 42
+    val externalEmptyCopy: externalEmpty.Copy = 42
     val externalEmptyValue: externalEmpty.Value = 43
+    val externalEmptyBranch: externalEmpty.Branch = 44
     assert(ExternalRichEmpty[Int].eq(externalEmpty))
     assert(ExternalRichEmpty.empty[Int] == 42)
     assert(externalEmpty.duplicate(42) == 42)
     assert(externalEmpty.choose(42, 43) == 42)
     assert(summon[externalEmpty.Item =:= Int](externalEmptyItem) == 42)
+    assert(summon[externalEmpty.Copy =:= Int](externalEmptyCopy) == 42)
     assert(summon[externalEmpty.Value =:= Int](externalEmptyValue) == 43)
+    assert(summon[externalEmpty.Branch =:= Int](externalEmptyBranch) == 44)
 
     val externalReverseEmpty = ExternalReverseRichEmpty[String]
     val externalReverseEmptyItem: externalReverseEmpty.Item = "typed"
+    val externalReverseEmptyCopy: externalReverseEmpty.Copy = "copy"
+    val externalReverseEmptyBranch: externalReverseEmpty.Branch = "branch"
     assert(ExternalReverseRichEmpty[String].eq(externalReverseEmpty))
     assert(ExternalReverseRichEmpty.fallback[String] == "external-empty")
     assert(externalReverseEmpty.repeat("retained") == "retained")
     assert(
       summon[externalReverseEmpty.Item =:= String](externalReverseEmptyItem) == "typed"
+    )
+    assert(
+      summon[externalReverseEmpty.Copy =:= String](externalReverseEmptyCopy) == "copy"
+    )
+    assert(
+      summon[externalReverseEmpty.Branch =:= String](externalReverseEmptyBranch) == "branch"
     )
     println("AUXIFY_SCALA3_EXTERNAL_RUNTIME_PASS")

@@ -155,6 +155,23 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
       )
   }
 
+  test("admits an enclosing-parameter-rooted alias chain in the curried family") {
+    val decoded = decodeEitherWithTypeStructure(
+      """trait CurriedAliasChain[Element]:
+        |  def append(left: Element)(right: Element): Element
+        |  type Item = Element
+        |  type Copy = Item
+        |  def retain(value: Element): Element = value
+        |  type More = Copy
+        |  type Branch = Item
+        |""".stripMargin,
+      "CurriedAliasChain"
+    ).fold(diagnostic => fail(diagnostic.message), identity)
+
+    assertEquals(decoded.carrierName, "combineFunction")
+    assertEquals(decoded.methodName, "append")
+  }
+
   test("freshens the carrier across every inherited method and parameter") {
     val source =
       """trait FreshTail[Element]:
@@ -273,7 +290,7 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
         |  type Item = String
         |""".stripMargin,
       "MethodThenWrongAlias",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "late invalid method after several valid members",

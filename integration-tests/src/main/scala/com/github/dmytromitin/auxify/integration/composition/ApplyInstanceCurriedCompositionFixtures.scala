@@ -17,8 +17,10 @@ trait CurriedInstanceThenApply[Element]:
 trait RichCurriedApplyThenInstance[A]:
   def combine(a: A)(b: A): A
   type Item = A
+  type Copy = Item
   def twice(a: A): A = combine(a)(a)
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def pick(first: A, second: A): A = first
   def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
 
@@ -28,6 +30,9 @@ trait RichCurriedInstanceThenApply[Element]:
   def merge(left: Element)(right: Element): Element
   def duplicate(value: Element): Element = merge(value)(value)
   type Item = Element
+  type Copy = Item
+  type More = Copy
+  type Branch = Item
 
 @instance
 @apply

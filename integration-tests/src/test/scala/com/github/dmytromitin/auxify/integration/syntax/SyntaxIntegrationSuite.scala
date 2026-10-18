@@ -50,4 +50,5 @@ class SyntaxIntegrationSuite extends munit.FunSuite:
 
   test("heterogeneous-tail inherited alias retains the enclosing type") {
     assertEquals(SyntaxRuntime.richAlias, 42)
+    assertEquals(SyntaxRuntime.richAliasChain, 42)
   }

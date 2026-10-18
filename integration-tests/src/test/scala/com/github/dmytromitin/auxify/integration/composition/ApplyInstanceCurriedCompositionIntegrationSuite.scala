@@ -29,7 +29,9 @@ class ApplyInstanceCurriedCompositionIntegrationSuite extends munit.FunSuite:
 
     val selected: RichCurriedApplyThenInstance[Int] = RichCurriedApplyThenInstance[Int]
     val item: selected.Item = 42
+    val copy: selected.Copy = 42
     val value: selected.Value = 42
+    val branch: selected.Branch = 42
     assert(selected.eq(constructed))
     assertEquals(selected.combine(20)(22), 42)
     assertEquals(selected.twice(21), 42)
@@ -37,7 +39,9 @@ class ApplyInstanceCurriedCompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(selected.fold3(10, 12, 20), 42)
     assertEquals(carrierCalls, 4)
     assertEquals(summon[selected.Item =:= Int](item), 42)
+    assertEquals(summon[selected.Copy =:= Int](copy), 42)
     assertEquals(summon[selected.Value =:= Int](value), 42)
+    assertEquals(summon[selected.Branch =:= Int](branch), 42)
   }
 
   test("instance then apply already composes for a renamed inherited tail") {
@@ -46,10 +50,16 @@ class ApplyInstanceCurriedCompositionIntegrationSuite extends munit.FunSuite:
 
     val selected: RichCurriedInstanceThenApply[Int] = RichCurriedInstanceThenApply[Int]
     val item: selected.Item = 42
+    val copy: selected.Copy = 42
+    val more: selected.More = 42
+    val branch: selected.Branch = 42
     assert(selected.eq(constructed))
     assertEquals(selected.merge(20)(22), 42)
     assertEquals(selected.duplicate(21), 42)
     assertEquals(summon[selected.Item =:= Int](item), 42)
+    assertEquals(summon[selected.Copy =:= Int](copy), 42)
+    assertEquals(summon[selected.More =:= Int](more), 42)
+    assertEquals(summon[selected.Branch =:= Int](branch), 42)
   }
 
   test("mixed inherited tails retain zero through four-argument concrete methods") {

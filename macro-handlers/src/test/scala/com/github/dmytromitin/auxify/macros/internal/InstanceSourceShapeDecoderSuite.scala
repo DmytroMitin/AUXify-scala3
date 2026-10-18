@@ -360,6 +360,69 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryCarrierName, "combineFunction")
   }
 
+  test("admits a source-ordered concrete alias chain rooted in the enclosing parameter") {
+    val decoded = decode(
+      """trait AliasChain[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  type Copy = Item
+        |  type More = Copy
+        |  def retain(value: A): A = value
+        |  type Branch = Item
+        |""".stripMargin,
+      "AliasChain"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  List(
+    (
+      "a forward reference",
+      "type Before = After\n  type After = A",
+      "Before"
+    ),
+    ("a self reference", "type Item = Item", "Item"),
+    (
+      "a mutual cycle",
+      "type First = Second\n  type Second = First",
+      "First"
+    ),
+    ("a missing name", "type Item = Missing", "Item"),
+    (
+      "an invalid root after a valid chain",
+      "type Item = A\n  type Copy = Item\n  type Broken = Missing",
+      "Broken"
+    )
+  ).foreach: (label, declarations, rejectedName) =>
+    test(s"rejects $label in a source-ordered alias tail") {
+      val source =
+        s"""trait RejectedAliasChain[A]:
+           |  def empty: A
+           |  def combine(a: A, a1: A): A
+           |  $declarations
+           |""".stripMargin
+      val (classView, bodyView, typeStructureView) = decodeAllViews(
+        source,
+        "RejectedAliasChain"
+      )
+      val rejected = typeStructureView.directTypeMembers
+        .find(_.name == rejectedName)
+        .getOrElse(fail(s"missing normalized alias evidence for $rejectedName"))
+      val diagnostic = InstanceSourceShapeDecoder
+        .decode(classView, bodyView, Some(typeStructureView))
+        .left.toOption
+        .getOrElse(fail(s"$label unexpectedly decoded"))
+
+      assertEquals(
+        diagnostic.message,
+        s"unsupported @instance source shape for `RejectedAliasChain`: inherited concrete type alias `$rejectedName` must target enclosing type parameter `A` or an earlier validated concrete alias"
+      )
+      assertEquals(diagnostic.pos, rejected.pos)
+    }
+
   test("admits multiple methods and aliases interleaved") {
     val decoded = decode(
       """trait RichTypedMonoid[A]:
@@ -502,17 +565,17 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       (
         "NamedItem",
         "type Item = String",
-        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+        "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
       ),
       (
         "AppliedItem",
         "type Item = List[A]",
-        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+        "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
       ),
       (
         "QualifiedItem",
         "type Item = scala.Predef.String",
-        "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+        "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
       ),
       (
         "PolymorphicItem",
@@ -626,6 +689,34 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
       ),
       "MismatchedAliasIndex",
       "direct body member at index 2 must provide normalized type-member evidence"
+    )
+  }
+
+  test("rejects type-member evidence whose normalized name does not match the tail member") {
+    val source =
+      """trait MismatchedAliasName[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |""".stripMargin
+    val (classView, bodyView, typeStructureView) = decodeAllViews(
+      source,
+      "MismatchedAliasName"
+    )
+    val alias = typeStructureView.directTypeMembers.head
+
+    assertRejected(
+      InstanceSourceShapeDecoder.decode(
+        classView,
+        bodyView,
+        Some(
+          typeStructureView.copy(
+            directTypeMembers = List(alias.copy(name = "Other"))
+          )
+        )
+      ),
+      "MismatchedAliasName",
+      "normalized direct type member `Other` at body index 2 must match actual direct type member `Item`"
     )
   }
 

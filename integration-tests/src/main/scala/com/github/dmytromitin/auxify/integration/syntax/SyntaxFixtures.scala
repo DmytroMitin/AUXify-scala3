@@ -14,11 +14,13 @@ trait Merge[Element]:
 trait RichMonoid[A]:
   def combine(left: A, right: A): A
   type inst = A
+  type Copy = inst
   def zeroLike: A = throw new UnsupportedOperationException("compile-only zero-arity witness")
   def inst(inst1: A): A = inst1
-  type Value = A
+  type Value = Copy
   def twice(value: A): A = combine(value, value)
-  type Result = A
+  type Result = Value
+  type Branch = inst
   def fold3(first: A, second: A, third: A): A =
     combine(combine(first, second), third)
 @syntax
@@ -90,3 +92,11 @@ object SyntaxRuntime:
   def richAlias: Int =
     val value: richInstance.Value = 42
     summon[richInstance.Value =:= Int](value)
+
+  def richAliasChain: Int =
+    val copy: richInstance.Copy = 42
+    val result: richInstance.Result = 42
+    val branch: richInstance.Branch = 42
+    summon[richInstance.Copy =:= Int](copy) +
+      summon[richInstance.Result =:= Int](result) -
+      summon[richInstance.Branch =:= Int](branch)

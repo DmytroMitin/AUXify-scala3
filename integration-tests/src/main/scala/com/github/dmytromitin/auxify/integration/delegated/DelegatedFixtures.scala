@@ -26,8 +26,10 @@ object Render:
 trait RichShow[A]:
   def show(a: A): String
   type Item = A
+  type Copy = Item
   def duplicate(a: A): A = a
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def pick(a: A, b: A): A = b
 
 object RichShow:
@@ -39,8 +41,10 @@ trait RichEmpty[A]:
   def empty: A
   def inst(inst1: A): A = inst1
   type inst = A
+  type Copy = inst
   def pick(a: A, b: A): A = b
-  type Value = A
+  type Value = Copy
+  type Branch = inst
 
 object RichEmpty:
   given RichEmpty[Int] with

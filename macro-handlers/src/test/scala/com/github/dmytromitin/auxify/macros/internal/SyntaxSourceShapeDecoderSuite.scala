@@ -94,6 +94,23 @@ class SyntaxSourceShapeDecoderSuite extends munit.FunSuite:
       )
   }
 
+  test("admits a source-ordered alias chain in the binary syntax family") {
+    val decoded = decodeEitherWithTypeStructure(
+      """trait SyntaxAliasChain[Element]:
+        |  def merge(left: Element, right: Element): Element
+        |  type Item = Element
+        |  type Copy = Item
+        |  def retain(value: Element): Element = value
+        |  type More = Copy
+        |  type Branch = Item
+        |""".stripMargin,
+      "SyntaxAliasChain"
+    ).fold(diagnostic => fail(diagnostic.message), identity)
+
+    assertEquals(decoded.evidenceParameterName, "inst")
+    assertEquals(decoded.methodName, "merge")
+  }
+
   test("freshens evidence across concrete term roles while aliases stay type-only") {
     val methodCollision = decodeEitherWithTypeStructure(
       """trait FreshSyntax[Element]:
@@ -228,7 +245,7 @@ class SyntaxSourceShapeDecoderSuite extends munit.FunSuite:
       "wrong alias target",
       "trait WrongAliasTail[A]:\n  def combine(a: A, b: A): A\n  type Item = String\n",
       "WrongAliasTail",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A`"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "bounded alias",

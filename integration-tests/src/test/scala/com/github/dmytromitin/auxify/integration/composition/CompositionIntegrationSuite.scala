@@ -32,9 +32,14 @@ class CompositionIntegrationSuite extends munit.FunSuite:
   test("both source orders compose parameterless forwarding with inherited tails") {
     val forward = RichEmpty[Int]
     val forwardItem: forward.Item = 42
+    val forwardCopy: forward.Copy = 42
     val forwardValue: forward.Value = 43
+    val forwardBranch: forward.Branch = 42
     val reverse = ReverseRichEmpty[String]
     val reverseItem: reverse.Item = "reverse"
+    val reverseCopy: reverse.Copy = "copy"
+    val reverseMore: reverse.More = "more"
+    val reverseBranch: reverse.Branch = "branch"
 
     assertEquals(forward.empty, 42)
     assertEquals(RichEmpty.empty[Int], 42)
@@ -42,11 +47,16 @@ class CompositionIntegrationSuite extends munit.FunSuite:
     assertEquals(forward.choose(42, 43), 42)
     assertEquals(forward.current, 42)
     assertEquals(summon[forward.Item =:= Int](forwardItem), 42)
+    assertEquals(summon[forward.Copy =:= Int](forwardCopy), 42)
     assertEquals(summon[forward.Value =:= Int](forwardValue), 43)
+    assertEquals(summon[forward.Branch =:= Int](forwardBranch), 42)
     assertEquals(reverse.fallback, "reverse")
     assertEquals(ReverseRichEmpty.fallback[String], "reverse")
     assertEquals(reverse.repeat("value"), "value")
     assertEquals(summon[reverse.Item =:= String](reverseItem), "reverse")
+    assertEquals(summon[reverse.Copy =:= String](reverseCopy), "copy")
+    assertEquals(summon[reverse.More =:= String](reverseMore), "more")
+    assertEquals(summon[reverse.Branch =:= String](reverseBranch), "branch")
   }
 
   test("an existing apply is preserved while delegated forwarding is generated") {
@@ -72,24 +82,34 @@ class CompositionIntegrationSuite extends munit.FunSuite:
   test("apply then delegated composes a unary forwarder with a heterogeneous inherited tail") {
     val instance = RichShow[Int]
     val item: instance.Item = 42
+    val copy: instance.Copy = 42
     val value: instance.Value = 43
+    val branch: instance.Branch = 42
 
     assertEquals(instance.show(42), "rich:42")
     assertEquals(RichShow.show(42), "rich:42")
     assertEquals(instance.duplicate(42), 42)
     assertEquals(summon[instance.Item =:= Int](item), 42)
+    assertEquals(summon[instance.Copy =:= Int](copy), 42)
     assertEquals(summon[instance.Value =:= Int](value), 43)
+    assertEquals(summon[instance.Branch =:= Int](branch), 42)
     assertEquals(RichShow.preserved, 97)
   }
 
   test("delegated then apply composes a renamed unary forwarder with an inherited tail") {
     val instance = ReverseRichRender[Long]
     val item: instance.Item = 19L
+    val copy: instance.Copy = 19L
+    val more: instance.More = 19L
+    val branch: instance.Branch = 19L
 
     assertEquals(instance.render(19L), Text("reverse-rich:19"))
     assertEquals(ReverseRichRender.render(19L), Text("reverse-rich:19"))
     assertEquals(instance.retain(19L), 19L)
     assertEquals(summon[instance.Item =:= Long](item), 19L)
+    assertEquals(summon[instance.Copy =:= Long](copy), 19L)
+    assertEquals(summon[instance.More =:= Long](more), 19L)
+    assertEquals(summon[instance.Branch =:= Long](branch), 19L)
     assertEquals(ReverseRichRender.preserved, 98)
   }
 

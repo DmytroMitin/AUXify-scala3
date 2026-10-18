@@ -23,6 +23,11 @@ import paradise3.api.ExpansionTargetTypeStructureView.{
 }
 
 private[internal] object InstanceInheritedConcreteTailValidator:
+  private final case class TailState(
+      occupiedTermNames: Set[String],
+      earlierValidatedTypeAliases: Set[String]
+  )
+
   def validate(
       traitName: String,
       enclosingTypeParameterName: String,
@@ -31,28 +36,31 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       typeStructureView: Option[ExpansionTargetTypeStructureView],
       diagnosticAnnotation: String = "@instance"
   ): Either[ExpansionDiagnostic, Set[String]] =
-    members.zipWithIndex.foldLeft[Either[ExpansionDiagnostic, Set[String]]](
-      Right(Set.empty)
+    members.zipWithIndex.foldLeft[Either[ExpansionDiagnostic, TailState]](
+      Right(TailState(Set.empty, Set.empty))
     ): (validated, indexedMember) =>
       val (member, offset) = indexedMember
-      validated.flatMap: occupied =>
-        inheritedMemberOccupiedNames(
+      validated.flatMap: state =>
+        inheritedMemberState(
           diagnosticAnnotation,
           traitName,
           index = firstBodyIndex + offset,
           member,
           enclosingTypeParameterName,
-          typeStructureView
-        ).map(occupied ++ _)
+          typeStructureView,
+          state
+        )
+    .map(_.occupiedTermNames)
 
-  private def inheritedMemberOccupiedNames(
+  private def inheritedMemberState(
       diagnosticAnnotation: String,
       traitName: String,
       index: Int,
       member: DirectMember,
       enclosingTypeParameterName: String,
-      typeStructureView: Option[ExpansionTargetTypeStructureView]
-  ): Either[ExpansionDiagnostic, Set[String]] =
+      typeStructureView: Option[ExpansionTargetTypeStructureView],
+      state: TailState
+  ): Either[ExpansionDiagnostic, TailState] =
     member.kind match
       case DirectMemberKind.Method =>
         inheritedMethodOccupiedNames(
@@ -61,7 +69,8 @@ private[internal] object InstanceInheritedConcreteTailValidator:
           index,
           member,
           enclosingTypeParameterName
-        )
+        ).map: occupied =>
+          state.copy(occupiedTermNames = state.occupiedTermNames ++ occupied)
       case DirectMemberKind.Type =>
         for
           typeStructure <- typeStructureView.toRight(
@@ -77,17 +86,21 @@ private[internal] object InstanceInheritedConcreteTailValidator:
             traitName,
             index,
             typeStructure,
-            member.pos
+            member
           )
           _ <- eligibleConcreteAlias(
             diagnosticAnnotation,
             traitName,
             alias,
-            enclosingTypeParameterName
+            enclosingTypeParameterName,
+            state.earlierValidatedTypeAliases
           )
-        yield Set.empty
+        yield state.copy(
+          earlierValidatedTypeAliases =
+            state.earlierValidatedTypeAliases + alias.name
+        )
       case _ =>
-        directMethod(diagnosticAnnotation, traitName, index, member).map(_ => Set.empty)
+        directMethod(diagnosticAnnotation, traitName, index, member).map(_ => state)
 
   private def inheritedMethodOccupiedNames(
       diagnosticAnnotation: String,
@@ -125,30 +138,38 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       traitName: String,
       index: Int,
       typeStructureView: ExpansionTargetTypeStructureView,
-      fallbackPos: SrcPos
+      member: DirectMember
   ): Either[ExpansionDiagnostic, DirectTypeMember] =
     typeStructureView.directTypeMembers.filter(_.bodyIndex == index) match
-      case List(alias) => Right(alias)
+      case List(alias) if alias.name == member.name => Right(alias)
+      case List(alias) =>
+        unsupported(
+          diagnosticAnnotation,
+          traitName,
+          s"normalized direct type member `${alias.name}` at body index $index must match actual direct type member `${member.name}`",
+          alias.pos
+        )
       case Nil =>
         unsupported(
           diagnosticAnnotation,
           traitName,
           s"direct body member at index $index must provide normalized type-member evidence",
-          fallbackPos
+          member.pos
         )
       case aliases =>
         unsupported(
           diagnosticAnnotation,
           traitName,
           s"direct body member at index $index must provide exactly one normalized direct type member; found ${aliases.size}",
-          aliases.headOption.map(_.pos).getOrElse(fallbackPos)
+          aliases.headOption.map(_.pos).getOrElse(member.pos)
         )
 
   private def eligibleConcreteAlias(
       diagnosticAnnotation: String,
       traitName: String,
       alias: DirectTypeMember,
-      enclosingTypeParameterName: String
+      enclosingTypeParameterName: String,
+      earlierValidatedTypeAliases: Set[String]
   ): Either[ExpansionDiagnostic, Unit] =
     val aliasName = alias.name
     if !normalizedNameAvailable(aliasName) then
@@ -195,11 +216,13 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       alias.aliasTarget match
         case Some(DirectTypeShape.EnclosingTypeParameter(name, _))
             if name == enclosingTypeParameterName => Right(())
+        case Some(DirectTypeShape.NamedType(name, _))
+            if earlierValidatedTypeAliases.contains(name) => Right(())
         case _ =>
           unsupported(
             diagnosticAnnotation,
             traitName,
-            s"inherited concrete type alias `$aliasName` must target enclosing type parameter `$enclosingTypeParameterName`",
+            s"inherited concrete type alias `$aliasName` must target enclosing type parameter `$enclosingTypeParameterName` or an earlier validated concrete alias",
             alias.pos
           )
 

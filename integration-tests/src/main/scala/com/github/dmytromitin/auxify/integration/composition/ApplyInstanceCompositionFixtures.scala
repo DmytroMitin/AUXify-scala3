@@ -161,8 +161,10 @@ trait HeterogeneousApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
+  type Copy = Item
   def twice(a: A): A = combine(a, a)
-  type Value = A
+  type Value = Copy
+  type Branch = Item
   def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
 
 object HeterogeneousApplyThenInstance:
@@ -174,8 +176,10 @@ trait HeterogeneousInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   type Value = Element
+  type Copy = Value
   def duplicate(value: Element): Element = select(value, value)
-  type Output = Element
+  type Output = Copy
+  type Branch = Value
   def fold3(first: Element, second: Element, third: Element): Element =
     select(select(first, second), third)
 

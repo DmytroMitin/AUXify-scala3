@@ -14,23 +14,31 @@ class DelegatedIntegrationSuite extends munit.FunSuite:
   test("unary forwarding preserves heterogeneous inherited concrete tails") {
     val instance = summon[RichShow[Int]]
     val item: instance.Item = 42
+    val copy: instance.Copy = 42
     val value: instance.Value = 42
+    val branch: instance.Branch = 42
     assertEquals(RichShow.show(42), "42")
     assertEquals(instance.duplicate(42), 42)
     assertEquals(instance.pick(41, 42), 42)
     assertEquals(summon[instance.Item =:= Int](item), 42)
+    assertEquals(summon[instance.Copy =:= Int](copy), 42)
     assertEquals(summon[instance.Value =:= Int](value), 42)
+    assertEquals(summon[instance.Branch =:= Int](branch), 42)
   }
 
   test("parameterless forwarding preserves heterogeneous inherited concrete tails") {
     val instance = summon[RichEmpty[Int]]
     val alias: instance.inst = 42
+    val copy: instance.Copy = 42
     val value: instance.Value = 42
+    val branch: instance.Branch = 42
     assertEquals(RichEmpty.empty[Int], 42)
     assertEquals(instance.inst(42), 42)
     assertEquals(instance.pick(41, 42), 42)
     assertEquals(summon[instance.inst =:= Int](alias), 42)
+    assertEquals(summon[instance.Copy =:= Int](copy), 42)
     assertEquals(summon[instance.Value =:= Int](value), 42)
+    assertEquals(summon[instance.Branch =:= Int](branch), 42)
   }
 
   test("an existing direct same-name method is preserved without duplication") {
