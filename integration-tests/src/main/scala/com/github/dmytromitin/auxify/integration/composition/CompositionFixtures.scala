@@ -48,11 +48,11 @@ trait RichEmpty[A]:
   def empty: A
   type Item = A
   type Copy = Item
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def choose(a: A, b: A): A = a
-  def current: A = empty
+  def choose(a: Value, b: Branch): Item = a
+  def current: Copy = empty
 
 object RichEmpty:
   given RichEmpty[Int] with
@@ -67,6 +67,7 @@ trait ReverseRichEmpty[Element]:
   type Copy = Item
   type More = Copy
   type Branch = Item
+  def choose(value: More): Branch = value
 
 object ReverseRichEmpty:
   given ReverseRichEmpty[String] with
@@ -115,7 +116,7 @@ trait RichShow[A]:
   def show(a: A): String
   type Item = A
   type Copy = Item
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
 
@@ -133,6 +134,7 @@ trait ReverseRichRender[Element]:
   type Copy = Item
   type More = Copy
   type Branch = Item
+  def choose(value: More): Branch = value
 
 object ReverseRichRender:
   val preserved = 98

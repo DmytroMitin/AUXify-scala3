@@ -111,6 +111,23 @@ class SyntaxSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.methodName, "merge")
   }
 
+  test("admits alias-typed inherited methods in the binary syntax family") {
+    val decoded = decodeEitherWithTypeStructure(
+      """trait SyntaxAliasMethods[Element]:
+        |  def merge(left: Element, right: Element): Element
+        |  type Item = Element
+        |  type Copy = Item
+        |  def identity(value: Item): Copy = value
+        |  def mixed(left: Element, right: Copy): Item = merge(left, right)
+        |  def zeroAlias: Copy = throw new NoSuchElementException
+        |""".stripMargin,
+      "SyntaxAliasMethods"
+    ).fold(diagnostic => fail(diagnostic.message), identity)
+
+    assertEquals(decoded.methodName, "merge")
+    assertEquals(decoded.evidenceParameterName, "inst")
+  }
+
   test("freshens evidence across concrete term roles while aliases stay type-only") {
     val methodCollision = decodeEitherWithTypeStructure(
       """trait FreshSyntax[Element]:
@@ -311,13 +328,13 @@ class SyntaxSourceShapeDecoderSuite extends munit.FunSuite:
       "wrong method parameter",
       "trait WrongTailParameter[A]:\n  def combine(a: A, b: A): A\n  def other(a: String): A = ???\n",
       "WrongTailParameter",
-      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A`"
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong method result",
       "trait WrongTailResult[A]:\n  def combine(a: A, b: A): A\n  def other(a: A): String = a.toString\n",
       "WrongTailResult",
-      "inherited concrete method `other` result type must use enclosing type parameter `A`"
+      "inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "late invalid member",

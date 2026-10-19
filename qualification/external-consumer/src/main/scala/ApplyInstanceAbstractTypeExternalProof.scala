@@ -5,10 +5,10 @@ import com.github.dmytromitin.auxify.macros.{apply, instance}
 trait ExternalComposedHasOut[A]:
   type Out
   type Item = A
-  def identity(value: A): A = value
+  def identity(value: Item): Item = value
   type Copy = Item
   type Value = Copy
-  def pick(first: A, second: A): A = first
+  def pick(first: Value, second: A): Copy = first
   type Branch = Item
 
 @instance
@@ -19,6 +19,7 @@ trait ExternalReverseComposedHasOut[Element]:
   type Item = Element
   type Copy = Item
   type Branch = Item
+  def choose(value: Copy): Branch = value
 
 object ApplyInstanceAbstractTypeExternalProof:
   def verify(): Unit =
@@ -54,6 +55,7 @@ object ApplyInstanceAbstractTypeExternalProof:
     assert(reverseSelected.eq(reverse))
     assert(reverseProof("external-reverse") == "external-reverse")
     assert(reverseSelected.keep(42) == 42)
+    assert(reverseSelected.choose(42) == 42)
     assert(summon[reverseSelected.Item =:= Int](reverseItem) == 42)
     assert(summon[reverseSelected.Copy =:= Int](reverseCopy) == 42)
     assert(summon[reverseSelected.Branch =:= Int](reverseBranch) == 42)

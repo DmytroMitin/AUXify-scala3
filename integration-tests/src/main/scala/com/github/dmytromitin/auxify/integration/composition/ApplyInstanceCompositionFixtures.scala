@@ -162,10 +162,10 @@ trait HeterogeneousApplyThenInstance[A]:
   def combine(a: A, a1: A): A
   type Item = A
   type Copy = Item
-  def twice(a: A): A = combine(a, a)
+  def twice(a: Item): Copy = combine(a, a)
   type Value = Copy
   type Branch = Item
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 
 object HeterogeneousApplyThenInstance:
   val preserved = 209
@@ -177,10 +177,10 @@ trait HeterogeneousInstanceThenApply[Element]:
   def select(left: Element, right: Element): Element
   type Value = Element
   type Copy = Value
-  def duplicate(value: Element): Element = select(value, value)
+  def duplicate(value: Value): Copy = select(value, value)
   type Output = Copy
   type Branch = Value
-  def fold3(first: Element, second: Element, third: Element): Element =
+  def fold3(first: Output, second: Element, third: Branch): Copy =
     select(select(first, second), third)
 
 object HeterogeneousInstanceThenApply:

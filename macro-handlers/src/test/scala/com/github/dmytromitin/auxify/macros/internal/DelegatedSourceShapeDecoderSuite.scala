@@ -158,6 +158,31 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
       assertEquals(decoded.occupiedTermNames, Set("retain", "value"))
   }
 
+  test("admits alias-typed inherited methods for both delegated primary families") {
+    val primaryRows = List(
+      ("UnaryAliasMethods", "def render(value: Element): Text"),
+      ("ParameterlessAliasMethods", "def fallback: Element")
+    )
+
+    primaryRows.foreach: (traitName, primary) =>
+      val decoded = decodeEitherWithTypeStructure(
+        s"""trait $traitName[Element]:
+           |  $primary
+           |  type Item = Element
+           |  type Copy = Item
+           |  def identity(value: Item): Copy = value
+           |  def mixed(left: Element, right: Copy): Item = left
+           |  def zeroAlias: Copy = throw new NoSuchElementException
+           |""".stripMargin,
+        traitName
+      ).fold(diagnostic => fail(diagnostic.message), identity)
+
+      assertEquals(
+        decoded.occupiedTermNames,
+        Set("identity", "value", "mixed", "left", "right", "zeroAlias")
+      )
+  }
+
   test("freshens across inherited method roles while aliases stay outside the term namespace") {
     val decoded = decodeEitherWithTypeStructure(
       """trait FreshDelegated[Element]:
@@ -337,7 +362,7 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
         |  def other(a: String): A = ???
         |""".stripMargin,
       "WrongParameterTail",
-      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A`"
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong inherited result type",
@@ -346,7 +371,7 @@ class DelegatedSourceShapeDecoderSuite extends munit.FunSuite:
         |  def other(a: A): String = a.toString
         |""".stripMargin,
       "WrongResultTail",
-      "inherited concrete method `other` result type must use enclosing type parameter `A`"
+      "inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "abstract inherited type",

@@ -8,10 +8,10 @@ trait RichMonoid[A]:
   def combine(left: A, right: A): A
   type Item = A
   type Copy = Item
-  def twice(value: A): A = combine(value, value)
+  def twice(value: Item): Copy = combine(value, value)
   type Value = Copy
   type Branch = Item
-  def fold3(first: A, second: A, third: A): A =
+  def fold3(first: Value, second: A, third: Branch): Copy =
     combine(combine(first, second), third)
 
 object RichMonoid:
@@ -29,6 +29,7 @@ trait ReverseRichMonoid[Element]:
   type Copy = Item
   type More = Copy
   type Branch = Item
+  def choose(value: More): Branch = value
 
 object ReverseRichMonoid:
   given ReverseRichMonoid[Int] with

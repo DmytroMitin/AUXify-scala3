@@ -7,7 +7,7 @@ import com.github.dmytromitin.auxify.macros.{apply, syntax}
 trait FreshApplySyntax[A]:
   def combine(left: A, right: A): A
   type Item = A
-  def twice(value: A): A = combine(value, value)
+  def twice(value: Item): Item = combine(value, value)
 
 @syntax
 @apply
@@ -15,6 +15,7 @@ trait FreshSyntaxApply[Element]:
   def merge(left: Element, right: Element): Element
   def duplicate(value: Element): Element = merge(value, value)
   type Item = Element
+  def retain(value: Item): Item = value
 
 @apply
 @syntax

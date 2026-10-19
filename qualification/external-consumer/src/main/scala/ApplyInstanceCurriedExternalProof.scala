@@ -5,10 +5,10 @@ import com.github.dmytromitin.auxify.macros.{apply, instance}
 trait ExternalComposedCurried[A]:
   def combine(a: A)(b: A): A
   type Item = A
-  def twice(a: A): A = combine(a)(a)
+  def twice(a: Item): Item = combine(a)(a)
   type Copy = Item
   type Value = Copy
-  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+  def fold3(a: Value, b: A, c: Copy): Item = combine(combine(a)(b))(c)
   type Branch = Item
 
 @instance
@@ -19,6 +19,7 @@ trait ExternalReverseComposedCurried[Element]:
   type Item = Element
   type Copy = Item
   type Branch = Item
+  def retain(value: Copy): Branch = value
 
 object ApplyInstanceCurriedExternalProof:
   def verify(): Unit =
@@ -55,6 +56,7 @@ object ApplyInstanceCurriedExternalProof:
     assert(reverseSelected.eq(reverse))
     assert(reverseSelected.merge(20)(22) == 42)
     assert(reverseSelected.duplicate(21) == 42)
+    assert(reverseSelected.retain(42) == 42)
     assert(summon[reverseSelected.Item =:= Int](reverseItem) == 42)
     assert(summon[reverseSelected.Copy =:= Int](reverseCopy) == 42)
     assert(summon[reverseSelected.Branch =:= Int](reverseBranch) == 42)

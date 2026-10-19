@@ -254,6 +254,18 @@ class InstanceIntegrationSuite extends munit.FunSuite:
     assertEquals(HeterogeneousDerivedMonoid.preserved, 98)
   }
 
+  test("inherits alias-typed parameters results and a zero-arity alias result") {
+    val derived = AliasTypedDerivedMonoid.instance[Int](42, _ + _)
+    val item: derived.Item = 42
+    val copy: derived.Copy = 42
+
+    assertEquals(derived.identity(item), 42)
+    assertEquals(derived.mixed(20, copy), 62)
+    assertEquals(derived.zeroAlias, 42)
+    assertEquals(summon[derived.Item =:= Int](item), 42)
+    assertEquals(summon[derived.Copy =:= Int](copy), 42)
+  }
+
   test("inherits a coherently renamed five-parameter concrete method") {
     var selectCalls = 0
     val choice = LargerDerivedChoice.instance[String](

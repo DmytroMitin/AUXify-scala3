@@ -24,11 +24,11 @@ trait RichHasOut[A]:
   type Out
   type Item = A
   type Copy = Item
-  def identity(a: A): A = a
+  def identity(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def fortyTwo: A = 42.asInstanceOf[A]
-  def pick(a: A, b: A): A = a
+  def fortyTwo: Value = 42.asInstanceOf[A]
+  def pick(a: A, b: Branch): Item = a
 
 object RichHasOut:
   val preserved = 342
@@ -75,10 +75,10 @@ trait RichCurried[A]:
   def combine(a: A)(b: A): A
   type combineFunction = A
   type Copy = combineFunction
-  def twice(a: A): A = combine(a)(a)
+  def twice(a: combineFunction): Copy = combine(a)(a)
   type Value = Copy
   type Branch = combineFunction
-  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a)(b))(c)
 
 object RichCurried:
   val preserved = 243
@@ -166,13 +166,23 @@ trait HeterogeneousDerivedMonoid[A]:
   def combine(a: A, a1: A): A
   type Item = A
   type Copy = Item
-  def twice(a: A): A = combine(a, a)
+  def twice(a: Item): Copy = combine(a, a)
   type Value = Copy
   type Branch = Item
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 
 object HeterogeneousDerivedMonoid:
   val preserved = 98
+
+@instance
+trait AliasTypedDerivedMonoid[A]:
+  def empty: A
+  def combine(a: A, a1: A): A
+  type Item = A
+  type Copy = Item
+  def identity(value: Item): Item = value
+  def mixed(left: A, right: Copy): Item = combine(left, right)
+  def zeroAlias: Copy = empty
 
 @instance
 trait BinaryDerivedChoice[Element]:

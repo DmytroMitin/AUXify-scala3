@@ -172,6 +172,23 @@ class InstanceCurriedMethodSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.methodName, "append")
   }
 
+  test("admits alias-typed inherited methods after earlier aliases in the curried family") {
+    val decoded = decodeEitherWithTypeStructure(
+      """trait CurriedAliasMethods[Element]:
+        |  def append(left: Element)(right: Element): Element
+        |  type Item = Element
+        |  type Copy = Item
+        |  def identity(value: Item): Copy = value
+        |  def mixed(left: Element, right: Copy): Item = append(left)(right)
+        |  def zeroAlias: Copy = throw new NoSuchElementException
+        |""".stripMargin,
+      "CurriedAliasMethods"
+    ).fold(diagnostic => fail(diagnostic.message), identity)
+
+    assertEquals(decoded.methodName, "append")
+    assertEquals(decoded.carrierName, "combineFunction")
+  }
+
   test("freshens the carrier across every inherited method and parameter") {
     val source =
       """trait FreshTail[Element]:

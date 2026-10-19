@@ -15,13 +15,13 @@ trait RichMonoid[A]:
   def combine(left: A, right: A): A
   type inst = A
   type Copy = inst
-  def zeroLike: A = throw new UnsupportedOperationException("compile-only zero-arity witness")
+  def zeroLike: Copy = throw new UnsupportedOperationException("compile-only zero-arity witness")
   def inst(inst1: A): A = inst1
   type Value = Copy
-  def twice(value: A): A = combine(value, value)
+  def twice(value: inst): Copy = combine(value, value)
   type Result = Value
   type Branch = inst
-  def fold3(first: A, second: A, third: A): A =
+  def fold3(first: Value, second: A, third: Branch): Copy =
     combine(combine(first, second), third)
 @syntax
 trait ExistingCompanion[A]:

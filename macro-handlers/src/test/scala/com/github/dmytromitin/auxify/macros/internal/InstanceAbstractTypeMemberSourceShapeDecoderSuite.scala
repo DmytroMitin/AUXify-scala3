@@ -102,6 +102,51 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.generatedTypeParameterName, "Result0")
   }
 
+  test("rejects the leading abstract result as an inherited method type root") {
+    assertRejected(
+      decodeEither(
+        """trait AbstractResultMethod[A]:
+          |  type Out
+          |  def identity(value: Out): Out = value
+          |""".stripMargin,
+        "AbstractResultMethod"
+      ),
+      "AbstractResultMethod",
+      "inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias"
+    )
+  }
+
+  test("rejects a malformed tail alias that duplicates the leading abstract result name") {
+    assertRejected(
+      decodeEither(
+        """trait AbstractResultAliasCollision[A]:
+          |  type Out
+          |  type Out = A
+          |""".stripMargin,
+        "AbstractResultAliasCollision"
+      ),
+      "AbstractResultAliasCollision",
+      "inherited concrete type alias `Out` must not duplicate the enclosing type parameter or an earlier direct type member"
+    )
+  }
+
+  test("admits alias-typed inherited methods without admitting the abstract result root") {
+    val decoded = decode(
+      """trait AbstractAliasMethods[Element]:
+        |  type Result
+        |  type Result0 = Element
+        |  type Result1 = Result0
+        |  def identity(value: Result0): Result1 = value
+        |  def mixed(left: Element, right: Result1): Result0 = left
+        |  def zeroAlias: Result1 = throw new NoSuchElementException
+        |""".stripMargin,
+      "AbstractAliasMethods"
+    )
+
+    assertEquals(decoded.memberName, "Result")
+    assertEquals(decoded.generatedTypeParameterName, "Result2")
+  }
+
   test("admits every supported inherited tail topology") {
     val rows = List(
       "AliasOnly" ->
@@ -532,13 +577,13 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
       "wrong method parameter",
       "trait WrongParameterTail[A]:\n  type Out\n  def other(a: String): A = ???\n",
       "WrongParameterTail",
-      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A`"
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong method result",
       "trait WrongResultTail[A]:\n  type Out\n  def other(a: A): String = ???\n",
       "WrongResultTail",
-      "inherited concrete method `other` result type must use enclosing type parameter `A`"
+      "inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "late invalid member",

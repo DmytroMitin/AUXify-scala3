@@ -5,10 +5,10 @@ import com.github.dmytromitin.auxify.macros.{apply, syntax}
 trait ExternalApplySyntax[A]:
   def combine(left: A, right: A): A
   type Item = A
-  def twice(value: A): A = combine(value, value)
+  def twice(value: Item): Item = combine(value, value)
   type Copy = Item
   type Value = Copy
-  def fold3(first: A, second: A, third: A): A =
+  def fold3(first: Value, second: A, third: Copy): Item =
     combine(combine(first, second), third)
   type Branch = Item
 
@@ -24,6 +24,7 @@ trait ExternalSyntaxApply[Element]:
   type Item = Element
   type Copy = Item
   type Branch = Item
+  def retain(value: Copy): Branch = value
 
 object ExternalSyntaxApply:
   given ExternalSyntaxApply[Int] with
@@ -53,6 +54,7 @@ object ApplySyntaxExternalProof:
     assert(summon[forward.Branch =:= Int](forwardBranch) == 42)
     assert(20.merge(22) == 42)
     assert(reverse.duplicate(21) == 42)
+    assert(reverse.retain(42) == 42)
     assert(summon[reverse.Item =:= Int](reverseItem) == 42)
     assert(summon[reverse.Copy =:= Int](reverseCopy) == 42)
     assert(summon[reverse.Branch =:= Int](reverseBranch) == 42)

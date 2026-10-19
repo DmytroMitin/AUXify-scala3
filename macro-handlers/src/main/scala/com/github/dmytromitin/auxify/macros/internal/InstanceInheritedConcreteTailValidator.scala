@@ -36,6 +36,11 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       typeStructureView: Option[ExpansionTargetTypeStructureView],
       diagnosticAnnotation: String = "@instance"
   ): Either[ExpansionDiagnostic, Set[String]] =
+    val earlierDirectTypeNames = typeStructureView.toList
+      .flatMap(_.directTypeMembers)
+      .collect:
+        case member if member.bodyIndex < firstBodyIndex => member.name
+      .toSet
     members.zipWithIndex.foldLeft[Either[ExpansionDiagnostic, TailState]](
       Right(TailState(Set.empty, Set.empty))
     ): (validated, indexedMember) =>
@@ -48,6 +53,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
           member,
           enclosingTypeParameterName,
           typeStructureView,
+          earlierDirectTypeNames,
           state
         )
     .map(_.occupiedTermNames)
@@ -59,6 +65,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       member: DirectMember,
       enclosingTypeParameterName: String,
       typeStructureView: Option[ExpansionTargetTypeStructureView],
+      earlierDirectTypeNames: Set[String],
       state: TailState
   ): Either[ExpansionDiagnostic, TailState] =
     member.kind match
@@ -68,7 +75,8 @@ private[internal] object InstanceInheritedConcreteTailValidator:
           traitName,
           index,
           member,
-          enclosingTypeParameterName
+          enclosingTypeParameterName,
+          state.earlierValidatedTypeAliases
         ).map: occupied =>
           state.copy(occupiedTermNames = state.occupiedTermNames ++ occupied)
       case DirectMemberKind.Type =>
@@ -93,6 +101,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
             traitName,
             alias,
             enclosingTypeParameterName,
+            earlierDirectTypeNames,
             state.earlierValidatedTypeAliases
           )
         yield state.copy(
@@ -107,7 +116,8 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       traitName: String,
       index: Int,
       member: DirectMember,
-      enclosingTypeParameterName: String
+      enclosingTypeParameterName: String,
+      earlierValidatedTypeAliases: Set[String]
   ): Either[ExpansionDiagnostic, Set[String]] =
     for
       inheritedMethod <- directMethod(diagnosticAnnotation, traitName, index, member)
@@ -122,14 +132,16 @@ private[internal] object InstanceInheritedConcreteTailValidator:
             traitName,
             inheritedMethod,
             parameter,
-            enclosingTypeParameterName
+            enclosingTypeParameterName,
+            earlierValidatedTypeAliases
           )
       _ <- enclosingResult(
         diagnosticAnnotation,
         traitName,
         "inherited concrete",
         inheritedMethod,
-        enclosingTypeParameterName
+        enclosingTypeParameterName,
+        earlierValidatedTypeAliases
       )
     yield Set(inheritedMethod.name) ++ inheritedParameters.map(_.name)
 
@@ -169,6 +181,7 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       traitName: String,
       alias: DirectTypeMember,
       enclosingTypeParameterName: String,
+      earlierDirectTypeNames: Set[String],
       earlierValidatedTypeAliases: Set[String]
   ): Either[ExpansionDiagnostic, Unit] =
     val aliasName = alias.name
@@ -177,6 +190,17 @@ private[internal] object InstanceInheritedConcreteTailValidator:
         diagnosticAnnotation,
         traitName,
         "inherited concrete type alias must have an available normalized name",
+        alias.pos
+      )
+    else if
+      aliasName == enclosingTypeParameterName ||
+        earlierDirectTypeNames.contains(aliasName) ||
+        earlierValidatedTypeAliases.contains(aliasName)
+    then
+      unsupported(
+        diagnosticAnnotation,
+        traitName,
+        s"inherited concrete type alias `$aliasName` must not duplicate the enclosing type parameter or an earlier direct type member",
         alias.pos
       )
     else if alias.kind != DirectTypeMemberKind.Alias then
@@ -326,7 +350,8 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       traitName: String,
       method: DirectMethod,
       parameter: DirectMethodParameter,
-      enclosingTypeParameterName: String
+      enclosingTypeParameterName: String,
+      earlierValidatedTypeAliases: Set[String]
   ): Either[ExpansionDiagnostic, Unit] =
     if
       !normalizedNameAvailable(parameter.name) ||
@@ -347,11 +372,13 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       parameter.parameterType match
         case DirectTypeShape.EnclosingTypeParameter(name, _)
             if name == enclosingTypeParameterName => Right(())
+        case DirectTypeShape.NamedType(name, _)
+            if earlierValidatedTypeAliases.contains(name) => Right(())
         case _ =>
           unsupported(
             diagnosticAnnotation,
             traitName,
-            s"inherited concrete method `${method.name}` parameter `${parameter.name}` must use enclosing type parameter `$enclosingTypeParameterName`",
+            s"inherited concrete method `${method.name}` parameter `${parameter.name}` must use enclosing type parameter `$enclosingTypeParameterName` or an earlier validated concrete alias",
             parameter.typePos
           )
 
@@ -360,16 +387,19 @@ private[internal] object InstanceInheritedConcreteTailValidator:
       traitName: String,
       role: String,
       method: DirectMethod,
-      enclosingTypeParameterName: String
+      enclosingTypeParameterName: String,
+      earlierValidatedTypeAliases: Set[String]
   ): Either[ExpansionDiagnostic, Unit] =
     method.resultType match
       case DirectTypeShape.EnclosingTypeParameter(name, _)
           if name == enclosingTypeParameterName => Right(())
+      case DirectTypeShape.NamedType(name, _)
+          if earlierValidatedTypeAliases.contains(name) => Right(())
       case _ =>
         unsupported(
           diagnosticAnnotation,
           traitName,
-          s"$role method `${method.name}` result type must use enclosing type parameter `$enclosingTypeParameterName`",
+          s"$role method `${method.name}` result type must use enclosing type parameter `$enclosingTypeParameterName` or an earlier validated concrete alias",
           method.resultTypePos
         )
 

@@ -56,6 +56,7 @@ class ApplyInstanceCurriedCompositionIntegrationSuite extends munit.FunSuite:
     assert(selected.eq(constructed))
     assertEquals(selected.merge(20)(22), 42)
     assertEquals(selected.duplicate(21), 42)
+    assertEquals(selected.retain(42), 42)
     assertEquals(summon[selected.Item =:= Int](item), 42)
     assertEquals(summon[selected.Copy =:= Int](copy), 42)
     assertEquals(summon[selected.More =:= Int](more), 42)

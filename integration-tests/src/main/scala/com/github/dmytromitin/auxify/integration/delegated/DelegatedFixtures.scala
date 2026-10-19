@@ -27,10 +27,10 @@ trait RichShow[A]:
   def show(a: A): String
   type Item = A
   type Copy = Item
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def pick(a: A, b: A): A = b
+  def pick(a: A, b: Branch): Value = b
 
 object RichShow:
   given RichShow[Int] with
@@ -42,9 +42,9 @@ trait RichEmpty[A]:
   def inst(inst1: A): A = inst1
   type inst = A
   type Copy = inst
-  def pick(a: A, b: A): A = b
   type Value = Copy
   type Branch = inst
+  def pick(a: Copy, b: Value): Branch = b
 
 object RichEmpty:
   given RichEmpty[Int] with

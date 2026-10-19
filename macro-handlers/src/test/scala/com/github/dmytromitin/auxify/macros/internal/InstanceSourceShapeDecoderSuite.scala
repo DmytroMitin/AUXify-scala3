@@ -378,6 +378,69 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.binaryCarrierName, "combineFunction")
   }
 
+  test("admits inherited concrete method parameters and results through earlier aliases") {
+    val decoded = decode(
+      """trait AliasTypedMethod[A]:
+        |  def empty: A
+        |  def combine(a: A, a1: A): A
+        |  type Item = A
+        |  type Copy = Item
+        |  def identity(value: Item): Item = value
+        |  def mixed(left: A, right: Copy): Item = combine(left, right)
+        |  def zeroAlias: Copy = empty
+        |""".stripMargin,
+      "AliasTypedMethod"
+    )
+
+    assertEquals(decoded.parameterlessCarrierName, "emptyValue")
+    assertEquals(decoded.binaryCarrierName, "combineFunction")
+  }
+
+  test("rejects an inherited concrete method that refers to a later alias") {
+    assertRejected(
+      decodeEither(
+        """trait ForwardAliasMethod[A]:
+          |  def empty: A
+          |  def combine(a: A, a1: A): A
+          |  def identity(value: Item): Item = value
+          |  type Item = A
+          |""".stripMargin,
+        "ForwardAliasMethod"
+      ),
+      "ForwardAliasMethod",
+      "inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias"
+    )
+  }
+
+  test("rejects malformed normalized aliases that collide with enclosing or earlier type names") {
+    val rows = List(
+      (
+        "EnclosingAliasCollision",
+        "type A = A",
+        "A"
+      ),
+      (
+        "DuplicateAliasCollision",
+        "type Item = A\n  type Item = A",
+        "Item"
+      )
+    )
+
+    rows.foreach: (traitName, aliases, aliasName) =>
+      assertRejected(
+        decodeEither(
+          s"""trait $traitName[A]:
+             |  def empty: A
+             |  def combine(a: A, a1: A): A
+             |  $aliases
+             |""".stripMargin,
+          traitName
+        ),
+        traitName,
+        s"inherited concrete type alias `$aliasName` must not duplicate the enclosing type parameter or an earlier direct type member"
+      )
+  }
+
   List(
     (
       "a forward reference",
@@ -887,7 +950,7 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |  def fold5(a: Other, b: A, c: A, d: A, e: A): A = b
         |""".stripMargin,
       "ConcreteEarlyParameter",
-      "inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`"
+      "inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong middle concrete parameter type",
@@ -897,7 +960,7 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |  def fold5(a: A, b: A, c: Other, d: A, e: A): A = a
         |""".stripMargin,
       "ConcreteMiddleParameter",
-      "inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`"
+      "inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong final concrete parameter type",
@@ -907,7 +970,7 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |  def fold5(a: A, b: A, c: A, d: A, e: Other): A = a
         |""".stripMargin,
       "ConcreteFinalParameter",
-      "inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A`"
+      "inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "wrong concrete result type",
@@ -917,7 +980,7 @@ class InstanceSourceShapeDecoderSuite extends munit.FunSuite:
         |  def twice(a: A, a1: A): Other = ???
         |""".stripMargin,
       "ConcreteResult",
-      "inherited concrete method `twice` result type must use enclosing type parameter `A`"
+      "inherited concrete method `twice` result type must use enclosing type parameter `A` or an earlier validated concrete alias"
     ),
     (
       "defaulted concrete parameter",

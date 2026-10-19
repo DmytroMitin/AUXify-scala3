@@ -14,6 +14,7 @@ class ApplySyntaxCompositionMatrixIntegrationSuite extends munit.FunSuite:
     assertEquals(20.merge(22), 42)
     assertEquals(FreshApplySyntax[Int].twice(21), 42)
     assertEquals(FreshSyntaxApply[Int].duplicate(21), 42)
+    assertEquals(FreshSyntaxApply[Int].retain(42), 42)
   }
 
   test("a fresh companion contains one apply and one primary extension only") {

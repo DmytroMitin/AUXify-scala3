@@ -254,8 +254,8 @@ for expected_diagnostic in \
   'unsupported @delegated source shape for `ContextualTailDelegated`: inherited concrete method `other` parameter clause must be ordinary and non-contextual' \
   'unsupported @delegated source shape for `DefaultedTailDelegated`: inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @delegated source shape for `PolymorphicTailDelegated`: inherited concrete method `other` must not declare method type parameters' \
-  'unsupported @delegated source shape for `WrongTailTypesDelegated`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A`' \
-  'unsupported @delegated source shape for `WrongTailResultDelegated`: inherited concrete method `other` result type must use enclosing type parameter `A`' \
+  'unsupported @delegated source shape for `WrongTailTypesDelegated`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @delegated source shape for `WrongTailResultDelegated`: inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @delegated source shape for `ValueTailDelegated`: direct body member at index 1 must be a method; found val' \
   'unsupported @delegated source shape for `VariableTailDelegated`: direct body member at index 1 must be a method; found var' \
   'unsupported @delegated source shape for `LazyValueTailDelegated`: direct body member at index 1 must be a method; found val' \
@@ -379,6 +379,8 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `AnnotatedConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `InlineConcrete`: inherited concrete method `twice` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `CurriedConcrete`: inherited concrete method `combineAgain` requires exactly one ordinary parameter clause; found 2' \
+  'unsupported @instance source shape for `AliasMethodForward`: inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `AliasMethodLateExternal`: inherited concrete method `invalid` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `CurriedFlattened`: curried method `combine` requires exactly two ordinary parameter clauses; found 1' \
   'unsupported @instance source shape for `CurriedUnary`: curried method `combine` requires exactly two ordinary parameter clauses; found 1' \
   'unsupported @instance source shape for `CurriedThreeClauses`: curried method `combine` requires exactly two ordinary parameter clauses; found 3' \
@@ -402,22 +404,22 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `CurriedTailPolymorphic`: inherited concrete method `invalid` must not declare method type parameters' \
   'unsupported @instance source shape for `CurriedTailPrivateMethod`: inherited concrete method `invalid` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `CurriedTailAnnotatedMethod`: inherited concrete method `invalid` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @instance source shape for `CurriedTailWrongParameter`: inherited concrete method `invalid` parameter `value` must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `CurriedTailWrongResult`: inherited concrete method `invalid` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `CurriedTailWrongParameter`: inherited concrete method `invalid` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `CurriedTailWrongResult`: inherited concrete method `invalid` result type must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `CurriedTailAbstractAlias`: inherited type member `Item` must be a concrete alias' \
   'unsupported @instance source shape for `CurriedTailPrivateAlias`: inherited concrete type alias `Item` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `CurriedTailNestedTrait`: direct body member at index 1 must be a method; found nested trait' \
   'unsupported @instance source shape for `CurriedTailAdditionalAbstractMethod`: inherited method `other` must be concrete' \
   'unsupported @instance source shape for `ImplicitConcrete`: inherited concrete method `combineAgain` parameter clause must be ordinary and non-contextual' \
-  'unsupported @instance source shape for `WrongConcreteEarlyParameter`: inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `WrongConcreteMiddleParameter`: inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `WrongConcreteFinalParameter`: inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A`' \
-  'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongConcreteEarlyParameter`: inherited concrete method `fold5` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `WrongConcreteMiddleParameter`: inherited concrete method `fold5` parameter `c` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `WrongConcreteFinalParameter`: inherited concrete method `fold5` parameter `e` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `WrongConcreteResult`: inherited concrete method `twice` result type must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `DefaultedConcrete`: inherited concrete method `fold5` parameter `d` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @instance source shape for `ContextualConcrete`: inherited concrete method `twice` parameter clause must be ordinary and non-contextual' \
   'unsupported @instance source shape for `AbstractZero`: inherited method `zero` must be concrete' \
   'unsupported @instance source shape for `EmptyClauseZero`: inherited concrete method `zero` requires one or more ordinary parameters in its single clause; found 0' \
-  'unsupported @instance source shape for `WrongZeroResult`: inherited concrete method `zero` result type must use enclosing type parameter `A`' \
+  'unsupported @instance source shape for `WrongZeroResult`: inherited concrete method `zero` result type must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `PolyZero`: inherited concrete method `zero` must not declare method type parameters' \
   'unsupported @instance source shape for `PrivateZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
   'unsupported @instance source shape for `ProtectedZero`: inherited concrete method `zero` must be public, unannotated, and free of unsupported modifiers' \
@@ -464,6 +466,7 @@ for expected_diagnostic in \
   'unsupported @instance source shape for `TypeMemberMethodThenType`: direct body member at index 1 must be a method; found type' \
   'unsupported @instance source shape for `TypeMemberThenAlias`: inherited concrete type alias `Alias` must target enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `TypeMemberOutRootAlias`: inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @instance source shape for `TypeMemberOutMethod`: inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @instance source shape for `TypeMemberNestedTrait`: direct body member at index 1 must be a method; found nested trait' \
   'unsupported @instance source shape for `TypeMemberNestedClass`: direct body member at index 1 must be a method; found nested class' \
   'unsupported @instance source shape for `TypeMemberNestedObject`: direct body member at index 1 must be a method; found nested object'; do
@@ -490,6 +493,7 @@ for source in \
   CurriedTailAnnotatedMethod CurriedTailWrongParameter CurriedTailWrongResult \
   CurriedTailAbstractAlias CurriedTailPrivateAlias CurriedTailNestedTrait \
   CurriedTailAdditionalAbstractMethod \
+  AliasMethodForward AliasMethodLateExternal \
   AliasForwardChain AliasSelfChain AliasMutualChain AliasMissingAfterValidChain \
   TypeMemberNoParameter TypeMemberTwoParameters TypeMemberVariant \
   TypeMemberBoundedParameter TypeMemberHigherKinded TypeMemberContextBound \
@@ -499,7 +503,7 @@ for source in \
   TypeMemberThenMethod TypeMemberMethodThenType TypeMemberThenAlias \
   TypeMemberAbstractVal TypeMemberAbstractVar TypeMemberDirectMethod \
   TypeMemberNestedTrait TypeMemberNestedClass TypeMemberNestedObject \
-  TypeMemberOutRootAlias; do
+  TypeMemberOutRootAlias TypeMemberOutMethod; do
   grep -Eq "$source[.]scala:[0-9]+:[0-9]+" "$instance_negative_log" ||
     fail "instance negative diagnostic is not source-positioned: $source"
 done
@@ -561,8 +565,8 @@ for expected_diagnostic in \
   'unsupported @syntax source shape for `SyntaxDefaultedTail`: inherited concrete method `other` parameter `a` must be ordinary, non-defaulted, and unmodified' \
   'unsupported @syntax source shape for `SyntaxPolymorphicTail`: inherited concrete method `other` must not declare method type parameters' \
   'unsupported @syntax source shape for `SyntaxInfixTail`: inherited concrete method `other` must be public, unannotated, and free of unsupported modifiers' \
-  'unsupported @syntax source shape for `SyntaxWrongTailTypes`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A`' \
-  'unsupported @syntax source shape for `SyntaxWrongTailResult`: inherited concrete method `other` result type must use enclosing type parameter `A`' \
+  'unsupported @syntax source shape for `SyntaxWrongTailTypes`: inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias' \
+  'unsupported @syntax source shape for `SyntaxWrongTailResult`: inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias' \
   'unsupported @syntax source shape for `SyntaxLateInvalidTail`: direct body member at index 4 must be a method; found val' \
   'unsupported @syntax source shape for `syntax`: trait name `syntax` conflicts with the fixed generated nested object name `syntax`'; do
   grep -Fq -- "$expected_diagnostic" "$syntax_negative_log" ||
@@ -937,6 +941,7 @@ printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_ABSTRACT_TYPE_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_APPLY_INSTANCE_CURRIED_COMPOSITION_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_METHOD_MODIFIER_HARDENING_PASS'
 printf '%s\n' 'AUXIFY_SCALA3_SHARED_INHERITED_ALIAS_CHAIN_PASS'
+printf '%s\n' 'AUXIFY_SCALA3_INHERITED_ALIAS_TYPED_METHOD_PASS'
 printf 'AUXIFY_SCALA3_APPLY_SHOW_MILESTONE1_PASS scala=%s jdk=%s\n' \
   "$scala_version" \
   "$java_feature"

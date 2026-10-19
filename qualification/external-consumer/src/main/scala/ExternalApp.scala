@@ -140,10 +140,10 @@ trait RichRender[A]:
   def render(a: A): String
   type Item = A
   type Copy = Item
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def pick(a: A, b: A): A = b
+  def pick(a: Value, b: Branch): Item = b
 
 object RichRender:
   given RichRender[Int] with
@@ -157,6 +157,7 @@ trait RichEmptyDelegated[A]:
   type Copy = inst
   type Value = Copy
   type Branch = inst
+  def choose(value: Value): Branch = value
 
 object RichEmptyDelegated:
   given RichEmptyDelegated[Int] with
@@ -181,11 +182,11 @@ trait RichHasOut[A]:
   type Out
   type Out0 = A
   type Copy = Out0
-  def identity(a: A): A = a
+  def identity(a: Out0): Copy = a
   type Out1 = Copy
   type Branch = Out0
-  def fortyTwo: A = 42.asInstanceOf[A]
-  def pick(a: A, b: A): A = a
+  def fortyTwo: Out1 = 42.asInstanceOf[A]
+  def pick(a: A, b: Branch): Copy = a
 
 @instance
 trait Curried[A]:
@@ -196,10 +197,10 @@ trait RichCurried[A]:
   def combine(a: A)(b: A): A
   type combineFunction = A
   type Copy = combineFunction
-  def twice(a: A): A = combine(a)(a)
+  def twice(a: combineFunction): Copy = combine(a)(a)
   type Value = Copy
   type Branch = combineFunction
-  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a)(b))(c)
 
 @instance
 trait DerivedMonoid[A]:
@@ -240,10 +241,10 @@ trait HeterogeneousDerivedMonoid[A]:
   def combine(a: A, a1: A): A
   type Item = A
   type Copy = Item
-  def twice(a: A): A = combine(a, a)
+  def twice(a: Item): Copy = combine(a, a)
   type Value = Copy
   type Branch = Item
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 
 @instance
 trait ZeroMonoid[A]:
@@ -340,10 +341,10 @@ trait HeterogeneousApplyThenInstance[A]:
   def empty: A
   def combine(a: A, a1: A): A
   type Item = A
-  def twice(a: A): A = combine(a, a)
+  def twice(a: Item): Item = combine(a, a)
   type Copy = Item
   type Value = Copy
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  def fold3(a: Value, b: A, c: Copy): Item = combine(combine(a, b), c)
   type Branch = Item
 
 @instance
@@ -352,10 +353,10 @@ trait HeterogeneousInstanceThenApply[Element]:
   def fallback: Element
   def select(left: Element, right: Element): Element
   type Value = Element
-  def duplicate(value: Element): Element = select(value, value)
+  def duplicate(value: Value): Value = select(value, value)
   type Copy = Value
   type Output = Copy
-  def fold3(first: Element, second: Element, third: Element): Element =
+  def fold3(first: Output, second: Element, third: Copy): Value =
     select(select(first, second), third)
   type Branch = Value
 
@@ -407,10 +408,10 @@ trait ExternalSyntaxMonoid[A]:
   def combine(left: A, right: A): A
   type Item = A
   type Copy = Item
-  def twice(value: A): A = combine(value, value)
+  def twice(value: Item): Copy = combine(value, value)
   type Value = Copy
   type Branch = Item
-  def fold3(first: A, second: A, third: A): A =
+  def fold3(first: Value, second: A, third: Branch): Copy =
     combine(combine(first, second), third)
 
 object DelegatedThenApply:
@@ -423,7 +424,7 @@ object DelegatedThenApply:
 trait ExternalRichShow[A]:
   def show(a: A): String
   type Item = A
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Item = a
   type Copy = Item
   type Value = Copy
   type Branch = Item
@@ -440,6 +441,7 @@ trait ExternalReverseRichShow[Element]:
   type Item = Element
   type Copy = Item
   type Branch = Item
+  def choose(value: Copy): Branch = value
 
 object ExternalReverseRichShow:
   given ExternalReverseRichShow[String] with
@@ -450,10 +452,10 @@ object ExternalReverseRichShow:
 trait ExternalRichEmpty[A]:
   def empty: A
   type Item = A
-  def duplicate(value: A): A = value
+  def duplicate(value: Item): Item = value
   type Copy = Item
   type Value = Copy
-  def choose(first: A, second: A): A = first
+  def choose(first: Value, second: A): Copy = first
   type Branch = Item
 
 object ExternalRichEmpty:
@@ -468,6 +470,7 @@ trait ExternalReverseRichEmpty[Element]:
   type Item = Element
   type Copy = Item
   type Branch = Item
+  def choose(value: Copy): Branch = value
 
 object ExternalReverseRichEmpty:
   given ExternalReverseRichEmpty[String] with
@@ -649,6 +652,7 @@ object ExternalApp:
     val richEmptyBranch: richEmptyDelegated.Branch = 42
     assert(RichEmptyDelegated.empty[Int] == 42)
     assert(richEmptyDelegated.inst(42) == 42)
+    assert(richEmptyDelegated.choose(42) == 42)
     assert(summon[richEmptyDelegated.inst =:= Int](richEmptyInst) == 42)
     assert(summon[richEmptyDelegated.Copy =:= Int](richEmptyCopy) == 42)
     assert(summon[richEmptyDelegated.Value =:= Int](richEmptyValue) == 42)

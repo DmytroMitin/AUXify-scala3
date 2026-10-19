@@ -159,6 +159,17 @@ Alias names occupy only the type namespace; generated term-name freshness is
 unchanged. Accepted aliases remain inherited and are never copied into a
 companion or generated anonymous child.
 
+An inherited concrete method in those same tails may use either direct `A` or
+the direct name of an earlier fully validated A-rooted alias for each ordinary
+parameter and its result. For example, after `type Item = A; type Copy = Item`,
+`def identity(value: Item): Copy = value` is admitted. The required abstract
+primary roles still use direct `A`; a later alias cannot be referenced
+forward, and the leading abstract result member of the abstract-type
+`@instance` family is not a method-signature root. This remains normalized
+source-order validation, not semantic type equality, imported or qualified
+name resolution, or support for applied, function, union, or intersection
+types. The concrete methods and aliases remain trait-owned and inherited.
+
 Scala 2 AUXify never implemented `@poly`; its planned target was an adapter
 from an AUXify type class to Shapeless `Poly1` / `Poly2` case dispatch, where
 separate `Case.Aux` instances could select different implementations and
@@ -380,16 +391,17 @@ trait RichHasOut[A]:
   type Out
   type Item = A
   type Copy = Item
-  def identity(a: A): A = a
+  def identity(a: Item): Copy = a
   type Value = Copy
-  def pick(a: A, b: A): A = a
   type Branch = Item
+  def pick(a: Value, b: A): Branch = a
 ```
 
 The trait has exactly one invariant, ordinary, unbounded enclosing type
 parameter. Its first direct member is exactly one public, unannotated,
 monomorphic, unbounded abstract type member. Any later entries must be concrete
-public methods returning direct `A` or public monomorphic concrete aliases.
+public methods whose parameters and result use direct `A` or an earlier
+validated A-rooted alias, or public monomorphic concrete aliases.
 Each alias must target `A` or an earlier fully validated alias in the same
 source-ordered tail; those entries may interleave. The abstract result `Out`
 is not another permitted alias root.
@@ -428,9 +440,10 @@ applies it successively. The required method may be followed by zero or more
 validated inherited members. Each tail member must be either:
 
 - a public, unannotated, non-polymorphic concrete method, free of unsupported
-  modifiers, returning `A`, with either no parameter clauses or one ordinary
-  non-contextual clause of one or more non-defaulted, unmodified direct-`A`
-  parameters; or
+  modifiers, whose result and ordinary parameters use direct `A` or a direct
+  name of an earlier validated A-rooted alias, with either no parameter clauses
+  or one ordinary non-contextual clause of one or more non-defaulted,
+  unmodified parameters; or
 - a public, unannotated, monomorphic concrete type alias, free of unsupported
   modifiers and bounds, whose target is the enclosing `A` or an earlier fully
   validated concrete alias in the same source-ordered tail.
@@ -454,7 +467,7 @@ composition.
 
 Post-0.1.0 `0.2.0-SNAPSHOT` development supports a heterogeneous inherited tail after the two abstract roles. Every tail member is validated independently and must be either:
 
-- a public, unannotated, non-polymorphic concrete method, free of unsupported modifiers, returning `A`, with either no parameter clauses or one ordinary non-contextual clause of one or more non-defaulted, unmodified direct-`A` parameters; or
+- a public, unannotated, non-polymorphic concrete method, free of unsupported modifiers, whose result and ordinary parameters use direct `A` or a direct name of an earlier validated A-rooted alias, with either no parameter clauses or one ordinary non-contextual clause of one or more non-defaulted, unmodified parameters; or
 - a public, unannotated, monomorphic concrete type alias, free of unsupported modifiers and bounds, whose target is the enclosing `A` or an earlier fully validated concrete alias in the same source-ordered tail.
 
 Methods and aliases may be interleaved and multiple aliases are allowed. For example:
@@ -465,11 +478,11 @@ trait RichTypedMonoid[A]:
   def empty: A
   def combine(a: A, b: A): A
   type Item = A
-  def twice(a: A): A = combine(a, a)
   type Copy = Item
+  def twice(a: Item): Copy = combine(a, a)
   type Value = Copy
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
   type Branch = Item
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 ```
 
 The factory remains the same two-carrier, two-override factory shown above. All accepted tail members are inherited from the trait; AUXify does not inspect method bodies or copy, re-author, or lower either methods or aliases. Type-alias names remain in the type namespace and do not reserve generated term-carrier names.
@@ -642,7 +655,7 @@ def empty[A](using inst: Empty[A]): A = inst.empty
 
 Here parameterless means that the source method has no parameter clauses; `def empty(): A` is not equivalent and remains rejected. The result must be the direct enclosing type parameter. Both families require exactly one invariant, ordinary, unbounded enclosing type parameter and one public, abstract, unannotated, non-polymorphic primary method.
 
-The primary method may be followed, in source order, by any number of inherited concrete methods and concrete aliases. An admitted concrete method is public, unannotated, non-polymorphic, and modifier-free, returns the enclosing type parameter directly, and has either no parameter clauses or one ordinary non-contextual clause containing one or more named, unmodified, non-defaulted parameters of that same direct type. An admitted alias is public, unannotated, unbounded, monomorphic, and modifier-free; it targets `A` or an earlier fully validated concrete alias. Methods and aliases may be interleaved:
+The primary method may be followed, in source order, by any number of inherited concrete methods and concrete aliases. An admitted concrete method is public, unannotated, non-polymorphic, and modifier-free; each ordinary parameter and its result uses direct `A` or a direct name of an earlier fully validated A-rooted alias. It has either no parameter clauses or one ordinary non-contextual clause containing one or more named, unmodified, non-defaulted parameters. An admitted alias is public, unannotated, unbounded, monomorphic, and modifier-free; it targets `A` or an earlier fully validated concrete alias. Methods and aliases may be interleaved:
 
 ```scala
 @delegated
@@ -650,15 +663,15 @@ trait RichShow[A]:
   def show(a: A): String
   type Item = A
   type Copy = Item
-  def duplicate(a: A): A = a
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def pick(a: A, b: A): A = b
+  def pick(a: Value, b: Branch): Item = b
 ```
 
 Only `show` receives a companion forwarder. `Item`, `Copy`, `Value`, `Branch`, `duplicate`, and `pick` remain ordinary inherited members of `RichShow`; they are not copied into the companion. Concrete method and parameter names participate in evidence-binder freshness, while type-only alias names do not. A direct same-name companion member still uses the existing preserve policy.
 
-Additional abstract methods or types, vals, vars, nested definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic/modifier-bearing concrete methods, non-`A` method parameters or results, and nonconforming aliases remain rejected. This tail support is AUXify-owned additive compatibility; it is not presented as recovered Scala 2 semantics or arbitrary delegated parity.
+Additional abstract methods or types, vals, vars, nested definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic/modifier-bearing concrete methods, method parameter or result types that are neither direct `A` nor an earlier validated alias, and nonconforming aliases remain rejected. This tail support is AUXify-owned additive compatibility; it is not presented as recovered Scala 2 semantics or arbitrary delegated parity.
 
 The supported `@apply` and `@delegated` slices may be stacked in either
 source order for two disjoint closed primary families: unary
@@ -672,8 +685,8 @@ standalone `@delegated`:
 trait RichShow[A]:
   def show(a: A): String
   type Item = A
-  def duplicate(a: A): A = a
   type Copy = Item
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
 
@@ -682,8 +695,8 @@ trait RichShow[A]:
 trait RichEmpty[A]:
   def empty: A
   type Item = A
-  def duplicate(a: A): A = a
   type Copy = Item
+  def duplicate(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
 ```
@@ -767,10 +780,10 @@ remaining-argument, and evidence names are freshened deterministically.
 
 The primary method may be followed, in source order, by any number of inherited
 concrete methods and concrete aliases. Each method must be public,
-unannotated, non-polymorphic, and modifier-free, return the enclosing type
-parameter directly, and have either no parameter clauses or one ordinary
-non-contextual clause containing one or more named, unmodified, non-defaulted
-parameters of that same direct type. Each alias must be public, unannotated,
+unannotated, non-polymorphic, and modifier-free; its result and ordinary
+parameters use direct `A` or a direct name of an earlier validated A-rooted
+alias. It has either no parameter clauses or one ordinary non-contextual clause
+containing one or more named, unmodified, non-defaulted parameters. Each alias must be public, unannotated,
 unbounded, monomorphic, and modifier-free, and target `A` or an earlier fully
 validated concrete alias. Methods and aliases may be interleaved:
 
@@ -779,11 +792,11 @@ validated concrete alias. Methods and aliases may be interleaved:
 trait RichMonoid[A]:
   def combine(a: A, a1: A): A
   type Item = A
-  def inst(a: A): A = a
   type Copy = Item
+  def inst(a: Item): Copy = a
   type Value = Copy
   type Branch = Item
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 ```
 
 The generated `Monoid.syntax`-shaped module still contains exactly one
@@ -800,7 +813,8 @@ member or a nested same-name definition is not a direct term conflict.
 Classes, objects, variance or bounds, a missing or nonconforming primary
 method, additional abstract methods or types, vals, vars, lazy vals, nested
 definitions, explicit empty clauses, contextual/defaulted/curried/polymorphic
-or modifier-bearing tail methods, non-`A` tail parameter or result types, and
+or modifier-bearing tail methods, parameter or result types other than direct
+`A` or an earlier validated alias, and
 nonconforming aliases remain rejected.
 
 Simple `@apply` and this first `@syntax` slice may be stacked in either source
@@ -813,11 +827,11 @@ inherited concrete tail:
 trait RichMonoid[A]:
   def combine(a: A, b: A): A
   type Item = A
-  def twice(a: A): A = combine(a, a)
   type Copy = Item
+  def twice(a: Item): Copy = combine(a, a)
   type Value = Copy
-  def fold3(a: A, b: A, c: A): A = combine(combine(a, b), c)
   type Branch = Item
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a, b), c)
 
 @syntax
 @apply

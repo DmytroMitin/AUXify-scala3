@@ -18,11 +18,11 @@ trait RichCurriedApplyThenInstance[A]:
   def combine(a: A)(b: A): A
   type Item = A
   type Copy = Item
-  def twice(a: A): A = combine(a)(a)
+  def twice(a: Item): Copy = combine(a)(a)
   type Value = Copy
   type Branch = Item
-  def pick(first: A, second: A): A = first
-  def fold3(a: A, b: A, c: A): A = combine(combine(a)(b))(c)
+  def pick(first: A, second: Branch): Value = first
+  def fold3(a: Value, b: A, c: Branch): Copy = combine(combine(a)(b))(c)
 
 @instance
 @apply
@@ -33,6 +33,7 @@ trait RichCurriedInstanceThenApply[Element]:
   type Copy = Item
   type More = Copy
   type Branch = Item
+  def retain(value: More): Branch = value
 
 @instance
 @apply

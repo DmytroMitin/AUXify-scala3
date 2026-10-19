@@ -18,10 +18,10 @@ trait RichHasOut[A]:
   type Out
   type Item = A
   type Copy = Item
-  def identity(value: A): A = value
+  def identity(value: Item): Copy = value
   type Value = Copy
   type Branch = Item
-  def pick(first: A, second: A): A = first
+  def pick(first: A, second: Branch): Value = first
 
 @instance
 @apply
@@ -32,6 +32,7 @@ trait ReverseHasOut[Element]:
   type Copy = Item
   type More = Copy
   type Branch = Item
+  def choose(first: More, second: Element): Branch = first
 
 @apply
 @instance

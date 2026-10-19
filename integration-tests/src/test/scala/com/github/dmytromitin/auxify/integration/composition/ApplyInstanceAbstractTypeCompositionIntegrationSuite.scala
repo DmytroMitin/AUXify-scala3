@@ -60,6 +60,7 @@ class ApplyInstanceAbstractTypeCompositionIntegrationSuite extends munit.FunSuit
     assert(selected.eq(constructed))
     assert(proof("typed") == "typed")
     assert(selected.keep(42) == 42)
+    assert(selected.choose(42, 99) == 42)
     assert(summon[selected.Item =:= Int](alias) == 42)
     assert(summon[selected.Copy =:= Int](copy) == 42)
     assert(summon[selected.More =:= Int](more) == 42)

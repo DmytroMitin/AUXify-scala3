@@ -31,6 +31,7 @@ class ApplySyntaxTailCompositionIntegrationSuite extends munit.FunSuite:
 
     assertEquals(20.merge(22), 42)
     assertEquals(instance.duplicate(21), 42)
+    assertEquals(instance.choose(42), 42)
     assertEquals(summon[instance.Item =:= Int](item), 42)
     assertEquals(summon[instance.Copy =:= Int](copy), 42)
     assertEquals(summon[instance.More =:= Int](more), 42)
