@@ -66,6 +66,13 @@ verifyExternalPolicy := {
     "Quasiquotes implementation/tooling leaked onto the external runtime classpath"
   )
   require(
+    !runtimeFiles.exists(file =>
+      file.getName.startsWith("macroparadise-scala3-") &&
+        file.getName.endsWith(".jar")
+    ),
+    "Macro-Paradise compiler tooling leaked onto the external runtime classpath"
+  )
+  require(
     compileOptions.count(_ == "-Xplugin-require:macroparadise") == 1,
     "external compile must require Macro-Paradise exactly once"
   )

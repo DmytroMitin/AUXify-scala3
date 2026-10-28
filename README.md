@@ -130,7 +130,7 @@ current project READMEs for the latest development APIs.
 | Simple `@apply` for the proven `Show[A]`-style trait shape | Supported development milestone | Qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | Full `@apply` for the path-dependent/refined `Add.Out` form | Supported bounded development slice | Exactly two invariant parameters with the same simple named upper bound, one compatible abstract result type member, and optional source-ordered concrete alias chains rooted in either parameter or that abstract result; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@aux` | Supported bounded development slice | The same one-result bounded family, optionally followed by source-ordered concrete alias chains rooted in either enclosing parameter or that abstract result; generates one companion `Aux` result refinement and is qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
-| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/source-ordered alias-chain tail, (2) one public unbounded abstract type member first, followed by the same optional validated tail, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by the same optional validated tail, generating the strict `A => A => A` carrier; every alias chain is rooted only in the enclosing `A`; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
+| `@instance` | Three disjoint bounded development families | With one invariant unbounded enclosing type parameter, either (1) the existing ordered parameterless/binary abstract-method family plus its validated inherited concrete method/source-ordered alias-chain tail, (2) one public unbounded abstract type member first, followed by the same optional validated tail, generating a second factory type parameter and refined result, or (3) one public abstract curried method `def combine(a: A)(b: A): A` followed by the same optional validated tail, generating the strict `A => A => A` carrier; historical/curried tails remain rooted only in `A`, while the abstract-type-first tail may also root in its one validated required abstract member; the families are not freely mixable; qualified on exact Scala 3.3.8, Scala 3.8.4, and Scala 3.9.0 LTS with JDK 25 |
 | `@delegated` | Two disjoint bounded development families | One public abstract primary method under one invariant unbounded type parameter—either unary `show(a: A): String` or parameterless `empty: A`—optionally followed by validated inherited concrete methods and source-ordered concrete alias chains rooted only in `A`; exactly the primary method receives one companion forwarder |
 | Stacked `@apply` + `@delegated` | Two closed supported composition families with optional inherited tails | Both source orders on the exact shared one-invariant-unbounded-parameter envelope: either unary `show(a: A): String` or parameterless `empty: A`, optionally followed by the same validated heterogeneous inherited method/source-ordered alias-chain tail; binary delegated stacks remain outside this composition claim |
 | Stacked `@apply` + `@aux` | Supported bounded composition slice | Both source orders and independent direct `apply` / type `Aux` conflicts pass on the same one-abstract-result family with optional source-ordered concrete alias chains rooted in either enclosing parameter or that abstract result; both handlers consume one shared source decoder |
@@ -150,25 +150,27 @@ two-result lowering support.
 Across the three `@instance` families, both `@delegated` families, `@syntax`,
 and every documented `@apply` composition with those families, an inherited
 concrete alias may target the enclosing type parameter `A` or an earlier fully
-validated concrete alias in the same source-ordered tail. Thus `type Item = A;
-type Copy = Item` is admitted, while forward references, self references,
-cycles, missing or unrelated names, and references to an abstract result member
-such as `Out` are rejected at the offending alias. This is a bounded syntactic
-one-owner forest, not semantic alias resolution or general alias parity.
-Alias names occupy only the type namespace; generated term-name freshness is
-unchanged. Accepted aliases remain inherited and are never copied into a
-companion or generated anonymous child.
+validated concrete alias in the same source-ordered tail. In the one
+abstract-type-first `@instance` family, the validated required abstract type
+member is also a permitted direct root: `type Copy = Out; type Again = Copy`.
+That permission follows the actual member name, including renamed `Result` or
+`Output`. Historical/curried `@instance`, both `@delegated` variants and
+`@syntax` remain purely A-rooted.
 
-An inherited concrete method in those same tails may use either direct `A` or
-the direct name of an earlier fully validated A-rooted alias for each ordinary
-parameter and its result. For example, after `type Item = A; type Copy = Item`,
-`def identity(value: Item): Copy = value` is admitted. The required abstract
-primary roles still use direct `A`; a later alias cannot be referenced
-forward, and the leading abstract result member of the abstract-type
-`@instance` family is not a method-signature root. This remains normalized
-source-order validation, not semantic type equality, imported or qualified
-name resolution, or support for applied, function, union, or intersection
-types. The concrete methods and aliases remain trait-owned and inherited.
+Forward references, self references, cycles and missing or unrelated names
+remain rejected. Alias names occupy only the type namespace; generated
+term-name freshness is unchanged. Accepted aliases remain inherited and are
+never copied into a companion or generated anonymous child.
+
+An inherited concrete method in those tails may use direct `A` or an earlier
+fully validated A-rooted alias for each ordinary parameter and its result.
+The abstract-type-first `@instance` family additionally admits its direct
+required abstract member and earlier aliases rooted in it, including mixed
+A/Out signatures. The required abstract primary method roles in the other
+families still use their established direct-`A` shapes. This is normalized,
+source-order syntactic validation: imported or qualified name resolution and
+applied, function, union or intersection types remain unsupported. The concrete
+methods and aliases stay trait-owned and inherited.
 
 Scala 2 AUXify never implemented `@poly`; its planned target was an adapter
 from an AUXify type class to Shapeless `Poly1` / `Poly2` case dispatch, where
@@ -390,21 +392,25 @@ tail:
 trait RichHasOut[A]:
   type Out
   type Item = A
-  type Copy = Item
-  def identity(a: Item): Copy = a
-  type Value = Copy
-  type Branch = Item
-  def pick(a: Value, b: A): Branch = a
+  type Copy = Out
+  type CopyAgain = Copy
+  def identityOut(value: Copy): CopyAgain = value
+  def directOut(value: Out): Out = value
+  type OutBranch = Out
+  type ItemCopy = Item
+  def identityA(value: ItemCopy): Item = value
 ```
 
 The trait has exactly one invariant, ordinary, unbounded enclosing type
 parameter. Its first direct member is exactly one public, unannotated,
 monomorphic, unbounded abstract type member. Any later entries must be concrete
-public methods whose parameters and result use direct `A` or an earlier
-validated A-rooted alias, or public monomorphic concrete aliases.
-Each alias must target `A` or an earlier fully validated alias in the same
-source-ordered tail; those entries may interleave. The abstract result `Out`
-is not another permitted alias root.
+public monomorphic methods whose ordinary parameters and result use direct
+`A`, the one validated abstract member, or an earlier validated alias rooted
+in either. Public monomorphic concrete aliases may target those same direct
+roots or earlier validated aliases. Methods and aliases may interleave in
+source order. A concrete method may have no parameter clauses or one ordinary
+nonempty clause; contextual, defaulted, empty-parentheses and curried tail
+methods remain unsupported. No second abstract role is admitted.
 
 The generated second type-parameter name skips occupied source type names,
 including inherited alias names. Only the required abstract member's concrete
@@ -537,10 +543,8 @@ semantics are preserved. A direct companion `apply` suppresses only generated
 `apply`; a direct companion `instance` suppresses only generated `instance`.
 
 The post-0.1.0 abstract-type-member factory family is also qualified with
-simple `@apply` in both source orders. Its no-tail and inherited-tail core
-generation already composed before this qualification; current coverage makes
-that existing behavior explicit and closes the claimed family to exactly the
-two handled participants:
+simple `@apply` in both source orders, including its A/Out-rooted inherited
+tail. The admitted cohort remains exactly these two handled participants:
 
 ```scala
 @apply
@@ -548,31 +552,38 @@ two handled participants:
 trait RichHasOut[A]:
   type Out
   type Item = A
-  type Copy = Item
-  def identity(value: A): A = value
-  type Value = Copy
-  def pick(first: A, second: A): A = first
-  type Branch = Item
+  type Copy = Out
+  type CopyAgain = Copy
+  def identityOut(value: Copy): CopyAgain = value
+  def directOut(value: Out): Out = value
+  type ItemCopy = Item
+  def identityA(value: ItemCopy): Item = value
 
 val constructed: RichHasOut[Int] { type Out = String } =
   RichHasOut.instance[Int, String]
-val proof: constructed.Out =:= String = summon
+val outProof: constructed.Out =:= String = summon
+val copyProof: constructed.Copy =:= String = summon
+val againProof: constructed.CopyAgain =:= String = summon
+val itemProof: constructed.Item =:= Int = summon
+assert(constructed.identityOut("typed") == "typed")
+assert(constructed.directOut("value") == "value")
+assert(constructed.identityA(42) == 42)
+
 given RichHasOut[Int] = constructed
 val selected: RichHasOut[Int] = RichHasOut[Int]
 assert(selected.eq(constructed))
-assert(selected.identity(42) == 42)
-val item: selected.Item = 42
-summon[selected.Item =:= Int]
+val selectedCopyProof: selected.Copy =:= selected.Out = summon
+val selectedItemProof: selected.Item =:= Int = summon
 ```
 
 The factory retains its refined static result and authors exactly the required
-`type Out = Out0` implementation in one anonymous child; optional concrete
-methods and one-owner alias chains remain inherited. The independent simple
-`apply[A]` accessor still returns `RichHasOut[A]`, so `selected.Out` remains
-abstract at that plain result type. Stacking does not widen `apply` to preserve
-the factory refinement. Generated type-binder freshness skips occupied source
-type names but correctly ignores same-spelling term members in Scala's separate
-term namespace.
+`type Out = Out0` implementation in one anonymous child. Concrete methods and
+alias chains remain inherited. The independent simple `apply[A]` accessor
+still returns `RichHasOut[A]`: although the runtime object is the same,
+`selected.Out` remains abstract at that plain static type, so there is no
+`selected.Out =:= String` witness. Stacking does not alter the simple apply
+signature. Generated type-binder freshness skips inherited alias names such as
+`Out0` and `Out1`, while same-spelling terms remain in their separate namespace.
 
 An unsupported `@instance` body remains a controlled rejection even though the
 same enclosing trait is admissible to simple `@apply`; the source-ordered

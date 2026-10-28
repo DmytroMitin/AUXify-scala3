@@ -89,18 +89,45 @@ private[internal] object InstanceAbstractTypeMemberSourceShapeDecoder:
             members.headOption.map(_.pos).getOrElse(direct.pos)
           )
       _ <- eligibleMember(traitName, member)
+      _ <-
+        if member.name == direct.name then Right(())
+        else
+          unsupported(
+            traitName,
+            s"normalized direct type member `${member.name}` at body index 0 must match actual direct type member `${direct.name}`",
+            member.pos
+          )
+      _ <-
+        if member.name != enclosing.name then Right(())
+        else
+          unsupported(
+            traitName,
+            s"abstract type member `${member.name}` must not duplicate the enclosing type parameter",
+            member.pos
+          )
       _ <- InstanceInheritedConcreteTailValidator.validate(
         traitName,
         enclosing.name,
         tail,
         firstBodyIndex = 1,
         typeStructureView = Some(typeStructureView),
-        diagnosticAnnotation = "@instance"
+        diagnosticAnnotation = "@instance",
+        permittedRequiredAbstractRoot = Some(member.name)
       )
       tailAliasIndices = tail.zipWithIndex.collect {
         case (tailMember, offset) if tailMember.kind == DirectMemberKind.Type =>
           1 + offset
       }.toSet
+      _ <- typeStructureView.directTypeMembers.find(value =>
+        value.bodyIndex != 0 && !tailAliasIndices.contains(value.bodyIndex)
+      ) match
+        case None => Right(())
+        case Some(value) =>
+          unsupported(
+            traitName,
+            s"normalized direct type member `${value.name}` at body index ${value.bodyIndex} must correspond to an actual direct type member",
+            value.pos
+          )
       tailAliasNames = typeStructureView.directTypeMembers.collect {
         case value
             if tailAliasIndices.contains(value.bodyIndex) &&

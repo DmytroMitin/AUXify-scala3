@@ -338,6 +338,11 @@ for source_pattern in \
 
   [[ "$batch_status" -ne 0 ]] ||
     fail "negativeInstanceUnsupported batch $source_pattern compiled successfully; unsupported instance shapes were admitted"
+  instance_batch_classes="$product_root/negative-instance-unsupported/target/scala-$scala_version/classes"
+  if [[ -d "$instance_batch_classes" ]] && find "$instance_batch_classes" -type f \
+    \( -name '*.class' -o -name '*.tasty' \) -print -quit | grep -q .; then
+    fail "instance rejection batch $source_pattern left partial class or TASTy output"
+  fi
 done
 
 printf '%s\n' '--- controlled instance source-shape diagnostics ---'
@@ -884,6 +889,36 @@ grep -Eq 'ApplyAuxAliasMutualChain\.scala:10:[0-9]+' "$type_member_modifier_nega
 grep -Eq 'AuxApplyAliasMissingAfterValidChain\.scala:11:[0-9]+' "$type_member_modifier_negative_log" ||
   fail "missing type-member diagnostic position for AuxApplyAliasMissingAfterValidChain"
 printf '%s\n' 'AUXIFY_SCALA3_CURRENT_PUBLIC_TYPE_MEMBER_MODIFIER_HARDENING_PASS'
+
+
+# Abstract-root authority belongs only to the abstract-type-first instance route.
+for pair in \
+  "$instance_negative_log|HistoricalOutAlias" \
+  "$instance_negative_log|HistoricalOutMethod" \
+  "$instance_negative_log|CurriedOutAlias" \
+  "$instance_negative_log|CurriedOutMethod" \
+  "$delegated_negative_log|UnaryOutAlias" \
+  "$delegated_negative_log|UnaryOutMethod" \
+  "$delegated_negative_log|ParameterlessOutAlias" \
+  "$delegated_negative_log|ParameterlessOutMethod" \
+  "$syntax_negative_log|SyntaxOutAlias" \
+  "$syntax_negative_log|SyntaxOutMethod" \
+  "$instance_negative_log|TypeMemberOutForward" \
+  "$instance_negative_log|TypeMemberOutQualified" \
+  "$instance_negative_log|TypeMemberOutLateInvalid"; do
+  log_path="${pair%|*}"
+  source_name="${pair##*|}"
+  grep -Eq "$source_name[.]scala:[0-9]+:[0-9]+" "$log_path" ||
+    fail "abstract-root isolation negative is not source-positioned: $source_name"
+  grep -Fq "source shape for \`$source_name\`: inherited concrete" "$log_path" ||
+    fail "abstract-root isolation negative omitted controlled tail diagnostic: $source_name"
+done
+for position in 'TypeMemberOutRootAlias.scala:8:7' 'TypeMemberOutMethod.scala:8:22' \
+  'TypeMemberOutLateInvalid.scala:11:6' 'TypeMemberOutForward.scala:8:7' \
+  'TypeMemberOutQualified.scala:8:7'; do
+  grep -Fq "$position" "$instance_negative_log" ||
+    fail "abstract-root negative omitted exact source position: $position"
+done
 
 external_root="$(mktemp -d "${TMPDIR:-/tmp}/auxify-external-consumer.XXXXXX")"
 cp -R "$product_root/qualification/external-consumer/." "$external_root"

@@ -480,6 +480,7 @@ object ExternalApp:
   def main(args: Array[String]): Unit =
     ApplySyntaxExternalProof.verify()
     ApplyInstanceAbstractTypeExternalProof.verify()
+    AbstractRootExternalProof.verify()
     ApplyInstanceCurriedExternalProof.verify()
 
     val output: HasOut[Int] { type Out = String } =

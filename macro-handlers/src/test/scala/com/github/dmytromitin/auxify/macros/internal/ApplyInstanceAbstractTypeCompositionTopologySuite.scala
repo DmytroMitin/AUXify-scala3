@@ -42,6 +42,7 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
           val applyMethod = terms.find(_.name == termName("apply")).getOrElse(fail("missing apply"))
           val instanceMethod = terms.find(_.name == termName("instance")).getOrElse(fail("missing instance"))
           assertEquals(applyMethod.leadingTypeParams.map(_.name.toString), List("A"))
+          assert(applyMethod.tpt.isInstanceOf[AppliedTypeTree], clue(applyMethod.tpt))
           assertEquals(instanceMethod.leadingTypeParams.map(_.name.toString), List("A", "Out0"))
           instanceMethod.tpt match
             case refinement: RefinedTypeTree =>
@@ -73,7 +74,7 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
       """@current
         |trait Collision[Element]:
         |  type Result
-        |  type Result0 = Element
+        |  type Result0 = Result
         |  type Result1 = Element
         |  def Result2(value: Element): Element = value
         |""".stripMargin
@@ -139,6 +140,7 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
           case method: DefDef if Set("apply", "instance").contains(method.name.toString) =>
             method.name.toString -> method
         }.toMap
+        val originalBody = companion.toList.flatMap(_.impl.body)
         val output = runComposition(
           primary,
           companion,
@@ -148,6 +150,12 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
         )
         val methods = output.companion.toList.flatMap(_.impl.body).collect {
           case method: DefDef if Set("apply", "instance").contains(method.name.toString) => method
+        }
+        val retainedBody = output.companion.toList.flatMap(_.impl.body)
+          .filter(tree => originalBody.exists(_.eq(tree)))
+        assertEquals(retainedBody.size, originalBody.size, clue(order))
+        retainedBody.zip(originalBody).foreach { (retained, original) =>
+          assert(retained.eq(original), clue(order))
         }
         assertEquals(methods.count(_.name == termName("apply")), 1, clue(order))
         assertEquals(methods.count(_.name == termName("instance")), 1, clue(order))
@@ -284,7 +292,7 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
        |  type Out
        |  type Item = A
        |  def identity(value: A): A = value
-       |  type Copy = Item
+       |  type Copy = Out
        |  type Value = Copy
        |  def pick(first: A, second: A): A = first
        |  type Branch = Item
@@ -308,6 +316,8 @@ class ApplyInstanceAbstractTypeCompositionTopologySuite extends munit.FunSuite:
     s"""@current
        |trait $className[A]:
        |  type Out
+       |  type Copy = Out
+       |  def identity(value: Copy): Out = value
        |
        |object $className:
        |  val retained = 1

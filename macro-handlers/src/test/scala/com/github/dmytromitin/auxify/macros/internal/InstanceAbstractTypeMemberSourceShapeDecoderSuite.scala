@@ -85,7 +85,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
-  test("admits alias chains rooted in the enclosing parameter but not the abstract result") {
+  test("admits alias chains rooted in the enclosing parameter and the abstract result") {
     val decoded = decode(
       """trait AbstractTypeAliasChain[Element]:
         |  type Result
@@ -102,17 +102,17 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     assertEquals(decoded.generatedTypeParameterName, "Result0")
   }
 
-  test("rejects the leading abstract result as an inherited method type root") {
+  test("rejects an unrelated inherited method type root") {
     assertRejected(
       decodeEither(
         """trait AbstractResultMethod[A]:
           |  type Out
-          |  def identity(value: Out): Out = value
+          |  def identity(value: Missing): Out = ???
           |""".stripMargin,
         "AbstractResultMethod"
       ),
       "AbstractResultMethod",
-      "inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias"
+      "inherited concrete method `identity` parameter `value` must use enclosing type parameter `A` or an earlier validated concrete alias or required abstract type member `Out`"
     )
   }
 
@@ -130,7 +130,7 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
     )
   }
 
-  test("admits alias-typed inherited methods without admitting the abstract result root") {
+  test("admits alias-typed inherited methods alongside the abstract result root") {
     val decoded = decode(
       """trait AbstractAliasMethods[Element]:
         |  type Result
@@ -466,16 +466,16 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
 
   private val rejectedTailSources = List(
     (
-      "abstract result as alias root",
-      "trait AbstractResultRoot[A]:\n  type Out\n  type Item = Out\n",
+      "unrelated name as alias root",
+      "trait AbstractResultRoot[A]:\n  type Out\n  type Item = Missing\n",
       "AbstractResultRoot",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias or required abstract type member `Out`"
     ),
     (
       "wrong alias target",
       "trait WrongAliasTail[A]:\n  type Out\n  type Item = String\n",
       "WrongAliasTail",
-      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias"
+      "inherited concrete type alias `Item` must target enclosing type parameter `A` or an earlier validated concrete alias or required abstract type member `Out`"
     ),
     (
       "bounded alias",
@@ -577,13 +577,13 @@ class InstanceAbstractTypeMemberSourceShapeDecoderSuite extends munit.FunSuite:
       "wrong method parameter",
       "trait WrongParameterTail[A]:\n  type Out\n  def other(a: String): A = ???\n",
       "WrongParameterTail",
-      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias"
+      "inherited concrete method `other` parameter `a` must use enclosing type parameter `A` or an earlier validated concrete alias or required abstract type member `Out`"
     ),
     (
       "wrong method result",
       "trait WrongResultTail[A]:\n  type Out\n  def other(a: A): String = ???\n",
       "WrongResultTail",
-      "inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias"
+      "inherited concrete method `other` result type must use enclosing type parameter `A` or an earlier validated concrete alias or required abstract type member `Out`"
     ),
     (
       "late invalid member",

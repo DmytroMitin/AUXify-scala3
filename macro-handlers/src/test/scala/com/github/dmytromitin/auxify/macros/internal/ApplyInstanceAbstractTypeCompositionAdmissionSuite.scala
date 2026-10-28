@@ -133,6 +133,6 @@ class ApplyInstanceAbstractTypeCompositionAdmissionSuite extends munit.FunSuite:
        |  type Out
        |  type Item = A
        |  def identity(value: A): A = value
-       |  type Value = A
+       |  type Value = Out
        |  def pick(first: A, second: A): A = first
        |""".stripMargin
