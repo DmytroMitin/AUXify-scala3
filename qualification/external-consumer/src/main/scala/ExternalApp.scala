@@ -478,6 +478,7 @@ object ExternalReverseRichEmpty:
 
 object ExternalApp:
   def main(args: Array[String]): Unit =
+    ledger.LedgerWorkflow.verify()
     ApplySyntaxExternalProof.verify()
     ApplyInstanceAbstractTypeExternalProof.verify()
     AbstractRootExternalProof.verify()

@@ -101,6 +101,15 @@ External library users who want only released AUXify should use the public
 contributors importing current `0.2.0-SNAPSHOT` development; it does not make
 current `main` available from Maven Central.
 
+### A coherent development consumer
+
+The [small ledger walkthrough](docs/real-consumer-workflow.md) combines the
+supported factories, binary syntax, forwarding and dependent result types in a
+separately compiled calculation. It includes copyable sources, observable
+results and the canonical three-line run command. It uses the pinned source-built
+`0.2.0-SNAPSHOT` development graph; the public `0.1.0` quick start above remains
+separate.
+
 ## Talk
 
 **Can Scala 3 Have Macro Annotations Again? Rebuilding Macro Paradise** was
