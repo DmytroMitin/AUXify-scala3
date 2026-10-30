@@ -236,6 +236,9 @@ changes remain on the distinct post-release
 `main` line and do not widen, rebase, or
 rewrite the 0.1.0 release or the public Giter8 starter.
 
+The [published 0.1.0 compatibility baseline](docs/public-v0.1.0-compatibility.md)
+records the fresh public smoke and its bounded comparison with development.
+
 For a supported generic trait such as:
 
 ```scala
